@@ -5,13 +5,14 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { WebSocketServer, WebSocket } from "ws";
 import { World } from "./server/game/world.js";
-import { CONFIG as C } from "./shared/config.js";
+import { CONFIG as C, SPECIES, PROTOCOL } from "./shared/config.js";
 const root = path.dirname(fileURLToPath(import.meta.url));
 const mime = {
   ".html": "text/html",
   ".js": "text/javascript",
   ".css": "text/css",
   ".glb": "model/gltf-binary",
+  ".png": "image/png",
 };
 const vendors = {
   "/vendor/babylon.js": "node_modules/babylonjs/babylon.js",
@@ -46,6 +47,7 @@ export function createGameServer() {
       res.writeHead(200, {
         "Content-Type": mime[path.extname(file)] || "application/octet-stream",
         "X-Content-Type-Options": "nosniff",
+        "Cache-Control": "no-cache",
       });
       res.end(data);
     } catch {
@@ -84,10 +86,20 @@ export function createGameServer() {
         }
         const name =
           typeof m.name === "string" ? m.name.trim().slice(0, 18) : "";
-        room.addPlayer(socket.id, name || "Little fish");
+        room.addPlayer(
+          socket.id,
+          name || "Little fish",
+          SPECIES.includes(m.species) ? m.species : undefined,
+        );
         socket.room = key;
         clearTimeout(joinTimeout);
-        socket.send(JSON.stringify({ type: "WELCOME", id: socket.id }));
+        socket.send(
+          JSON.stringify({
+            type: "WELCOME",
+            id: socket.id,
+            protocol: PROTOCOL,
+          }),
+        );
       }
       if (m.type === "INPUT" && socket.room) {
         rooms.get(socket.room)?.setInput(socket.id, m);

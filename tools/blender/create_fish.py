@@ -1,18 +1,21 @@
 """Rebuild our original stylized fish with Blender's bundled Python.
-Run: blender --background --factory-startup --python tools/blender/create_fish.py
+Run: blender --background --factory-startup --python tools/blender/create_fish.py [-- kinds... | -- --thumbnails-only kinds...]
+Without kinds every species is built. --thumbnails-only re-renders menu thumbnails from the saved .blend files.
 Authoring coordinates below are X right, Y up, Z forward; convert to Blender Z up.
 """
 import bpy
 import math
-import json
+import sys
 from pathlib import Path
 from mathutils import Vector
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / 'client/assets/models'
+THUMBS = ROOT / 'client/assets/thumbs'
 SOURCE = ROOT / 'assets/blender'
 DOCS = ROOT / 'docs'
-for path in [OUT, SOURCE, DOCS]: path.mkdir(parents=True, exist_ok=True)
+for path in [OUT, THUMBS, SOURCE, DOCS]: path.mkdir(parents=True, exist_ok=True)
+KINDS = ['clownfish', 'blue-tang', 'pufferfish', 'angelfish', 'goldfish', 'betta', 'shark']
 
 def vec(p): return Vector((p[0], -p[2], p[1]))
 def mat(name, color, rough=.4):
@@ -65,6 +68,10 @@ def body(parent, scale, materials, kind):
                 dist=min(abs(z-.69),abs(z+.04),abs(z+.72))
                 index=1 if dist<.09 else 2 if dist<.135 else 0
             elif kind=='pufferfish' and math.sin(a)<-.24: index=1
+            elif kind=='angelfish' and min(abs(z-.42),abs(z+.02),abs(z+.46))<.075: index=1
+            elif kind=='goldfish' and math.sin(a)<-.6: index=1
+            elif kind=='betta' and math.sin(a)>.8: index=1
+            elif kind=='shark' and math.sin(a)<-.3: index=1
             indices.append(index)
     obj=mesh('Body',vertices,faces,materials[0],parent)
     for m in materials[1:]:obj.data.materials.append(m)
@@ -130,8 +137,12 @@ def build(kind):
     orange=mat('Tangerine',(1,.24,.025));gold=mat('Honey',(1,.62,.08))
     blue=mat('Lagoon',(.025,.32,.9));navy=mat('Midnight',(.015,.045,.16))
     mint=mat('Seafoam',(.27,.68,.40));spot=mat('Freckles',(.065,.25,.16))
+    silver=mat('Moonlight',(.62,.70,.78),.35);marigold=mat('Marigold',(1,.42,.03))
+    garnet=mat('Garnet',(.55,.02,.07),.35);violet=mat('Amethyst',(.30,.05,.55),.35)
+    slate=mat('Slate',(.22,.29,.36),.45)
     root=bpy.data.objects.new(kind,None);bpy.context.collection.objects.link(root)
     root['forward']='+Z in glTF';root['style']='Original Fishtank stylized fish'
+    tailshapes=None;rays=None;raymat=None;tailthickness=.035
     if kind=='clownfish':
         body(root,(.43,.59,1.06),[orange,cream,dark],kind)
         eyes(root,.32,.16,.73,cream,dark,gold)
@@ -140,7 +151,7 @@ def build(kind):
         for side in [-1,1]:
             fin('Pectoral',[(side*.33,-.08,.45),(side*.72,-.30,.05),(side*.61,-.38,-.24),(side*.36,-.15,-.22)],gold,dark,root,.016)
         line('Smile',[(-.12,-.13,1.027),(0,-.16,1.058),(.12,-.13,1.027)],dark,root,.015)
-        tailmat=orange;edge=dark;tailheight=.51
+        tailmat=orange;edge=dark;tailheight=.51;raymat=cream
     elif kind=='blue-tang':
         body(root,(.31,.66,1.02),[blue],kind)
         eyes(root,.235,.23,.70,cream,dark,gold)
@@ -152,7 +163,7 @@ def build(kind):
         fin('Sail ventral',[(0,-.36,.5),(0,-.82,-.03),(0,-.62,-.60),(0,-.2,-.92)],blue,navy,root)
         line('Smile',[(-.085,-.075,.998),(0,-.11,1.027),(.085,-.075,.998)],dark,root)
         tailmat=gold;edge=navy;tailheight=.55
-    else:
+    elif kind=='pufferfish':
         body(root,(.77,.77,.90),[mint,cream],kind)
         eyes(root,.39,.27,.67,cream,dark,gold)
         for side in [-1,1]:
@@ -171,11 +182,64 @@ def build(kind):
         sphere('Muzzle',(0,-.025,.865),(.18,.135,.09),cream,root)
         sphere('Mouth',(0,-.035,.946),(.07,.065,.016),dark,root)
         tailmat=gold;edge=orange;tailheight=.32
+    elif kind=='angelfish':
+        # Tall, thin disc with black bars and sail fins trailing gold streamers.
+        body(root,(.20,.76,.82),[silver,dark],kind)
+        eyes(root,.15,.20,.50,cream,dark,gold)
+        fin('Sail dorsal',[(0,.52,.36),(0,1.18,-.12),(0,1.05,-.55),(0,.36,-.66)],silver,dark,root,.03)
+        fin('Sail ventral',[(0,-.48,.32),(0,-1.12,-.16),(0,-.98,-.56),(0,-.32,-.66)],silver,dark,root,.03)
+        for side in [-1,1]:
+            fin('Pectoral',[(side*.17,-.04,.34),(side*.46,-.20,.05),(side*.36,-.28,-.14)],gold,dark,root,.014)
+            line('Streamer',[(side*.07,-.36,.28),(side*.11,-1.15,-.05)],gold,root,.012)
+        line('Smile',[(-.07,-.10,.80),(0,-.13,.825),(.07,-.10,.80)],dark,root,.012)
+        tailmat=silver;edge=dark;tailheight=.50
+    elif kind=='goldfish':
+        # Plump body, cream belly, big flowing double fantail.
+        body(root,(.50,.56,.90),[marigold,cream],kind)
+        eyes(root,.38,.17,.62,cream,dark,gold)
+        fin('Dorsal',[(0,.46,.42),(0,.86,.04),(0,.74,-.40),(0,.42,-.70)],marigold,orange,root)
+        fin('Ventral',[(0,-.44,.05),(0,-.78,-.30),(0,-.48,-.56)],marigold,orange,root)
+        for side in [-1,1]:
+            fin('Pectoral',[(side*.42,-.10,.35),(side*.85,-.30,-.05),(side*.70,-.42,-.30),(side*.45,-.20,-.20)],marigold,orange,root,.016)
+        line('Smile',[(-.10,-.12,.88),(0,-.15,.91),(.10,-.12,.88)],dark,root,.013)
+        tailmat=marigold;edge=orange;tailheight=.72
+        tailthickness=.018
+        tailshapes=[[(s*.06,.10,-.83),(s*.22,.58,-1.30),(s*.30,.74,-1.52),(s*.36,.50,-1.74),(s*.30,.14,-1.40),(s*.30,-.14,-1.40),(s*.36,-.50,-1.74),(s*.30,-.74,-1.52),(s*.22,-.58,-1.30),(s*.06,-.10,-.83)] for s in [-1,1]]
+        rays=[[(s*.08,0,-.90),(s*.30,i*.30,-1.46)] for s in [-1,1] for i in [-1,0,1]]
+    elif kind=='betta':
+        # Slender fighting fish with a violet sheen and huge veil fins.
+        body(root,(.30,.42,1.00),[garnet,violet],kind)
+        eyes(root,.22,.15,.72,cream,dark,gold)
+        fin('Veil dorsal',[(0,.34,.30),(0,.94,-.05),(0,1.04,-.55),(0,.74,-1.00),(0,.24,-.76)],violet,garnet,root,.03)
+        fin('Veil anal',[(0,-.30,.36),(0,-.94,.06),(0,-1.08,-.50),(0,-.70,-1.00),(0,-.20,-.80)],violet,garnet,root,.03)
+        for side in [-1,1]:
+            fin('Pectoral',[(side*.28,-.05,.45),(side*.70,-.25,.10),(side*.55,-.35,-.20),(side*.30,-.12,-.20)],violet,garnet,root,.015)
+            line('Pelvic streamer',[(side*.10,-.34,.30),(side*.14,-.95,-.05)],violet,root,.018)
+        line('Smile',[(-.09,-.10,.97),(0,-.13,1.00),(.09,-.10,.97)],dark,root,.012)
+        tailmat=violet;edge=garnet;tailheight=.85
+        tailshapes=[[(0,.12,-.83),(0,.85,-1.30),(0,.95,-1.75),(0,0,-1.90),(0,-.95,-1.75),(0,-.85,-1.30),(0,-.12,-.83)]]
+        rays=[[(.039,0,-.91),(.039,i*.34,-1.62)] for i in [-2,-1,0,1,2]]
+    else:
+        # Sleek grey shark: swept fins, gill slits, a wide grin and a crescent tail.
+        body(root,(.34,.40,1.08),[slate,cream],kind)
+        eyes(root,.26,.12,.70,cream,dark,dark)
+        fin('Dorsal',[(0,.35,.25),(0,.98,-.35),(0,.62,-.42),(0,.30,-.45)],slate,dark,root)
+        fin('Second dorsal',[(0,.20,-.70),(0,.42,-.90),(0,.14,-.92)],slate,dark,root,.025)
+        for side in [-1,1]:
+            fin('Pectoral',[(side*.30,-.10,.30),(side*.95,-.35,-.20),(side*.90,-.40,-.45),(side*.35,-.15,-.15)],slate,dark,root,.02)
+            fin('Pelvic',[(side*.15,-.35,-.35),(side*.35,-.55,-.60),(side*.20,-.36,-.65)],slate,dark,root,.015)
+            for i in range(3):
+                line('Gill',[(side*.335,.12,.36-i*.09),(side*.34,-.10,.34-i*.09)],dark,root,.008)
+        line('Grin',[(-.20,-.20,.85),(0,-.25,.98),(.20,-.20,.85)],dark,root,.014)
+        tailmat=slate;edge=dark;tailheight=.60
+        tailshapes=[[(0,.10,-.83),(0,.78,-1.55),(0,.62,-1.62),(0,.05,-1.25),(0,-.45,-1.50),(0,-.55,-1.45),(0,-.10,-.83)]]
+        rays=[]
     # Keep tail pivot local to its attachment for exported swim animation.
     tail=bpy.data.objects.new('Tail',None);bpy.context.collection.objects.link(tail);tail.parent=root
-    fin('Tail fan',[(0,.12,-.83),(0,tailheight,-1.50),(0,.12,-1.43),(0,-tailheight,-1.50),(0,-.12,-.83)],tailmat,edge,tail)
-    for i in [-2,-1,0,1,2]:
-        line('Fin ray',[(.039,0,-.91),(.039,i*tailheight*.40,-1.42)],cream if kind=='clownfish' else edge,tail,.008)
+    for shape in tailshapes or [[(0,.12,-.83),(0,tailheight,-1.50),(0,.12,-1.43),(0,-tailheight,-1.50),(0,-.12,-.83)]]:
+        fin('Tail fan',shape,tailmat,edge,tail,tailthickness)
+    if rays is None: rays=[[(.039,0,-.91),(.039,i*tailheight*.40,-1.42)] for i in [-2,-1,0,1,2]]
+    for points in rays: line('Fin ray',points,raymat or edge,tail,.008)
     static=merge_parts(root,'BodyMesh');tailmesh=merge_parts(tail,'TailMesh')
     # Move pivot without moving its geometry in world space.
     tail.location=vec((0,0,-.85));tailmesh.location=-tail.location
@@ -191,7 +255,15 @@ def build(kind):
     studio(scene)
     bpy.ops.wm.save_as_mainfile(filepath=str(SOURCE/f'{kind}.blend'))
     scene.render.filepath=str(DOCS/f'{kind}.png');bpy.ops.render.render(write_still=True)
+    thumbnail(kind)
     return kind
+
+def thumbnail(kind):
+    # Small transparent render for the species picker in the menu.
+    scene=bpy.context.scene
+    scene.render.resolution_percentage=24
+    scene.render.filepath=str(THUMBS/f'{kind}.png');bpy.ops.render.render(write_still=True)
+    scene.render.resolution_percentage=100
 
 def studio(scene):
     scene.render.engine='CYCLES';scene.cycles.samples=32;scene.cycles.use_denoising=True
@@ -210,5 +282,13 @@ def studio(scene):
     scene.render.image_settings.file_format='PNG'
     scene.render.film_transparent=True
 
-for kind in ['clownfish','blue-tang','pufferfish']:build(kind)
-print('FISHTANK: Three Blender sources, GLBs, and previews exported.')
+args=sys.argv[sys.argv.index('--')+1:] if '--' in sys.argv else []
+kinds=[a for a in args if a in KINDS] or KINDS
+if '--thumbnails-only' in args:
+    for kind in kinds:
+        bpy.ops.wm.open_mainfile(filepath=str(SOURCE/f'{kind}.blend'))
+        thumbnail(kind)
+    print(f'FISHTANK: Thumbnails rendered for {", ".join(kinds)}.')
+else:
+    for kind in kinds:build(kind)
+    print(f'FISHTANK: Built {", ".join(kinds)} (Blender sources, GLBs, previews, thumbnails).')

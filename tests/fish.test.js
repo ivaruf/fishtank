@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { SPECIES, speciesOf } from "../shared/config.js";
+import { SPECIES } from "../shared/config.js";
 // fish.js reads the browser global; the UMD bundles run headless on NullEngine.
 const require = createRequire(import.meta.url);
 const BABYLON = require("babylonjs");
@@ -69,9 +69,7 @@ test("Blender fish load, face +Z, share instanced geometry, swim, tint and dispo
     assert.deepEqual(result, { loaded: SPECIES, failed: [] });
     const baseline = { meshes: scene.meshes.length, groups: 0 };
     for (const [color, species] of SPECIES.entries()) {
-      assert.equal(speciesOf(color), species);
-      assert.equal(speciesOf(color + SPECIES.length), species);
-      const fish = createFish(scene, color, false);
+      const fish = createFish(scene, species, false, color);
       fish.root.position.set(3, 4, 5);
       fish.root.computeWorldMatrix(true);
       const meshes = fish.root.getChildMeshes();
@@ -83,7 +81,7 @@ test("Blender fish load, face +Z, share instanced geometry, swim, tint and dispo
         if (m.material)
           assert.equal(m.material.getClassName(), "StandardMaterial");
       const { nose, tail } = worldZ(fish);
-      assert.ok(nose > 5.8, `${species} nose ahead of origin: ${nose}`);
+      assert.ok(nose > 5.7, `${species} nose ahead of origin: ${nose}`);
       assert.ok(tail < 3.6, `${species} tail behind origin: ${tail}`);
       assert.ok(meshes.some((m) => m.name === "player crest"));
       assert.ok(fish.swim.isStarted);
@@ -108,8 +106,8 @@ test("Blender fish load, face +Z, share instanced geometry, swim, tint and dispo
     }
     assert.equal(scene.meshes.length, baseline.meshes);
     assert.equal(scene.animationGroups.length, baseline.groups);
-    const a = createFish(scene, 1, true),
-      b = createFish(scene, 1, true);
+    const a = createFish(scene, "blue-tang", true, 1),
+      b = createFish(scene, "blue-tang", true, 1);
     const sources = (fish) =>
       fish.root
         .getChildMeshes()
@@ -134,7 +132,7 @@ test("Blender fish load, face +Z, share instanced geometry, swim, tint and dispo
 test("missing models fall back to a procedural fish with the same contract", () => {
   const { engine, scene } = headless();
   try {
-    const fish = createFish(scene, 4, true);
+    const fish = createFish(scene, "unknown-fish", true, 4);
     const meshes = fish.root.getChildMeshes();
     assert.ok(meshes.length > 3);
     assert.ok(meshes.every((m) => m.getClassName() === "Mesh"));

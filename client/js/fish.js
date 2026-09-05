@@ -1,4 +1,4 @@
-import { speciesOf } from "../../shared/config.js";
+import { SPECIES } from "../../shared/config.js";
 const B = window.BABYLON;
 export const palette = [
   "#edb45e",
@@ -42,7 +42,7 @@ export async function loadFishModels(
 ) {
   const failed = [];
   await Promise.all(
-    [...new Set([0, 1, 2].map(speciesOf))].map(async (species) => {
+    SPECIES.map(async (species) => {
       try {
         const container = await load(species);
         prepare(container, scene);
@@ -53,7 +53,7 @@ export async function loadFishModels(
       }
     }),
   );
-  return { loaded: [...modelsFor(scene).keys()], failed };
+  return { loaded: SPECIES.filter((s) => modelsFor(scene).has(s)), failed };
 }
 function prepare(container, scene) {
   // The glTF loader auto-plays the first clip on the hidden source model.
@@ -86,12 +86,13 @@ function prepare(container, scene) {
     mesh.instancedBuffers[INSTANCE_COLOR] = new B.Color4(1, 1, 1, 1);
   }
 }
-export function createFish(scene, color, npc = false) {
+// species picks the model; color only feeds the procedural fallback palette.
+export function createFish(scene, species, npc = false, color = 0) {
   // Server state drives root; bite and death animations play on pose.
   const root = new B.TransformNode("fish", scene),
     pose = new B.TransformNode("pose", scene);
   pose.parent = root;
-  const model = modelsFor(scene).get(speciesOf(color));
+  const model = modelsFor(scene).get(species);
   const body = model
     ? instantiate(model, pose)
     : procedural(scene, pose, color);

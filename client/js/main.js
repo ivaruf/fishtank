@@ -4,7 +4,16 @@ import { createFish, loadFishModels } from "./fish.js";
 import { createPuffs } from "./effects.js";
 import { createControls } from "./controls.js";
 import { connect } from "./networking.js";
-import { CONFIG as C, radius, direction, clamp, wrap } from "/shared/config.js";
+import {
+  CONFIG as C,
+  SPECIES,
+  PROTOCOL,
+  radius,
+  direction,
+  clamp,
+  wrap,
+  speciesLabel,
+} from "/shared/config.js";
 const B = window.BABYLON,
   $ = (id) => document.getElementById(id);
 let aquarium;
@@ -38,6 +47,7 @@ let network = null,
 const demos = Array.from({ length: 18 }, (_, i) => ({
   id: `demo-${i}`,
   color: i % 5,
+  species: SPECIES[i % SPECIES.length],
   npc: true,
   mass: 3 + (i % 7),
   alive: true,
@@ -47,9 +57,83 @@ const demos = Array.from({ length: 18 }, (_, i) => ({
   yaw: i,
   pitch: 0,
 }));
+// Species picker: one card per model, remembered between visits.
+let chosenSpecies = SPECIES[0];
+try {
+  const saved = localStorage.getItem("fishtank.species");
+  if (SPECIES.includes(saved)) chosenSpecies = saved;
+} catch {
+  /* Private mode or blocked storage: keep the default. */
+}
+$("species").replaceChildren(
+  ...SPECIES.map((species) => {
+    const option = document.createElement("label");
+    option.className = "species-option";
+    const input = document.createElement("input");
+    input.type = "radio";
+    input.name = "species";
+    input.value = species;
+    input.checked = species === chosenSpecies;
+    input.addEventListener("change", () => {
+      chosenSpecies = species;
+      try {
+        localStorage.setItem("fishtank.species", species);
+      } catch {
+        /* Not remembered this time. */
+      }
+    });
+    const thumb = document.createElement("img");
+    thumb.src = `/assets/thumbs/${species}.png`;
+    thumb.alt = "";
+    thumb.width = 58;
+    thumb.height = 48;
+    const name = document.createElement("span");
+    name.textContent = speciesLabel(species);
+    option.append(input, thumb, name);
+    return option;
+  }),
+);
 function clearFish() {
   for (const v of visuals.values()) v.dispose();
   visuals.clear();
+  hideHero();
+}
+// The chosen species swims large beside the menu until the player dives in.
+let hero = null;
+function hideHero() {
+  hero?.dispose();
+  hero = null;
+}
+function showHero(dt) {
+  if (hero && hero.species !== chosenSpecies) hideHero();
+  if (!hero) {
+    hero = createFish(scene, chosenSpecies, false);
+    hero.species = chosenSpecies;
+    hero.swim.speedRatio = 0.9;
+  }
+  const wide = engine.getRenderWidth() > engine.getRenderHeight(),
+    forward = camera.getDirection(B.Vector3.Forward());
+  hero.root.position.copyFrom(
+    camera.position
+      .add(forward.scale(10))
+      .add(camera.getDirection(B.Vector3.Right()).scale(wide ? 4.3 : 0.9))
+      .add(
+        camera
+          .getDirection(B.Vector3.Up())
+          .scale((wide ? -0.1 : 3.5) + Math.sin(time * 1.1) * 0.15),
+      ),
+  );
+  // Three-quarter view that slowly swings between profile and face-on.
+  hero.root.rotation.set(
+    Math.sin(time * 0.8) * 0.06,
+    Math.atan2(forward.x, forward.z) +
+      Math.PI / 2 +
+      0.55 +
+      Math.sin(time * 0.45) * 0.55,
+    0,
+  );
+  hero.root.scaling.setAll(wide ? 2 : 1.15);
+  hero.update(dt);
 }
 function leave(message = "") {
   controls.setActive(false);
@@ -74,7 +158,8 @@ function join(mode) {
   const connection = connect({
     name: $("name").value,
     mode,
-    onWelcome(id) {
+    species: chosenSpecies,
+    onWelcome(id, protocol) {
       myId = id;
       joining = false;
       document.body.classList.add("playing");
@@ -86,6 +171,12 @@ function join(mode) {
       $("touch").hidden = !matchMedia("(pointer:coarse)").matches;
       $("connection").textContent =
         mode === "single" ? "● SOLO AQUARIUM" : "● LAN MULTIPLAYER";
+      if (protocol !== PROTOCOL) {
+        console.warn(
+          `Server speaks protocol ${protocol}, this client expects ${PROTOCOL}. Restart the server (npm start).`,
+        );
+        $("connection").textContent = "● SERVER IS AN OLDER BUILD · RESTART IT";
+      }
     },
     onState(next) {
       const before = state?.players.find((p) => p.id === myId);
@@ -199,7 +290,13 @@ engine.runRenderLoop(() => {
   for (const f of fish) {
     let v = visuals.get(f.id);
     if (!v) {
-      v = createFish(scene, f.color, f.npc);
+      // Snapshots from an older server carry no species; stay deterministic.
+      v = createFish(
+        scene,
+        f.species ?? SPECIES[f.color % SPECIES.length],
+        f.npc,
+        f.color,
+      );
       visuals.set(f.id, v);
     }
     if (f.alive && !v.wasAlive) {
@@ -260,6 +357,8 @@ engine.runRenderLoop(() => {
   } else {
     camera.position.set(Math.sin(time * 0.035) * 8, 13, -28);
     camera.setTarget(new B.Vector3(1, 11, 0));
+    if (network) hideHero();
+    else showHero(dt);
   }
   scene.render();
 });

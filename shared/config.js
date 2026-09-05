@@ -21,6 +21,9 @@ export const CONFIG = Object.freeze({
   broadcastRate: 15,
   maxPlayers: 8,
 });
+// Bumped whenever snapshots or join messages change shape, so a client can
+// tell when it is talking to a server process started from older code.
+export const PROTOCOL = 2;
 export const radius = (mass) => Math.cbrt(mass) * 0.48;
 export const direction = (fish) => ({
   x: Math.sin(fish.yaw) * Math.cos(fish.pitch),
@@ -29,9 +32,17 @@ export const direction = (fish) => ({
 });
 export const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
 export const wrap = (angle) => Math.atan2(Math.sin(angle), Math.cos(angle));
-// The server-assigned color picks the Blender model, so every client agrees
-// and the server can name a wild predator.
-export const SPECIES = ["clownfish", "blue-tang", "pufferfish"];
-export const speciesOf = (color) =>
-  SPECIES[Math.abs(color | 0) % SPECIES.length];
-export const speciesLabel = (color) => speciesOf(color).replace("-", " ");
+// Blender models in client/assets/models, built by tools/blender/create_fish.py.
+// Players pick one when they join; the server assigns NPCs and names wild
+// predators, so this list is the single source of truth.
+export const SPECIES = Object.freeze([
+  "clownfish",
+  "blue-tang",
+  "pufferfish",
+  "angelfish",
+  "goldfish",
+  "betta",
+  "shark",
+]);
+export const speciesLabel = (species = "fish") =>
+  String(species).replaceAll("-", " ");

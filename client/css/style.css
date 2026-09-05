@@ -86,11 +86,72 @@ p {
   line-height: 1.7;
   color: #b9ceca;
 }
-label {
+label,
+.group-label {
   display: block;
   font-size: 9px;
   letter-spacing: 2px;
   margin: 30px 0 10px;
+}
+.group-label {
+  margin-top: 22px;
+}
+.species {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: 520px;
+}
+.species-option {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  width: 66px;
+  margin: 0;
+  padding: 7px 4px 6px;
+  border: 1px solid #5b827a;
+  border-radius: 10px;
+  background: #153e40a8;
+  color: #b6d2c6;
+  font-size: 7px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  text-align: center;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background 0.15s,
+    color 0.15s;
+}
+.species-option:hover {
+  border-color: #8fb3a8;
+}
+.species-option:has(:checked) {
+  border-color: #d1ed9e;
+  background: #1f5a52c0;
+  color: #edf8ef;
+  box-shadow: 0 0 0 1px #d1ed9e66;
+}
+.species-option:has(:focus-visible) {
+  outline: 2px solid #d1ed9e;
+  outline-offset: 2px;
+}
+.species-option input {
+  position: absolute;
+  width: 0;
+  height: 0;
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+.species-option img {
+  width: 58px;
+  height: 48px;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 6px #00000055);
 }
 input {
   width: 100%;
@@ -617,5 +678,19 @@ select {
   .header-tools {
     flex-direction: row;
     gap: 12px;
+  }
+  .group-label {
+    margin-top: 12px;
+  }
+  .species {
+    gap: 6px;
+  }
+  .species-option {
+    width: 52px;
+    padding: 4px 2px 4px;
+  }
+  .species-option img {
+    width: 44px;
+    height: 34px;
   }
 }

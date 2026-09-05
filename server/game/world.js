@@ -4,6 +4,7 @@ import {
   direction,
   clamp,
   wrap,
+  SPECIES,
   speciesLabel,
 } from "../../shared/config.js";
 import { movementVector, parseInput } from "../../shared/movement.js";
@@ -62,16 +63,18 @@ export class World {
         npc: true,
         mass: i < 75 ? 1 + this.random() * 3 : 5 + this.random() * 22,
         color: i % 5,
+        species: SPECIES[i % SPECIES.length],
         decision: 0,
       };
       this.spawn(f);
       return f;
     });
   }
-  addPlayer(id, name) {
+  addPlayer(id, name, species = SPECIES[this.players.size % SPECIES.length]) {
     const p = {
       id,
       name,
+      species,
       mass: C.startMass,
       score: 0,
       color: this.players.size % 8,
@@ -114,7 +117,7 @@ export class World {
     prey.alive = false;
     prey.respawn = prey.npc ? 2 + this.random() * 3 : C.respawnDelay;
     prey.killedBy = predator.npc
-      ? `a wild ${speciesLabel(predator.color)}`
+      ? `a wild ${speciesLabel(predator.species)}`
       : predator.name;
     this.events.push({
       type: prey.npc ? "NPC_EATEN" : "PLAYER_EATEN",
@@ -215,6 +218,7 @@ export class World {
       id: f.id,
       npc: !!f.npc,
       name: f.name,
+      species: f.species,
       x: f.x,
       y: f.y,
       z: f.z,

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { once } from "node:events";
 import { WebSocket } from "ws";
 import { createGameServer } from "../server.js";
+import { SPECIES, PROTOCOL } from "../shared/config.js";
 function message(socket, type) {
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
@@ -27,26 +28,44 @@ test("HTTP, two clients, input authority, solo isolation and reconnect", async (
   const base = `http://127.0.0.1:${server.address().port}`,
     clients = [];
   try {
-    assert.equal((await fetch(base)).status, 200);
+    const index = await fetch(base);
+    assert.equal(index.status, 200);
+    assert.equal(index.headers.get("cache-control"), "no-cache");
     assert.equal((await fetch(`${base}/vendor/babylon.js`)).status, 200);
     assert.equal((await fetch(`${base}/vendor/loaders.js`)).status, 200);
     assert.equal((await fetch(`${base}/server.js`)).status, 404);
     const model = await fetch(`${base}/assets/models/clownfish.glb`);
     assert.equal(model.status, 200);
     assert.equal(model.headers.get("content-type"), "model/gltf-binary");
-    async function join(mode = "multiplayer") {
+    async function join(mode = "multiplayer", species) {
       const s = new WebSocket(base.replace("http", "ws") + "/ws");
       clients.push(s);
       await once(s, "open");
       const welcome = message(s, "WELCOME");
-      s.send(JSON.stringify({ type: "JOIN", name: "Test fish", mode }));
-      await welcome;
+      s.send(
+        JSON.stringify({ type: "JOIN", name: "Test fish", mode, species }),
+      );
+      const greeting = await welcome;
+      assert.equal(greeting.protocol, PROTOCOL);
+      s.playerId = greeting.id;
       return s;
     }
-    const a = await join(),
-      b = await join();
+    const a = await join("multiplayer", "shark"),
+      b = await join("multiplayer", "not-a-fish");
     let state = await message(a, "WORLD_STATE");
     assert.equal(state.players.length, 2);
+    // Chosen species is honored; unknown ones fall back to a real model.
+    assert.equal(
+      state.players.find((p) => p.id === a.playerId).species,
+      "shark",
+    );
+    assert.ok(
+      SPECIES.includes(state.players.find((p) => p.id === b.playerId).species),
+    );
+    assert.ok(state.npcs.every((n) => SPECIES.includes(n.species)));
+    const thumb = await fetch(`${base}/assets/thumbs/clownfish.png`);
+    assert.equal(thumb.status, 200);
+    assert.equal(thumb.headers.get("content-type"), "image/png");
     a.send("bad json");
     a.send("null");
     a.send(
