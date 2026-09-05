@@ -81,7 +81,7 @@
         </button>
       </div>
       <div class="hint">
-        ONE AQUARIUM · UP TO 8 FRIENDS · FIVE MINUTE ROUNDS
+        ONE AQUARIUM · UP TO 8 FRIENDS · TWO MINUTE ROUNDS
       </div>
       <p class="error" id="error" role="alert"></p>
     </main>
@@ -105,6 +105,9 @@
       <div class="eyebrow" id="overlay-tag"></div>
       <h2 id="overlay-title"></h2>
       <p id="overlay-text"></p>
+      <button id="next-round" class="secondary" type="button" hidden>
+        Start the next round <span>→</span>
+      </button>
     </section>
     <footer>
       <div>
@@ -116,27 +119,17 @@
       <span>THE AQUARIUM · 001</span>
     </footer>
     <div id="touch" hidden>
-      <div class="touch-control movement-pad">
-        <div
-          id="move-stick"
-          class="joystick"
-          role="group"
-          aria-label="Movement stick"
-        >
-          <div class="stick"></div>
+      <div id="move-zone" class="touch-zone steer-zone" aria-label="Steer">
+        <div id="move-stick" class="joystick floating" hidden>
+          <div class="knob"></div>
         </div>
-        <span>MOVE</span>
+        <span class="zone-hint">STEER · TOUCH AND DRAG</span>
       </div>
-      <div class="touch-control camera-pad">
-        <div
-          id="look-stick"
-          class="joystick"
-          role="group"
-          aria-label="Camera stick"
-        >
-          <div class="stick"></div>
+      <div id="depth-zone" class="touch-zone depth-zone" aria-label="Depth">
+        <div id="depth-gauge" class="depth-gauge floating" hidden>
+          <div class="knob"></div>
         </div>
-        <span>LOOK</span>
+        <span class="zone-hint">DIVE · DRAG DOWN OR UP</span>
       </div>
       <div class="landscape-hint">
         Rotate your phone for more swimming room ↻

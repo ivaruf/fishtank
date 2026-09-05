@@ -1,10 +1,21 @@
-import { clamp } from "../../shared/config.js";
+import { clamp, wrap } from "../../shared/config.js";
 
+// Desktop: WASD plus mouse aim, and the fish swims where you look. Touch: the
+// fish always swims; one thumb steers with a floating stick relative to the
+// camera, the other drags up or down for depth (and the fish levels out when
+// released), and main.js keeps the camera behind the fish. Both produce the
+// same {forward, strafe, yaw, pitch} for the server.
+const TURN = 2.4, // rad/s the touch heading may change
+  ASSIST = 0.9, // rad/s the bite assist may nudge when the thumb is idle
+  LEVEL = 1.2, // 1/s pitch decay back to level on touch
+  STICK = 48, // px of thumb travel for full deflection
+  DEPTH = 150; // px of drag for a full dive or climb
 export function createControls(canvas, onStop = () => {}) {
   const keys = new Set();
   const aim = { yaw: 0, pitch: 0 };
-  const pads = [];
-  let active = false;
+  let active = false,
+    touchMode = false,
+    assist = null;
   const allowed = [
     "w",
     "a",
@@ -16,19 +27,22 @@ export function createControls(canvas, onStop = () => {}) {
     "arrowright",
   ];
   const look = (x, y) => {
-    aim.yaw = Math.atan2(Math.sin(aim.yaw + x), Math.cos(aim.yaw + x));
+    aim.yaw = wrap(aim.yaw + x);
     aim.pitch = clamp(aim.pitch + y, -1.35, 1.35);
   };
+  // Touch zones: each tracks one pointer and shows a floating visual under it.
+  const steer = { pointer: null, x: 0, y: 0 },
+    depth = { pointer: null, value: 0, base: 0 };
+  function release(zone) {
+    if (zone.pointer !== null && zone.element.hasPointerCapture(zone.pointer))
+      zone.element.releasePointerCapture(zone.pointer);
+    zone.pointer = null;
+    zone.x = zone.y = zone.value = 0;
+    zone.visual.hidden = true;
+  }
   function reset() {
     keys.clear();
-    for (const pad of pads) {
-      const pointer = pad.pointer;
-      pad.pointer = null;
-      pad.x = pad.y = 0;
-      pad.knob.style.transform = "";
-      if (pointer !== null && pad.element.hasPointerCapture(pointer))
-        pad.element.releasePointerCapture(pointer);
-    }
+    for (const zone of [steer, depth]) release(zone);
     onStop();
   }
   window.addEventListener("keydown", (e) => {
@@ -70,52 +84,73 @@ export function createControls(canvas, onStop = () => {}) {
   document.addEventListener("pointerlockerror", () => {
     /* Keep hover aiming. */
   });
-  function stick(id) {
-    const element = document.getElementById(id);
-    const pad = {
-      element,
-      knob: element.querySelector(".stick"),
-      pointer: null,
-      x: 0,
-      y: 0,
-    };
-    pads.push(pad);
-    function update(e) {
-      const rect = element.getBoundingClientRect(),
-        travel = rect.width * 0.36;
-      const x = (e.clientX - rect.left - rect.width / 2) / travel;
-      const y = (e.clientY - rect.top - rect.height / 2) / travel;
-      const distance = Math.hypot(x, y),
-        magnitude = clamp((distance - 0.12) / 0.88, 0, 1);
-      pad.x = distance ? (x / distance) * magnitude : 0;
-      pad.y = distance ? (y / distance) * magnitude : 0;
-      pad.knob.style.transform = `translate(${pad.x * travel}px,${pad.y * travel}px)`;
-    }
-    element.addEventListener("pointerdown", (e) => {
-      if (!active || pad.pointer !== null) return;
+  function track(zone, id, visualId, onDown, onMove) {
+    zone.element = document.getElementById(id);
+    zone.visual = document.getElementById(visualId);
+    zone.knob = zone.visual.querySelector(".knob");
+    zone.element.addEventListener("pointerdown", (e) => {
+      if (!active || !touchMode || zone.pointer !== null) return;
       e.preventDefault();
-      pad.pointer = e.pointerId;
-      element.setPointerCapture(e.pointerId);
-      update(e);
+      zone.pointer = e.pointerId;
+      zone.element.setPointerCapture(e.pointerId);
+      const rect = zone.element.getBoundingClientRect();
+      zone.visual.style.left = `${e.clientX - rect.left}px`;
+      zone.visual.style.top = `${e.clientY - rect.top}px`;
+      zone.visual.hidden = false;
+      zone.knob.style.transform = "";
+      onDown(e);
     });
-    element.addEventListener("pointermove", (e) => {
-      if (e.pointerId === pad.pointer) update(e);
+    zone.element.addEventListener("pointermove", (e) => {
+      if (e.pointerId === zone.pointer) onMove(e);
     });
-    function release(e) {
-      if (e.pointerId !== pad.pointer) return;
-      pad.pointer = null;
-      pad.x = pad.y = 0;
-      pad.knob.style.transform = "";
-      if (element.hasPointerCapture(e.pointerId))
-        element.releasePointerCapture(e.pointerId);
+    const end = (e) => {
+      if (e.pointerId !== zone.pointer) return;
+      release(zone);
       onStop();
-    }
-    for (const event of ["pointerup", "pointercancel", "lostpointercapture"])
-      element.addEventListener(event, release);
-    return pad;
+    };
+    for (const type of ["pointerup", "pointercancel", "lostpointercapture"])
+      zone.element.addEventListener(type, end);
   }
-  const movePad = stick("move-stick"),
-    lookPad = stick("look-stick");
+  track(
+    steer,
+    "move-zone",
+    "move-stick",
+    (e) => {
+      steer.ox = e.clientX;
+      steer.oy = e.clientY;
+    },
+    (e) => {
+      let dx = (e.clientX - steer.ox) / STICK,
+        dy = (e.clientY - steer.oy) / STICK;
+      const d = Math.hypot(dx, dy);
+      if (d > 1) {
+        dx /= d;
+        dy /= d;
+      }
+      steer.x = dx;
+      steer.y = dy;
+      steer.knob.style.transform = `translate(${dx * STICK}px, ${dy * STICK}px)`;
+    },
+  );
+  track(
+    depth,
+    "depth-zone",
+    "depth-gauge",
+    (e) => {
+      depth.oy = e.clientY;
+      depth.base = aim.pitch;
+      depth.value = aim.pitch;
+    },
+    (e) => {
+      // Drag up to rise, down to dive, relative to the pitch you started at.
+      depth.value = clamp(
+        depth.base - ((e.clientY - depth.oy) / DEPTH) * 1.1,
+        -1.1,
+        1.1,
+      );
+      depth.knob.style.transform = `translateY(${(-depth.value / 1.1) * 60}px)`;
+    },
+  );
   return {
     setActive(value) {
       if (active === value) return;
@@ -125,26 +160,53 @@ export function createControls(canvas, onStop = () => {}) {
         if (document.pointerLockElement === canvas) document.exitPointerLock();
       }
     },
+    setTouchMode(value) {
+      touchMode = value;
+      if (!value) for (const zone of [steer, depth]) release(zone);
+    },
+    // A {yaw, pitch} to drift toward while the thumb is idle, or null.
+    assist(target) {
+      assist = target;
+    },
     orient(yaw, pitch) {
       aim.yaw = yaw;
       aim.pitch = pitch;
     },
-    read(dt = 0) {
-      if (active) look(lookPad.x * dt * 2.2, -lookPad.y * dt * 1.7);
+    // cameraYaw makes stick directions screen-relative on touch.
+    read(dt = 0, cameraYaw = aim.yaw) {
+      if (active && touchMode) {
+        if (steer.pointer !== null && Math.hypot(steer.x, steer.y) > 0.2) {
+          const wanted = cameraYaw + Math.atan2(steer.x, -steer.y);
+          aim.yaw = wrap(
+            aim.yaw + clamp(wrap(wanted - aim.yaw), -TURN * dt, TURN * dt),
+          );
+        } else if (assist) {
+          aim.yaw = wrap(
+            aim.yaw +
+              clamp(wrap(assist.yaw - aim.yaw), -ASSIST * dt, ASSIST * dt),
+          );
+        }
+        if (depth.pointer !== null) aim.pitch = depth.value;
+        else if (assist)
+          aim.pitch += clamp(
+            assist.pitch - aim.pitch,
+            -ASSIST * dt,
+            ASSIST * dt,
+          );
+        else aim.pitch *= Math.exp(-dt * LEVEL);
+      }
+      const forward = touchMode
+        ? 1
+        : Number(keys.has("w") || keys.has("arrowup")) -
+          Number(keys.has("s") || keys.has("arrowdown"));
+      const strafe = touchMode
+        ? 0
+        : Number(keys.has("d") || keys.has("arrowright")) -
+          Number(keys.has("a") || keys.has("arrowleft"));
       return {
         ...aim,
-        forward: active
-          ? movePad.pointer !== null
-            ? -movePad.y
-            : Number(keys.has("w") || keys.has("arrowup")) -
-              Number(keys.has("s") || keys.has("arrowdown"))
-          : 0,
-        strafe: active
-          ? movePad.pointer !== null
-            ? movePad.x
-            : Number(keys.has("d") || keys.has("arrowright")) -
-              Number(keys.has("a") || keys.has("arrowleft"))
-          : 0,
+        forward: active ? forward : 0,
+        strafe: active ? strafe : 0,
       };
     },
   };

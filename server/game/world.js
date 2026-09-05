@@ -129,28 +129,29 @@ export class World {
       prey: prey.id,
     });
   }
+  // Results stay up until a player asks for the next round.
+  nextRound() {
+    if (this.phase !== "results") return false;
+    this.phase = "playing";
+    this.remaining = C.roundLength;
+    this.round++;
+    this.seedNPCs();
+    for (const p of this.players.values()) {
+      p.mass = C.startMass;
+      p.score = 0;
+      this.spawn(p);
+    }
+    return true;
+  }
   tick(dt) {
-    if (!this.players.size) return;
+    if (!this.players.size || this.phase !== "playing") return;
     this.remaining -= dt;
     if (this.remaining <= 0) {
-      if (this.phase === "playing") {
-        this.phase = "results";
-        this.remaining = C.intermission;
-        this.events.push({ type: "ROUND_END" });
-      } else {
-        this.phase = "playing";
-        this.remaining = C.roundLength;
-        this.round++;
-        this.seedNPCs();
-        for (const p of this.players.values()) {
-          p.mass = C.startMass;
-          p.score = 0;
-          this.spawn(p);
-        }
-        return;
-      }
+      this.phase = "results";
+      this.remaining = 0;
+      this.events.push({ type: "ROUND_END" });
+      return;
     }
-    if (this.phase !== "playing") return;
     for (const f of [...this.players.values(), ...this.npcs]) {
       if (!f.alive) {
         f.respawn -= dt;

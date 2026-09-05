@@ -28,6 +28,11 @@ export function connect({
       if (socket.readyState === WebSocket.OPEN)
         socket.send(JSON.stringify({ type: "INPUT", ...input }));
     },
+    // Bare requests such as NEXT_ROUND.
+    request(type) {
+      if (socket.readyState === WebSocket.OPEN)
+        socket.send(JSON.stringify({ type }));
+    },
     close() {
       socket.close();
     },

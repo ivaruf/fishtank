@@ -105,6 +105,9 @@ export function createGameServer() {
       if (m.type === "INPUT" && socket.room) {
         rooms.get(socket.room)?.setInput(socket.id, m);
       }
+      if (m.type === "NEXT_ROUND" && socket.room) {
+        rooms.get(socket.room)?.nextRound();
+      }
     });
     socket.on("close", () => {
       clearTimeout(joinTimeout);

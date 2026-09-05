@@ -15,8 +15,7 @@ export const CONFIG = Object.freeze({
   // their own radius) and swim a little faster while doing so.
   npcHuntRange: 9,
   npcHuntSpeed: 1.3,
-  roundLength: 300,
-  intermission: 12,
+  roundLength: 120,
   // Long enough to watch yourself get eaten and still read the banner.
   respawnDelay: 5,
   spawnProtection: 3,

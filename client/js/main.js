@@ -95,7 +95,11 @@ let network = null,
   toastUntil = 0,
   lastSend = 0,
   lastDanger = 0,
-  deathCam = null;
+  deathCam = null,
+  touchMode = false,
+  leaderId = null;
+// Touch camera: settles in behind the fish's own heading instead of an aim.
+const follow = { yaw: 0, pitch: 0 };
 // How long the camera lingers on the predator before the banner appears.
 const DEATH_CAM_SECONDS = 2.2;
 const demos = Array.from({ length: 18 }, (_, i) => ({
@@ -166,16 +170,27 @@ function showHero(dt) {
     hero.species = chosenSpecies;
     hero.swim.speedRatio = 0.9;
   }
-  const wide = engine.getRenderWidth() > engine.getRenderHeight(),
+  const canvas = $("game"),
+    wide = canvas.clientWidth > canvas.clientHeight,
+    // Short landscape phones: the form fills the screen, so keep the hero small
+    // and tucked into the top-right corner.
+    short = canvas.clientHeight < 520,
     forward = camera.getDirection(B.Vector3.Forward());
+  if (wide && short) return hideHero();
   hero.root.position.copyFrom(
     camera.position
       .add(forward.scale(10))
-      .add(camera.getDirection(B.Vector3.Right()).scale(wide ? 4.3 : 0.9))
+      .add(
+        camera
+          .getDirection(B.Vector3.Right())
+          .scale(wide ? (short ? 6.2 : 4.3) : 0.9),
+      )
       .add(
         camera
           .getDirection(B.Vector3.Up())
-          .scale((wide ? 2.2 : 3.5) + Math.sin(time * 1.1) * 0.15),
+          .scale(
+            (wide ? (short ? 2.6 : 2.2) : 3.5) + Math.sin(time * 1.1) * 0.15,
+          ),
       ),
   );
   // Three-quarter view that slowly swings between profile and face-on.
@@ -187,11 +202,14 @@ function showHero(dt) {
       Math.sin(time * 0.45) * 0.55,
     0,
   );
-  hero.root.scaling.setAll(wide ? 2 : 1.15);
+  hero.root.scaling.setAll(wide ? (short ? 1.1 : 2) : 1.15);
   hero.update(dt);
 }
 function leave(message = "") {
   controls.setActive(false);
+  controls.setTouchMode(false);
+  touchMode = false;
+  leaderId = null;
   document.body.classList.remove("playing");
   network?.close();
   network = null;
@@ -225,7 +243,9 @@ function join(mode) {
       $("menu").hidden = true;
       $("hud").hidden = false;
       $("error").textContent = "";
-      $("touch").hidden = !matchMedia("(pointer:coarse)").matches;
+      touchMode = matchMedia("(pointer:coarse)").matches;
+      $("touch").hidden = !touchMode;
+      controls.setTouchMode(touchMode);
       audio.music("game");
       $("connection").textContent =
         mode === "single" ? "● SOLO AQUARIUM" : "● LAN MULTIPLAYER";
@@ -242,8 +262,11 @@ function join(mode) {
       if (
         me &&
         (!before || (!before.alive && me.alive) || next.round !== state?.round)
-      )
+      ) {
         controls.orient(me.yaw, me.pitch);
+        follow.yaw = me.yaw;
+        follow.pitch = 0;
+      }
       if (before && !before.alive && me?.alive) {
         audio.play("respawn");
         deathCam = null;
@@ -308,6 +331,10 @@ $("leave").onclick = () => {
   audio.play("click");
   leave();
 };
+$("next-round").onclick = () => {
+  audio.play("click");
+  network?.request("NEXT_ROUND");
+};
 function updateUI() {
   const me = state.players.find((p) => p.id === myId);
   if (!me) return;
@@ -320,6 +347,12 @@ function updateUI() {
   const ranked = [...state.players].sort(
     (a, b) => b.score - a.score || b.mass - a.mass,
   );
+  // The crown needs a clear leader: someone who has scored and is not tied.
+  leaderId =
+    ranked[0]?.score > 0 &&
+    (ranked.length < 2 || ranked[0].score > ranked[1].score)
+      ? ranked[0].id
+      : null;
   $("leaders").replaceChildren(
     ...ranked.slice(0, 8).map((p) => {
       const li = document.createElement("li");
@@ -337,8 +370,10 @@ function updateUI() {
     $("overlay-title").textContent = `${ranked[0]?.name || "Nobody"} wins!`;
     const largest = [...state.players].sort((a, b) => b.mass - a.mass)[0];
     $("overlay-text").textContent =
-      `Largest fish: ${largest.name} · ${largest.mass.toFixed(1)} mass\nYour score: ${me.score}\nNext round in ${Math.ceil(state.remaining)}s`;
+      `Largest fish: ${largest.name} · ${largest.mass.toFixed(1)} mass\nYour score: ${me.score}`;
+    $("next-round").hidden = false;
   } else if (!me.alive) {
+    $("next-round").hidden = true;
     $("overlay-tag").textContent = "THERE’S ALWAYS A BIGGER FISH";
     $("overlay-title").textContent = "You became lunch.";
     $("overlay-text").textContent =
@@ -375,7 +410,8 @@ function placeLabels() {
       $("labels").append(label);
       labels.set(p.id, label);
     }
-    if (label.textContent !== p.name) label.textContent = p.name;
+    const text = (p.id === leaderId ? "👑 " : "") + p.name;
+    if (label.textContent !== text) label.textContent = text;
     const v = visuals.get(p.id);
     if (!p.alive || p.hidden || !v?.root.isEnabled()) {
       label.hidden = true;
@@ -413,6 +449,29 @@ function placeLabels() {
       label.remove();
       labels.delete(id);
     }
+}
+// Touch bite assist: the nearest lighter fish inside a narrow cone ahead.
+function biteAssist(me) {
+  const heading = direction(me),
+    reach = 7 + radius(me.mass) * 3;
+  let best = null,
+    nearest = Infinity;
+  for (const f of [...state.npcs, ...state.players]) {
+    if (f.id === me.id || !f.alive || !outweighs(me, f)) continue;
+    const dx = f.x - me.x,
+      dy = f.y - me.y,
+      dz = f.z - me.z,
+      dist = Math.hypot(dx, dy, dz);
+    if (dist > reach || dist < 0.01 || dist >= nearest) continue;
+    const along = (dx * heading.x + dy * heading.y + dz * heading.z) / dist;
+    if (along < Math.cos(0.35)) continue;
+    nearest = dist;
+    best = {
+      yaw: Math.atan2(dx, dz),
+      pitch: Math.atan2(dy, Math.hypot(dx, dz)),
+    };
+  }
+  return best;
 }
 // Death cam: swing to the predator's mouth from the side and watch it chew.
 function deathCamera(dt, now) {
@@ -459,7 +518,9 @@ engine.runRenderLoop(() => {
   time += dt;
   aquarium.animate(dt);
   const now = performance.now();
-  const input = controls.read(dt);
+  const me = state?.players.find((p) => p.id === myId);
+  if (touchMode) controls.assist(me?.alive ? biteAssist(me) : null);
+  const input = controls.read(dt, follow.yaw);
   if (network && myId && now - lastSend > 50) {
     network.send(input);
     lastSend = now;
@@ -473,7 +534,6 @@ engine.runRenderLoop(() => {
         z: Math.cos(time * 0.13 + i * 2.4) * 18,
         yaw: time * 0.13 + i * 2.4 + Math.PI / 2,
       }));
-  const me = state?.players.find((p) => p.id === myId);
   const ids = new Set(fish.map((f) => f.id));
   for (const [id, v] of visuals)
     if (!ids.has(id)) {
@@ -539,14 +599,23 @@ engine.runRenderLoop(() => {
       audio.play("danger");
     }
     v.tint(v.threat);
+    if (!f.npc) v.setCrown(f.id === leaderId);
   }
   placeLabels();
   const mine = me && visuals.get(me.id);
   if (deathCam && me && !me.alive) deathCamera(dt, now);
   else if (mine) {
-    const d = direction(input),
-      r = radius(me.mass),
+    const r = radius(me.mass),
       p = mine.root.position;
+    let d;
+    if (touchMode) {
+      const k = 1 - Math.exp(-dt * 3);
+      follow.yaw = wrap(
+        follow.yaw + wrap(mine.root.rotation.y - follow.yaw) * k,
+      );
+      follow.pitch += (-mine.root.rotation.x * 0.5 - follow.pitch) * k;
+      d = direction(follow);
+    } else d = direction(input);
     const desired = new B.Vector3(
       p.x - d.x * (7 + r * 3),
       p.y + 2 + r * 0.4 - d.y * (7 + r * 3),

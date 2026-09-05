@@ -29,7 +29,8 @@ const NEUTRAL = new B.Color3(1, 1, 1),
 // ~2-unit body, a "Tail" pivot carrying the swim clip.
 const models = new WeakMap(),
   crests = new WeakMap(),
-  maws = new WeakMap();
+  maws = new WeakMap(),
+  crowns = new WeakMap();
 // Where each model's nose ends (+Z), so the cartoon maw sits on the mouth.
 const NOSE = {
   clownfish: 1.04,
@@ -154,6 +155,33 @@ export function createFish(scene, species, npc = false, color = 0) {
     return m;
   });
   mouth.setEnabled(false);
+  // A little gold crown marks the round's current leader.
+  let crown = null;
+  if (!npc) {
+    const gold = shared(crowns, scene, () =>
+      material(scene, "crown", "#f2c14e", 0.6),
+    );
+    crown = B.MeshBuilder.CreateCylinder(
+      "crown",
+      { height: 0.2, diameterTop: 0.5, diameterBottom: 0.4, tessellation: 8 },
+      scene,
+    );
+    crown.position.set(0, 1.58, 0.05);
+    crown.parent = pose;
+    crown.material = gold;
+    for (let i = 0; i < 4; i++) {
+      const point = B.MeshBuilder.CreateCylinder(
+        "crown point",
+        { height: 0.18, diameterTop: 0, diameterBottom: 0.12, tessellation: 4 },
+        scene,
+      );
+      const a = (i / 4) * Math.PI * 2;
+      point.position.set(Math.sin(a) * 0.2, 0.19, Math.cos(a) * 0.2);
+      point.parent = crown;
+      point.material = gold;
+    }
+    crown.setEnabled(false);
+  }
   const { swim } = body;
   swim.start(true, 1);
   if (swim.isStarted)
@@ -166,6 +194,7 @@ export function createFish(scene, species, npc = false, color = 0) {
     root,
     pose,
     mouth,
+    crown,
     swim,
     wasAlive: false,
     threat: 0,
@@ -238,6 +267,9 @@ export function createFish(scene, species, npc = false, color = 0) {
         }
       }
       return false;
+    },
+    setCrown(on) {
+      crown?.setEnabled(on);
     },
     // threat: -1 it can eat me … 0 neutral … 1 I can eat it.
     tint(threat) {

@@ -105,6 +105,10 @@ test("Blender fish load, face +Z, share instanced geometry, swim, tint and dispo
       assert.ok(nose > 5.7, `${species} nose ahead of origin: ${nose}`);
       assert.ok(tail < 3.6, `${species} tail behind origin: ${tail}`);
       assert.ok(meshes.some((m) => m.name === "player crest"));
+      assert.equal(fish.crown.isEnabled(), false, "no crown until leading");
+      fish.setCrown(true);
+      assert.equal(fish.crown.isEnabled(), true);
+      fish.setCrown(false);
       assert.ok(fish.swim.isStarted);
       const pivot = fish.swim.targetedAnimations[0].target;
       const before = pivot.rotationQuaternion.clone();
@@ -138,6 +142,8 @@ test("Blender fish load, face +Z, share instanced geometry, swim, tint and dispo
     assert.ok(sources(a).length > 0);
     assert.deepEqual(sources(a), sources(b));
     assert.ok(!a.root.getChildMeshes().some((m) => m.name === "player crest"));
+    assert.equal(a.crown, null, "wild fish never wear the crown");
+    a.setCrown(true);
     a.tint(-1);
     b.tint(1);
     const shade = (fish) =>

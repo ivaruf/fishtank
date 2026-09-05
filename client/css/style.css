@@ -314,24 +314,47 @@ footer {
   font-weight: bold;
   font-size: 18px;
 }
-#touch {
+`#touch {
   position: absolute;
   inset: 0;
+  z-index: 1;
   pointer-events: none;
 }
-.touch-control {
+/* HUD and header sit above the touch zones so their buttons stay tappable. */
+header,
+#hud > * {
+  z-index: 2;
+}
+.touch-zone {
   position: absolute;
-  bottom: max(24px, env(safe-area-inset-bottom));
+  top: 0;
+  bottom: 0;
+  pointer-events: auto;
+  touch-action: none;
+}
+.steer-zone {
+  left: 0;
+  width: 50%;
+}
+.depth-zone {
+  right: 0;
+  width: 50%;
+}
+.zone-hint {
+  position: absolute;
+  bottom: max(18px, env(safe-area-inset-bottom));
+  left: 0;
+  right: 0;
   text-align: center;
   font-size: 9px;
   letter-spacing: 2px;
-  color: #d4e9dc;
+  color: #d4e9dc99;
+  pointer-events: none;
 }
-.movement-pad {
-  left: max(24px, env(safe-area-inset-left));
-}
-.camera-pad {
-  right: max(24px, env(safe-area-inset-right));
+.floating {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
 }
 .joystick {
   height: 112px;
@@ -339,20 +362,36 @@ footer {
   border-radius: 50%;
   background: #abc8bf1a;
   border: 1px solid #d1ed9e88;
-  touch-action: none;
-  margin-bottom: 8px;
-  pointer-events: auto;
-  user-select: none;
 }
-.stick {
-  height: 42px;
+.joystick .knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
   width: 42px;
+  height: 42px;
+  margin: -21px;
   border-radius: 50%;
   background: #d1ed9e99;
-  position: relative;
-  top: 34px;
-  left: 34px;
-  pointer-events: none;
+}
+.depth-gauge {
+  width: 26px;
+  height: 150px;
+  border-radius: 13px;
+  background: #abc8bf1a;
+  border: 1px solid #d1ed9e88;
+}
+.depth-gauge .knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 34px;
+  height: 34px;
+  margin: -17px;
+  border-radius: 50%;
+  background: #d1ed9e99;
+}
+#next-round {
+  margin-top: 18px;
 }
 .landscape-hint {
   display: none;
@@ -511,8 +550,11 @@ select {
     font-size: 0;
   }
   footer > div:after {
-    content: "LEFT STICK: MOVE · RIGHT STICK: LOOK";
+    content: "LEFT: STEER · RIGHT: DIVE OR RISE · YOU ALWAYS SWIM";
     font-size: 9px;
+  }
+  .aim {
+    display: none;
   }
 }
 
@@ -562,14 +604,19 @@ select {
   .header-tools {
     gap: 6px;
   }
+  /* Two columns: copy on the left, the whole form including the fish picker on
+     the right. The panel scrolls if a phone is shorter still. */
   .panel {
-    top: 62px;
+    top: 56px;
     transform: none;
-    left: 7%;
-    width: 86%;
+    left: 6%;
+    width: 88%;
+    max-width: none;
+    max-height: calc(100dvh - 60px);
+    overflow-y: auto;
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    column-gap: 24px;
+    grid-template-columns: 0.85fr 1.15fr;
+    column-gap: 20px;
   }
   .panel .eyebrow {
     grid-column: 1;
@@ -577,93 +624,65 @@ select {
   }
   .panel h1 {
     grid-column: 1;
-    grid-row: 2 / span 3;
-    font-size: 43px;
-    margin: 14px 0;
+    grid-row: 2 / span 4;
+    font-size: 40px;
+    margin: 12px 0;
     letter-spacing: -2px;
   }
   .panel > p:not(.error) {
     grid-column: 1;
-    grid-row: 5;
+    grid-row: 6;
     margin: 0;
     font-size: 11px;
   }
   .panel > label {
     grid-column: 2;
     grid-row: 1;
-    margin: 10px 0;
+    margin: 8px 0 6px;
   }
   .panel > input {
     grid-column: 2;
     grid-row: 2;
-    padding: 10px;
+    padding: 9px 12px;
+    font-size: 14px;
+  }
+  .panel .group-label {
+    grid-column: 2;
+    grid-row: 3;
+    margin: 8px 0 4px;
+  }
+  .panel .species {
+    grid-column: 2;
+    grid-row: 4;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+  .panel .species-option {
+    flex: 0 0 auto;
   }
   .panel .buttons {
     grid-column: 2;
-    grid-row: 3;
+    grid-row: 5;
     margin-top: 8px;
   }
   .panel .buttons button {
-    padding: 12px;
+    padding: 10px 12px;
   }
   .panel .buttons button span {
     display: none;
   }
   .panel .hint {
     grid-column: 2;
-    grid-row: 4;
+    grid-row: 6;
     font-size: 7px;
-    margin-top: 12px;
+    margin-top: 8px;
   }
   .panel .error {
     grid-column: 2;
-    grid-row: 5;
-  }
-  .stats {
-    top: 57px;
-    left: 20px;
-    right: auto;
-    padding: 10px 15px;
-    gap: 22px;
-  }
-  .stats small {
-    font-size: 8px;
-  }
-  .stats b {
-    margin-top: 3px;
-    font-size: 20px;
-  }
-  .leaderboard {
-    top: 72px;
-    right: 20px;
-    width: 165px;
-    padding: 10px;
-    max-height: 96px;
-    overflow: auto;
-  }
-  .leaderboard li {
-    font-size: 10px;
-    padding: 4px 0;
-  }
-  .leaderboard .eyebrow {
-    font-size: 8px;
-  }
-  .leaderboard ol {
-    margin-top: 5px;
-  }
-  footer {
-    bottom: 12px;
-    font-size: 8px;
-  }
-  footer > span {
-    display: none;
-  }
-  .overlay {
-    padding: 16px 24px;
-  }
-  .overlay h2 {
-    font-size: 25px;
-    margin: 12px 0;
+    grid-row: 7;
+    margin: 4px 0 0;
   }
 }
 
@@ -725,10 +744,10 @@ select {
     margin-top: 12px;
   }
   .species {
-    gap: 6px;
+    gap: 5px;
   }
   .species-option {
-    width: 52px;
+    width: 50px;
     padding: 4px 2px 4px;
   }
   .species-option img {

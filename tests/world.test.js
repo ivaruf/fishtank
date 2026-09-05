@@ -90,9 +90,13 @@ test("round ends, freezes, then resets score and mass", () => {
   w.tick(0.02);
   assert.equal(w.phase, "results");
   const z = p.z;
+  w.setInput(p.id, { forward: 1, strafe: 0, yaw: 0, pitch: 0 });
   w.tick(1);
-  assert.equal(p.z, z);
-  w.tick(C.intermission);
+  w.tick(60);
+  assert.equal(p.z, z, "results freeze the tank");
+  assert.equal(w.phase, "results", "no round starts on its own");
+  assert.equal(w.nextRound(), true);
+  assert.equal(w.nextRound(), false, "only from the results screen");
   assert.equal(w.phase, "playing");
   assert.equal(p.mass, C.startMass);
   assert.equal(p.score, 0);
