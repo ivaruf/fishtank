@@ -1,0 +1,799 @@
+Build a small, polished 3D multiplayer game prototype using Babylon.js, HTML, CSS, JavaScript, Node.js, and WebSockets.
+
+The project should be deliberately simple in gameplay, but structured as a good foundation for learning and later expansion into a more polished cross-platform game.
+
+## Core concept
+
+The game takes place inside a large 3D aquarium.
+
+Every player starts as a very small fish.
+
+The aquarium contains many smaller NPC fish swimming around.
+
+Players grow by eating NPC fish that are sufficiently smaller than themselves.
+
+As players grow, they become capable of eating increasingly larger NPC fish.
+
+Eventually, sufficiently large players can also eat smaller human-controlled players.
+
+The basic loop is:
+
+small fish → eat smaller fish → grow → become dangerous → hunt larger prey → potentially eat other players
+
+Rounds should be relatively short and arcade-like.
+
+The game should feel playful rather than realistic.
+
+Do not overcomplicate the first implementation.
+
+---
+
+# Primary goals
+
+The first working version must support:
+
+1. Single-player mode
+2. Multiplayer mode
+3. WebSocket networking
+4. Multiple browser clients connected to a Node.js server
+5. 3D fish movement using Babylon.js
+6. NPC fish
+7. Eating NPC fish
+8. Player growth
+9. Eating other players when the size difference allows it
+10. Death and respawning
+11. A simple round/game-state system
+12. Desktop keyboard controls
+13. Basic mobile/touch controls
+14. Cross-platform browser support
+
+The game should run from a normal web browser.
+
+Target environments include:
+
+* macOS
+* Windows
+* Linux
+* Android
+* iOS/iPadOS browsers where practical
+
+Avoid platform-specific code.
+
+---
+
+# Technology constraints
+
+Use:
+
+* Node.js
+* vanilla JavaScript
+* HTML
+* CSS
+* Babylon.js
+* WebSockets
+
+For WebSockets, a lightweight Node package such as `ws` is acceptable.
+
+Avoid large frameworks.
+
+Do not introduce React, Vue, Angular, Electron, Unity, Godot, etc.
+
+Keep dependencies minimal.
+
+Use ES modules where practical.
+
+---
+
+# Architecture
+
+Use a clear client/server architecture.
+
+Suggested structure:
+
+/server
+server.js
+game/
+world.js
+players.js
+npcFish.js
+collision.js
+gameLoop.js
+
+/client
+index.html
+css/
+js/
+main.js
+networking.js
+world.js
+player.js
+npcFish.js
+camera.js
+controls.js
+interpolation.js
+ui.js
+assets/
+models/
+textures/
+
+Shared protocol definitions may live under:
+
+/shared
+
+The exact structure may be adjusted if there is a cleaner solution.
+
+Keep modules reasonably small and responsibilities clear.
+
+---
+
+# Multiplayer architecture
+
+The Node server must be authoritative.
+
+Clients should NOT decide whether they:
+
+* ate another fish
+* grew
+* died
+* killed another player
+* changed score
+
+The client primarily sends player input/state intentions.
+
+For example:
+
+* movement direction
+* orientation
+* boost/action state if implemented
+
+The server determines the authoritative world state.
+
+The server should maintain:
+
+* connected players
+* positions
+* velocity
+* direction
+* player sizes
+* NPC fish
+* collisions
+* eating events
+* deaths
+* respawns
+* scores
+* round state
+
+For the first version, optimize for clarity rather than massive scale.
+
+The server should run a fixed simulation tick, for example around 20–30 ticks per second.
+
+Network state may be broadcast somewhat less frequently if useful.
+
+Clients should interpolate remote player positions so movement does not look excessively jerky.
+
+Do not attempt advanced rollback networking, prediction correction systems, or sophisticated lag compensation yet.
+
+A simple authoritative server plus interpolation is enough.
+
+---
+
+# LAN multiplayer
+
+The first multiplayer target is LAN play.
+
+One player/computer can run:
+
+node server.js
+
+Other players should be able to connect by opening something similar to:
+
+[http://192.168.x.x:PORT](http://192.168.x.x:PORT)
+
+The server should serve the client files as well as host the WebSocket connection.
+
+The host should also be able to play through their browser.
+
+Keep deployment simple enough that later the exact same server could be moved to a public internet host.
+
+---
+
+# Single-player mode
+
+Single-player must work without needing another human player.
+
+However, avoid creating an entirely separate game implementation.
+
+Ideally reuse the same fundamental game systems.
+
+Possible approach:
+
+Single-player can still run against the local Node server, but with only one connected human player.
+
+Alternatively, if there is a clean abstraction that allows local simulation, that is acceptable.
+
+Prefer whichever architecture creates the least duplication.
+
+The single-player experience should include:
+
+* one human fish
+* NPC fish
+* eating
+* growth
+* death if relevant
+* score
+* round ending/winning condition
+
+---
+
+# Aquarium
+
+Create a simple but attractive 3D aquarium.
+
+For the first version, use primitive geometry where convenient.
+
+Examples:
+
+* large transparent or semi-transparent tank boundaries
+* sandy or simple bottom
+* rocks
+* plants
+* bubbles
+* subtle lighting
+* blue/green underwater ambience
+
+Do not spend excessive development time on visual fidelity.
+
+The aquarium should primarily help establish scale and orientation.
+
+Add environmental objects in a way that allows them to be replaced later with Blender models.
+
+---
+
+# Placeholder fish graphics
+
+Do NOT block development waiting for finished 3D models.
+
+Start with procedural/basic placeholder fish.
+
+A placeholder fish could consist of:
+
+* ellipsoid body
+* simple tail
+* eyes
+* color variation
+
+Different fish sizes should be immediately readable.
+
+Human players should be visually distinguishable from NPC fish.
+
+For multiplayer, assign players different colors.
+
+Later we will create proper animated fish in Blender.
+
+Structure the rendering code so a placeholder fish can later be replaced by a `.glb` model without changing the gameplay logic.
+
+---
+
+# Blender asset pipeline
+
+Prepare the project for future Blender assets.
+
+Babylon.js should load glTF/GLB models cleanly.
+
+Create an `/assets/models/` directory.
+
+Document how future fish models should be exported from Blender.
+
+Prefer:
+
+* `.glb`
+* reasonable scale
+* origin near center of body
+* forward direction standardized
+* animation clips where applicable
+
+Eventually fish models may have animations such as:
+
+* swim
+* idle
+* accelerate
+* bite
+* death
+
+These animations do not need to exist in the first prototype.
+
+---
+
+# Fish movement
+
+Movement should feel smooth and aquatic.
+
+The fish moves continuously forward rather than behaving like a free-flying FPS camera.
+
+Player controls adjust direction.
+
+Desktop example:
+
+W / Up = pitch/swim upward
+S / Down = pitch/swim downward
+A / Left = turn left
+D / Right = turn right
+
+Alternative mouse steering is acceptable if it feels substantially better.
+
+Experiment and choose the simplest enjoyable implementation.
+
+Fish should turn gradually instead of snapping instantly.
+
+Allow full 3D movement inside the aquarium.
+
+Prevent fish from leaving the playable volume.
+
+Do not implement complicated fluid physics.
+
+---
+
+# Camera
+
+Use a third-person follow camera.
+
+The camera should:
+
+* follow behind the fish
+* smoothly interpolate
+* look slightly toward the direction of travel
+* pull back somewhat as the fish becomes very large
+
+Avoid motion sickness and excessive camera movement.
+
+---
+
+# NPC fish
+
+The aquarium should contain many NPC fish.
+
+NPC fish should:
+
+* swim around autonomously
+* have simple wandering behavior
+* avoid leaving the tank
+* have different sizes
+* respawn over time
+* provide the primary growth mechanism
+
+Initial AI can be extremely simple.
+
+Potential behaviors:
+
+* choose a random target direction
+* periodically change direction
+* loosely avoid walls
+* perhaps flee from significantly larger nearby fish
+
+Do not implement sophisticated pathfinding.
+
+---
+
+# Size and growth
+
+Every fish has a numeric size/mass value.
+
+When a player eats a fish, the player gains some portion of that fish's mass.
+
+Do not make size increase linearly without limit in visual radius.
+
+Use a sensible relationship between:
+
+mass
+visual scale
+collision radius
+
+For example, visual scale could roughly correspond to the cube root of mass.
+
+The exact formula should be centralized and easy to tune.
+
+---
+
+# Eating rules
+
+A fish can eat another fish only if the predator is sufficiently larger.
+
+For example:
+
+predatorSize >= preySize * SIZE_ADVANTAGE_REQUIRED
+
+Make this configurable.
+
+Eating should occur when:
+
+* predator is large enough
+* predator/prey collision volumes overlap appropriately
+
+It should not feel like prey disappears when merely touching the predator's tail.
+
+Prefer the collision/eating area to be biased toward the front/head/mouth of the predator.
+
+Keep the first implementation simple.
+
+On successful eating:
+
+* prey disappears
+* predator grows
+* score increases
+* server broadcasts the event
+
+If the prey is another human player:
+
+* victim dies
+* killer receives appropriate growth/score
+* victim respawns after a short delay as a small fish
+
+---
+
+# Collision representation
+
+Gameplay physics should not depend directly on detailed render meshes.
+
+Represent fish gameplay collision using simple shapes such as:
+
+* spheres
+* ellipsoids
+* simple distance checks
+
+This allows future visual fish models to become complicated without changing gameplay.
+
+---
+
+# Round structure
+
+Implement simple short rounds.
+
+Example default:
+
+5 minutes
+
+At round start:
+
+* players spawn small
+* aquarium contains NPC fish
+
+During the round:
+
+* players grow
+* players compete
+
+At round end, show:
+
+* winner
+* largest fish
+* score
+* player ranking
+
+Then allow restarting another round.
+
+Keep round configuration centralized.
+
+---
+
+# UI
+
+Keep UI simple.
+
+Include:
+
+Main screen:
+
+* Single Player
+* Multiplayer
+* Player name
+* server connection field if useful
+
+During gameplay:
+
+* current size
+* score
+* round timer
+* player count
+* simple leaderboard
+
+On death:
+
+"You were eaten by X"
+
+Then respawn countdown.
+
+At round end:
+
+simple results panel.
+
+Use normal HTML/CSS overlays on top of the Babylon canvas.
+
+---
+
+# Mobile controls
+
+Create basic touch controls.
+
+Do not spend excessive time polishing them initially.
+
+Possible implementation:
+
+* virtual joystick on the left
+* vertical steering control or swipe steering
+* optional boost/action button
+
+The game must remain playable on a phone.
+
+Ensure UI scales reasonably across screen sizes.
+
+---
+
+# Performance
+
+Design for a small multiplayer game.
+
+Initial target:
+
+* 1–8 human players
+* perhaps 50–150 NPC fish
+
+These are not strict limits.
+
+Use Babylon meshes efficiently.
+
+If NPC counts become significant, consider:
+
+* thin instances
+* shared meshes/materials
+* simplified remote rendering
+
+But do not prematurely optimize.
+
+Correct architecture and fun gameplay come first.
+
+---
+
+# Network protocol
+
+Use explicit message types.
+
+For example:
+
+client → server
+
+JOIN
+INPUT
+PING
+
+server → client
+
+WELCOME
+WORLD_STATE
+PLAYER_JOINED
+PLAYER_LEFT
+PLAYER_EATEN
+NPC_EATEN
+RESPAWN
+ROUND_STATE
+ROUND_END
+
+Do not blindly serialize every JavaScript object.
+
+Keep network messages deliberate and reasonably compact.
+
+Document the protocol briefly.
+
+---
+
+# Development order
+
+Build this incrementally.
+
+## Milestone 1
+
+Create Babylon scene.
+
+* aquarium
+* placeholder player fish
+* camera
+* 3D movement
+* boundaries
+
+Confirm it is enjoyable to swim around.
+
+## Milestone 2
+
+Create Node server + WebSocket connection.
+
+Have two browser windows connect.
+
+Synchronize two placeholder player fish.
+
+## Milestone 3
+
+Move authoritative player state to server.
+
+Clients send input.
+
+Server simulates players.
+
+Clients render interpolated remote players.
+
+## Milestone 4
+
+Add NPC fish.
+
+NPCs should be server-owned.
+
+Synchronize them to clients.
+
+## Milestone 5
+
+Add eating and growth.
+
+Player eats NPC.
+
+NPC disappears.
+
+Player grows.
+
+NPC respawns.
+
+## Milestone 6
+
+Add player-vs-player eating.
+
+Larger players can consume smaller players.
+
+Add death/respawn.
+
+## Milestone 7
+
+Add rounds, scoring, leaderboard and basic menus.
+
+## Milestone 8
+
+Add basic touch/mobile controls and cross-platform cleanup.
+
+## Milestone 9
+
+Improve placeholder aquarium visuals.
+
+Prepare Blender/GLB model replacement pipeline.
+
+---
+
+# Important engineering rules
+
+Favor simplicity.
+
+Do not build infrastructure for hypothetical future problems unless it naturally falls out of good architecture.
+
+Avoid giant files.
+
+Avoid unnecessary abstraction.
+
+Avoid deep inheritance hierarchies.
+
+Prefer composition and simple data-oriented game objects.
+
+Keep gameplay values configurable.
+
+Centralize constants such as:
+
+PLAYER_START_SIZE
+PLAYER_SPEED
+TURN_SPEED
+NPC_COUNT
+NPC_RESPAWN_RATE
+EAT_SIZE_RATIO
+ROUND_LENGTH
+SERVER_TICK_RATE
+STATE_BROADCAST_RATE
+
+The game should be easy for another coding agent to inspect and modify.
+
+Comment unusual decisions, but do not clutter obvious code with comments.
+
+---
+
+# Testing
+
+At minimum test:
+
+* server starts cleanly
+* client connects
+* disconnect/reconnect does not crash server
+* two browser windows see each other
+* players cannot leave aquarium
+* NPCs spawn
+* NPCs move
+* eating grows player
+* smaller players cannot eat larger players
+* larger players can eat smaller players
+* death works
+* respawn works
+* round reset works
+* single-player works
+* multiplayer works
+
+Provide simple automated tests for server-side pure logic where practical.
+
+Especially test:
+
+* size comparison
+* growth calculations
+* collision/eating rules
+* round state transitions
+
+---
+
+# README
+
+Create a useful README covering:
+
+## Installation
+
+npm install
+
+## Run
+
+npm start
+
+## Local play
+
+[http://localhost:PORT](http://localhost:PORT)
+
+## LAN multiplayer
+
+Explain how another device on the same network connects to the host computer.
+
+## Architecture
+
+Brief explanation of:
+
+client
+server
+WebSockets
+authoritative simulation
+render interpolation
+
+## Controls
+
+Desktop and mobile.
+
+## Blender assets
+
+Explain the expected GLB workflow.
+
+---
+
+# First objective
+
+Do not attempt to make the finished game immediately.
+
+First get this exact vertical slice working:
+
+1. Start Node server.
+2. Open game in two browser windows.
+3. Both players appear as basic fish in the same aquarium.
+4. Both can swim independently in full 3D.
+5. Server owns authoritative position/state.
+6. NPC fish swim around.
+7. Players can eat smaller NPC fish.
+8. Eating causes visible growth.
+9. A sufficiently large player can eat the smaller human player.
+10. The eaten player respawns.
+
+Once this works reliably, improve presentation and game feel.
+
+The most important outcome of the first pass is:
+
+**A genuinely playable tiny multiplayer game rather than an impressive architecture with no game.**
+
+Keep running and testing the project throughout development.
+
+Fix errors rather than merely documenting them.
+
+Make reasonable design decisions autonomously when details are unspecified.
+
