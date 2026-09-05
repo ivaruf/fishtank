@@ -1,3 +1,4 @@
+import { speciesOf } from "../../shared/config.js";
 const B = window.BABYLON;
 export const palette = [
   "#edb45e",
@@ -11,14 +12,207 @@ export const palette = [
 ];
 export function material(scene, name, color, emissive = 0) {
   const m = new B.StandardMaterial(name, scene);
-  m.diffuseColor = B.Color3.FromHexString(color);
+  m.diffuseColor =
+    typeof color === "string" ? B.Color3.FromHexString(color) : color;
   m.specularColor = new B.Color3(0.15, 0.2, 0.17);
   m.emissiveColor = m.diffuseColor.scale(emissive);
   return m;
 }
+const BITE_TIME = 0.4,
+  DEATH_TIME = 0.7;
+// Threat cue tints: food a touch brighter and warmer, threats darker and cooler.
+const NEUTRAL = new B.Color3(1, 1, 1),
+  EDIBLE = new B.Color3(1.25, 1.2, 1.05),
+  DANGER = new B.Color3(0.55, 0.5, 0.6),
+  INSTANCE_COLOR = B.VertexBuffer.ColorInstanceKind;
+// Blender fish exported by tools/blender/create_fish.py: +Z forward, +Y up,
+// ~2-unit body, a "Tail" pivot carrying the swim clip.
+const models = new WeakMap(),
+  crests = new WeakMap();
+const modelsFor = (scene) => {
+  if (!models.has(scene)) models.set(scene, new Map());
+  return models.get(scene);
+};
+// Load every species once into an asset container. Fish are then GPU instances
+// sharing geometry and materials, so a hundred fish cost a handful of draw calls.
+export async function loadFishModels(
+  scene,
+  load = (species) =>
+    B.LoadAssetContainerAsync(`/assets/models/${species}.glb`, scene),
+) {
+  const failed = [];
+  await Promise.all(
+    [...new Set([0, 1, 2].map(speciesOf))].map(async (species) => {
+      try {
+        const container = await load(species);
+        prepare(container, scene);
+        modelsFor(scene).set(species, container);
+      } catch (error) {
+        failed.push(species);
+        console.warn(`Fish model "${species}" failed to load`, error);
+      }
+    }),
+  );
+  return { loaded: [...modelsFor(scene).keys()], failed };
+}
+function prepare(container, scene) {
+  // The glTF loader auto-plays the first clip on the hidden source model.
+  for (const group of container.animationGroups) group.stop();
+  // The scene has no environment texture, so swap the exported PBR materials
+  // for the same StandardMaterial look as the rest of the aquarium. glTF base
+  // colors are linear; StandardMaterial expects gamma space. The two lights add
+  // up to ~2.6x on upward faces, which clips pale colors to white, so the fish
+  // take only part of their color from lighting and the rest as same-hue
+  // emissive: tops sit near the authored color, sides fall to ~70%.
+  const converted = new Map();
+  for (const mesh of container.meshes) {
+    const pbr = mesh.material;
+    if (!pbr) continue;
+    if (!converted.has(pbr)) {
+      const base = (pbr.albedoColor ?? B.Color3.White()).toGammaSpace();
+      const m = material(scene, pbr.name, base.scale(0.3));
+      m.emissiveColor = base.scale(0.4);
+      converted.set(pbr, m);
+    }
+    mesh.material = converted.get(pbr);
+  }
+  for (const pbr of converted.keys()) pbr.dispose();
+  container.materials = [...new Set(converted.values())];
+  // A per-instance color buffer lets the threat cue tint each fish while all
+  // fish of a species still draw as one instanced batch.
+  for (const mesh of container.meshes) {
+    if (!mesh.getTotalVertices()) continue;
+    mesh.registerInstancedBuffer(INSTANCE_COLOR, 4);
+    mesh.instancedBuffers[INSTANCE_COLOR] = new B.Color4(1, 1, 1, 1);
+  }
+}
 export function createFish(scene, color, npc = false) {
+  // Server state drives root; bite and death animations play on pose.
   const root = new B.TransformNode("fish", scene),
-    skin = material(scene, "skin", palette[color % palette.length], 0.12);
+    pose = new B.TransformNode("pose", scene);
+  pose.parent = root;
+  const model = modelsFor(scene).get(speciesOf(color));
+  const body = model
+    ? instantiate(model, pose)
+    : procedural(scene, pose, color);
+  if (!npc) {
+    if (!crests.has(scene))
+      crests.set(scene, material(scene, "crest", "#e4ffc3", 0.7));
+    const crest = B.MeshBuilder.CreateSphere(
+      "player crest",
+      { segments: 6, diameter: 0.28 },
+      scene,
+    );
+    crest.position.set(0, 1.22, 0.05);
+    crest.parent = pose;
+    crest.material = crests.get(scene);
+  }
+  const { swim } = body;
+  swim.start(true, 1);
+  if (swim.isStarted)
+    swim.goToFrame(swim.from + Math.random() * (swim.to - swim.from));
+  let bite = -1,
+    death = -1;
+  const tint = new B.Color3();
+  const fish = {
+    root,
+    pose,
+    swim,
+    wasAlive: false,
+    threat: 0,
+    eatenBy: null,
+    bite() {
+      if (death >= 0) return;
+      bite = 0;
+      swim.speedRatio = 4;
+    },
+    die(predator = null) {
+      fish.eatenBy = predator;
+      death = 0;
+      bite = -1;
+    },
+    reset() {
+      bite = death = -1;
+      fish.eatenBy = null;
+      pose.position.setAll(0);
+      pose.rotation.setAll(0);
+      pose.scaling.setAll(1);
+    },
+    // Advances bite and death animations; true while a death is still playing.
+    update(dt) {
+      if (death >= 0) {
+        death += dt;
+        const t = Math.min(1, death / DEATH_TIME);
+        // Roll belly-up, tumble and shrink away as the predator swallows.
+        pose.rotation.z = t * t * 7;
+        pose.rotation.x = t * 1.5;
+        pose.scaling.setAll(Math.max(0.001, 1 - t * t));
+        if (t < 1) return true;
+        death = -1;
+      } else if (bite >= 0) {
+        bite += dt;
+        const t = bite / BITE_TIME;
+        if (t >= 1) {
+          bite = -1;
+          pose.position.z = 0;
+          pose.rotation.x = 0;
+          pose.scaling.setAll(1);
+        } else {
+          // Lunge forward with a nod, stretching then squashing the body.
+          const lunge = Math.sin(Math.PI * t),
+            chomp = Math.sin(2 * Math.PI * t) * (1 - t);
+          pose.position.z = lunge * 0.45;
+          pose.rotation.x = lunge * 0.18;
+          pose.scaling.set(1 - chomp * 0.12, 1 - chomp * 0.12, 1 + chomp * 0.3);
+        }
+      }
+      return false;
+    },
+    // threat: -1 it can eat me … 0 neutral … 1 I can eat it.
+    tint(threat) {
+      if (threat > 0) B.Color3.LerpToRef(NEUTRAL, EDIBLE, threat, tint);
+      else B.Color3.LerpToRef(NEUTRAL, DANGER, -threat, tint);
+      body.tint(tint);
+    },
+    dispose() {
+      swim.dispose();
+      body.dispose();
+      root.dispose();
+    },
+  };
+  return fish;
+}
+function instantiate(container, parent) {
+  const entries = container.instantiateModelsToScene((name) => name, false, {
+    doNotInstantiate: false,
+  });
+  for (const node of entries.rootNodes) node.parent = parent;
+  const instances = parent
+    .getChildMeshes()
+    .filter((m) => m.instancedBuffers?.[INSTANCE_COLOR]);
+  for (const m of instances)
+    m.instancedBuffers[INSTANCE_COLOR] = new B.Color4(1, 1, 1, 1);
+  const swim =
+    entries.animationGroups.find((g) => /swim/i.test(g.name)) ??
+    entries.animationGroups[0] ??
+    new B.AnimationGroup("swim", parent.getScene());
+  return {
+    swim,
+    tint(color) {
+      for (const m of instances)
+        m.instancedBuffers[INSTANCE_COLOR].set(color.r, color.g, color.b, 1);
+    },
+    dispose() {
+      for (const g of entries.animationGroups) if (g !== swim) g.dispose();
+    },
+  };
+}
+// Fallback when a model is missing or has not finished loading yet.
+function procedural(scene, parent, color) {
+  const skin = material(scene, "skin", palette[color % palette.length], 0.12),
+    white = material(scene, "eyes", "#fff5d9", 0.25),
+    black = material(scene, "pupils", "#102b30"),
+    base = skin.diffuseColor.clone();
   function sphere(name, scale, pos, mat) {
     const mesh = B.MeshBuilder.CreateSphere(
       name,
@@ -27,7 +221,7 @@ export function createFish(scene, color, npc = false) {
     );
     mesh.scaling.set(...scale);
     mesh.position.set(...pos);
-    mesh.parent = root;
+    mesh.parent = parent;
     mesh.material = mat;
     return mesh;
   }
@@ -36,38 +230,34 @@ export function createFish(scene, color, npc = false) {
   tail.rotation.x = 0.25;
   sphere("dorsal", [0.07, 0.5, 0.55], [0, 0.55, -0.15], skin);
   for (const side of [-1, 1]) {
-    const fin = sphere(
+    sphere(
       "fin",
       [0.5, 0.07, 0.32],
       [side * 0.52, -0.2, -0.15],
       skin,
-    );
-    fin.rotation.z = side * 0.3;
-  }
-  const white = material(scene, "eyes", "#fff5d9", 0.25),
-    black = material(scene, "pupils", "#102b30");
-  for (const side of [-1, 1]) {
+    ).rotation.z = side * 0.3;
     sphere("eye", [0.2, 0.23, 0.23], [side * 0.45, 0.22, 0.72], white);
     sphere("pupil", [0.11, 0.14, 0.13], [side * 0.57, 0.23, 0.84], black);
   }
-  if (!npc) {
-    const fin = sphere(
-      "player crest",
-      [0.09, 0.24, 0.23],
-      [0, 0.9, 0.15],
-      material(scene, "crest", "#e4ffc3", 0.7),
-    );
-    fin.rotation.x = 0.3;
-  }
+  const wag = new B.Animation(
+    "wag",
+    "rotation.y",
+    60,
+    B.Animation.ANIMATIONTYPE_FLOAT,
+    B.Animation.ANIMATIONLOOPMODE_CYCLE,
+  );
+  wag.setKeys(
+    [0, 0.3, 0, -0.3, 0].map((value, i) => ({ frame: i * 15, value })),
+  );
+  const swim = new B.AnimationGroup("swim", scene);
+  swim.addTargetedAnimation(wag, tail);
   return {
-    root,
-    tail,
+    swim,
+    tint(color) {
+      base.multiplyToRef(color, skin.diffuseColor);
+    },
     dispose() {
-      const meshes = root.getChildMeshes();
-      const materials = new Set(meshes.map((m) => m.material));
-      meshes.forEach((m) => m.dispose());
-      root.dispose();
-      materials.forEach((m) => m?.dispose());
+      for (const m of [skin, white, black]) m.dispose();
     },
   };
 }

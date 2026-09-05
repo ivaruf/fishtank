@@ -1,6 +1,6 @@
 # Fishtank
 
-A tiny 3D aquarium game: swim, eat smaller fish, grow, and try not to become lunch. Babylon.js, vanilla JavaScript, and an authoritative Node/WebSocket server. No build step or external runtime CDN.
+A tiny 3D aquarium game: swim, eat smaller fish, grow, and try not to become lunch. Babylon.js, vanilla JavaScript, Blender-made fish, and an authoritative Node/WebSocket server. No build step or external runtime CDN.
 
 ## Run
 
@@ -23,17 +23,19 @@ For LAN play, other devices open `http://HOST_LOCAL_IP:3000` on the same network
 - Tap the ⛶ button beside the resolution setting to enter fullscreen; tap it again to exit. It keeps the HUD and touch sticks visible and is shown when the browser supports page fullscreen.
 - Input clears on focus loss, and the server stops movement after 350 ms without fresh input. Movement diagonals are normalized; partial stick deflection gives partial speed.
 - Swim headfirst into a smaller fish to eat it. Required mass advantage: 1.35×. Visual radius grows with the cube root of mass. Larger fish swim slightly slower.
+- Wild fish play by the same rule against you: any with 1.35× your mass can eat you, and those drift toward smaller players within about nine units, swimming a little faster while they do. Give the big ones room. Fish you can eat look a touch brighter; fish that can eat you look darker.
+- Eating plays a forward lunge with a puff of bubbles; the eaten fish rolls over, tumbles and shrinks into the predator's mouth before it vanishes.
 - New and respawning players have three seconds of protection: they cannot eat or be eaten. Eaten players return after three seconds. Score survives death.
 - Five-minute rounds rank players by score, then mass. Results also show the largest fish. A new round starts after twelve seconds.
 - Leave tank returns to the menu. After a connection failure, join again to start as a new fish.
 
 ## Architecture
 
-`server.js` serves an allowlisted client/shared/vendor surface and hosts WebSockets. `server/game/world.js` owns movement, NPC wandering, head-biased collisions, growth, deaths, respawning, and rounds. It simulates at 30 Hz and publishes at 15 Hz. Idle rooms pause; empty private rooms are removed. Shared tuning values live in `shared/config.js`.
+`server.js` serves an allowlisted client/shared/vendor surface and hosts WebSockets. `server/game/world.js` owns movement, NPC wandering and hunting, head-biased collisions, growth, deaths, respawning, and rounds. It simulates at 30 Hz and publishes at 15 Hz. Idle rooms pause; empty private rooms are removed. Shared tuning values live in `shared/config.js`.
 
-`client/js/world.js` creates the aquarium. `fish.js` is the replaceable procedural rendering factory; meshes do not decide collisions. `controls.js` reads keyboard/touch intentions. `networking.js` handles messages. `main.js` interpolates positions and angles, smooths the camera, and updates safe text-only UI. No client prediction or lag compensation is implemented.
+`client/js/world.js` creates the aquarium. `fish.js` loads the three Blender fish once and hands out GPU-instanced copies with bite, death and threat-tint hooks; `effects.js` owns the shared bubble-puff particles; meshes do not decide collisions. `controls.js` reads keyboard/touch intentions. `networking.js` handles messages. `main.js` interpolates positions and angles, smooths the camera, and updates safe text-only UI. No client prediction or lag compensation is implemented.
 
-Protocol: JSON client `JOIN {name, mode}` and `INPUT {forward, strafe, yaw, pitch}` with normalized movement axes and camera angles in radians. Server `WELCOME {id}`, `WORLD_STATE {round, phase, remaining, players, npcs, events}`, and `ERROR {message}`. Events contain `NPC_EATEN` / `PLAYER_EATEN {predator, prey}` or `ROUND_END`. Full snapshots carry joins, departures, respawns, scores, and round transitions. Server ignores client position, size, and score claims. Payloads are limited to 2 KB; dead connections are cleaned up with ping/pong and slow clients skip snapshots.
+Protocol: JSON client `JOIN {name, mode}` and `INPUT {forward, strafe, yaw, pitch}` with normalized movement axes and camera angles in radians. Server `WELCOME {id}`, `WORLD_STATE {round, phase, remaining, players, npcs, events}`, and `ERROR {message}`. Events contain `NPC_EATEN` / `PLAYER_EATEN {predator, prey}` or `ROUND_END`; the predator may be a wild fish, in which case the prey's `killedBy` reads like “a wild blue tang”. Full snapshots carry joins, departures, respawns, scores, and round transitions. Server ignores client position, size, and score claims. Payloads are limited to 2 KB; dead connections are cleaned up with ping/pong and slow clients skip snapshots.
 
 ## Tests
 
@@ -41,22 +43,30 @@ Protocol: JSON client `JOIN {name, mode}` and `INPUT {forward, strafe, yaw, pitc
 npm test
 ```
 
-Tests cover eating thresholds/head collision, protection, growth, NPC movement and respawn, PvP death and respawn, all tank boundaries, round transitions, HTTP assets, two real WebSocket clients, private solo rooms, malformed messages, authority, and disconnect/reconnect.
+Tests cover eating thresholds/head collision, protection, growth, NPC movement, hunting and predation, respawn, PvP death and respawn, all tank boundaries, round transitions, HTTP assets including the `.glb` models, two real WebSocket clients, private solo rooms, malformed messages, authority, and disconnect/reconnect. `tests/fish.test.js` loads the real model files on Babylon's NullEngine and checks orientation, instancing, material conversion, the swim clip, bite and death animation state, threat tints through the per-instance color buffer, disposal, and the procedural fallback.
 
 Manual browser check: join multiplayer in two windows, move and aim independently, eat small NPCs, compare growth across windows, then eat a smaller player. Verify stopping on key release, dual-stick movement and aiming on a phone, respawn, and results after five minutes. Browser/device coverage is not implied by automated server tests.
 
-## Future Blender assets
+## Blender fish models
 
-Place assets in `client/assets/models/`. Export glTF Binary (`.glb`), apply scale/transforms, use a body-centered origin, and keep exported forward along +Z, up +Y. Design a fish around a two-unit body length, then apply gameplay radius on its parent transform. Confirm orientation after export and correct it on a visual child transform if needed. Keep the gameplay-facing root +Z-forward.
+Three stylized fish live in `client/assets/models/` as glTF Binary: `clownfish.glb`, `blue-tang.glb`, and `pufferfish.glb`. Their Blender sources are in `assets/blender/` and `docs/*.png` are studio renders. Everything is generated by `tools/blender/create_fish.py`:
 
-The Babylon glTF loader is served locally. Replace `createFish` internals with `BABYLON.SceneLoader.ImportMeshAsync('', '/assets/models/', 'fish.glb', scene)` and parent the imported meshes to a transform node while preserving the factory's root/animation/disposal contract (adapt the synchronous factory for loading or cache models before joining). Recommended animation clip names: `swim`, `idle`, `accelerate`, `bite`, `death`. Keep mesh geometry independent of server collision rules.
+```sh
+blender --background --factory-startup --python tools/blender/create_fish.py
+```
 
-This first prototype uses decorative plants and rocks without obstacle collision. NPCs wander and provide food; PvP is the current source of death. It targets small LAN games, not hardened public matchmaking.
+Each file has a root node, a static `BodyMesh`, and a `Tail` pivot whose child fan is animated by a one-second looping wag. Fish face +Z with +Y up around a two-unit body; gameplay radius is applied on the parent transform in the client. Materials are plain PBR colors without textures.
+
+At startup `fish.js` loads all three into Babylon asset containers via the locally served glTF loader. Every fish in the tank is then created with `instantiateModelsToScene` using GPU instances, so a hundred NPCs share three sets of geometry and a couple of dozen draw calls. Since the scene has no environment texture, the exported PBR materials are converted to the same `StandardMaterial` setup as the rocks and plants. Linear glTF colors are gamma-converted, and because the tank's two lights add up to roughly 2.6x on upward faces, each fish material takes 30% of its color from lighting and 40% as same-hue emissive so pale species like the pufferfish keep their color instead of clipping to white. Species is `color % 3`, using the server-assigned `color`, so all clients agree. Players carry a small glowing crest so they can be told apart from NPCs. The exported swim clip is cloned per fish, started at a random phase, and its speed follows how fast the fish is moving, so idle fish only idle-wag. Each fish has a root node carrying the server transform and a child pose node for client-side bite lunges and death tumbles, so the models need no extra clips. The threat cue writes a per-instance color (`instanceColor`), which the standard shader multiplies into the final color while keeping every fish of a species in one instanced batch.
+
+If a model fails to load the factory falls back to the earlier procedural sphere fish with the same root/swim/dispose contract, and the console names the missing species. To add a species, export another `.glb` with the same conventions and append its file name to `SPECIES` in `client/js/fish.js`. The Blender exporter currently names the clip `Animation` rather than `swim`; the client accepts either and takes the first clip it finds.
+
+This first prototype uses decorative plants and rocks without obstacle collision. NPCs wander and provide food, and the large ones hunt players who stray close. It targets small LAN games, not hardened public matchmaking.
 
 ## Rendering and mobile resolution
 
 The browser downloads JavaScript and renders the aquarium locally on its GPU. Only gameplay state is exchanged while playing; the server does not stream video or meshes. Preloading affects startup, not the visual fidelity of an already loaded scene.
 
-The resolution selector offers Battery saver (1 render pixel per CSS pixel), Balanced (up to 1.5), and Sharper (up to 2), capped by the display pixel ratio. Babylon uses the inverse hardware scaling factor. The initial prototype mistakenly reduced resolution as device pixel ratio increased; this is corrected. Higher resolution can cost frame rate on slower phones. The procedural models and simple lighting remain placeholders.
+The resolution selector offers Battery saver (1 render pixel per CSS pixel), Balanced (up to 1.5), and Sharper (up to 2), capped by the display pixel ratio. Babylon uses the inverse hardware scaling factor. The initial prototype mistakenly reduced resolution as device pixel ratio increased; this is corrected. Higher resolution can cost frame rate on slower phones. The Blender fish are roughly five times the triangle count of the old procedural spheres but are hardware instanced; lighting is still a simple hemispheric and directional pair.
 
 Automated control tests cover keyboard release, mouse aim without movement, simultaneous independent stick pointers, cancellation, dead zones, and focus loss. A physical Android/iOS check is still needed to assess touch feel and GPU performance.

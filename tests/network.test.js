@@ -31,6 +31,9 @@ test("HTTP, two clients, input authority, solo isolation and reconnect", async (
     assert.equal((await fetch(`${base}/vendor/babylon.js`)).status, 200);
     assert.equal((await fetch(`${base}/vendor/loaders.js`)).status, 200);
     assert.equal((await fetch(`${base}/server.js`)).status, 404);
+    const model = await fetch(`${base}/assets/models/clownfish.glb`);
+    assert.equal(model.status, 200);
+    assert.equal(model.headers.get("content-type"), "model/gltf-binary");
     async function join(mode = "multiplayer") {
       const s = new WebSocket(base.replace("http", "ws") + "/ws");
       clients.push(s);

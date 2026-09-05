@@ -1,9 +1,10 @@
 import { setupFullscreen } from "./fullscreen.js";
 import { createAquarium } from "./world.js";
-import { createFish } from "./fish.js";
+import { createFish, loadFishModels } from "./fish.js";
+import { createPuffs } from "./effects.js";
 import { createControls } from "./controls.js";
 import { connect } from "./networking.js";
-import { radius, direction } from "/shared/config.js";
+import { CONFIG as C, radius, direction, clamp, wrap } from "/shared/config.js";
 const B = window.BABYLON,
   $ = (id) => document.getElementById(id);
 let aquarium;
@@ -15,11 +16,18 @@ try {
   throw e;
 }
 const { engine, scene, camera } = aquarium,
+  puffs = createPuffs(scene),
   controls = createControls($("game"), () => {
     if (network && myId) network.send(controls.read());
   }),
   visuals = new Map();
 setupFullscreen(() => engine.resize());
+// Fish drawn before the Blender models arrive are rebuilt once they are cached.
+loadFishModels(scene).then(({ failed }) => {
+  if (failed.length)
+    console.warn(`Using procedural fish for: ${failed.join(", ")}`);
+  clearFish();
+});
 let network = null,
   myId = null,
   state = null,
@@ -90,9 +98,18 @@ function join(mode) {
       controls.setActive(!!me?.alive && next.phase === "playing");
       state = next;
       updateUI();
-      if (next.events.some((e) => e.predator === myId)) {
-        toastUntil = performance.now() + 1400;
-        $("toast").textContent = "A little bigger. A little bolder. +";
+      for (const e of next.events) {
+        if (!e.prey) continue;
+        visuals.get(e.predator)?.bite();
+        const prey = visuals.get(e.prey);
+        if (prey) {
+          prey.die(e.predator);
+          puffs.burst(prey.root.position, prey.root.scaling.x);
+        }
+        if (e.predator === myId) {
+          toastUntil = performance.now() + 1400;
+          $("toast").textContent = "A little bigger. A little bolder. +";
+        }
       }
     },
     onError(message) {
@@ -143,6 +160,14 @@ function updateUI() {
       `Eaten by ${me.killedBy}\nBack in the water in ${Math.ceil(me.respawn)}s`;
   }
 }
+// Where a fish's mouth is right now, or null if it is not being shown.
+function mouth(v) {
+  if (!v?.root.isEnabled()) return null;
+  const d = direction({ yaw: v.root.rotation.y, pitch: -v.root.rotation.x });
+  return v.root.position.add(
+    new B.Vector3(d.x, d.y, d.z).scale(v.root.scaling.x * 0.8),
+  );
+}
 engine.runRenderLoop(() => {
   const dt = Math.min(engine.getDeltaTime() / 1000, 0.05);
   time += dt;
@@ -162,43 +187,62 @@ engine.runRenderLoop(() => {
         z: Math.cos(time * 0.13 + i * 2.4) * 18,
         yaw: time * 0.13 + i * 2.4 + Math.PI / 2,
       }));
+  const me = state?.players.find((p) => p.id === myId);
   const ids = new Set(fish.map((f) => f.id));
   for (const [id, v] of visuals)
     if (!ids.has(id)) {
       v.dispose();
       visuals.delete(id);
     }
+  const alpha = 1 - Math.exp(-dt * 12),
+    settle = 1 - Math.exp(-dt * 5);
   for (const f of fish) {
     let v = visuals.get(f.id);
     if (!v) {
       v = createFish(scene, f.color, f.npc);
-      v.root.position.set(f.x, f.y, f.z);
-      v.root.rotation.set(-f.pitch, f.yaw, 0);
       visuals.set(f.id, v);
     }
-    v.root.setEnabled(f.alive);
-    if (!f.alive) continue;
-    const alpha = 1 - Math.exp(-dt * 12);
-    v.root.position = B.Vector3.Lerp(
-      v.root.position,
-      new B.Vector3(f.x, f.y, f.z),
-      alpha,
-    );
-    v.root.rotation.y +=
-      Math.atan2(
-        Math.sin(f.yaw - v.root.rotation.y),
-        Math.cos(f.yaw - v.root.rotation.y),
-      ) * alpha;
+    if (f.alive && !v.wasAlive) {
+      // Fresh spawn: appear in place rather than streak across the tank.
+      v.reset();
+      v.root.position.set(f.x, f.y, f.z);
+      v.root.rotation.set(-f.pitch, f.yaw, 0);
+    }
+    v.wasAlive = f.alive;
+    const dying = v.update(dt);
+    v.root.setEnabled(f.alive || dying);
+    if (!f.alive && !dying) continue;
+    const r = radius(f.mass);
+    // Prey drifts into its predator's mouth while the death animation plays.
+    const target = f.alive
+      ? new B.Vector3(f.x, f.y, f.z)
+      : (mouth(visuals.get(v.eatenBy)) ?? v.root.position);
+    // Distance closed this frame approximates the fish's speed for the tail.
+    const speed =
+      (B.Vector3.Distance(v.root.position, target) * alpha) /
+      Math.max(dt, 0.001);
+    v.root.position = B.Vector3.Lerp(v.root.position, target, alpha);
+    v.root.rotation.y += wrap(f.yaw - v.root.rotation.y) * alpha;
     v.root.rotation.x += (-f.pitch - v.root.rotation.x) * alpha;
-    v.root.scaling.setAll(radius(f.mass));
-    v.tail.rotation.y = Math.sin(time * (f.npc ? 8 : 11) + f.color) * 0.35;
+    v.root.scaling.setAll(r);
+    v.swim.speedRatio +=
+      (clamp(0.4 + (speed * 0.2) / Math.sqrt(r), 0.4, 2.4) -
+        v.swim.speedRatio) *
+      settle;
+    // Subtle cue: food looks a touch brighter, threats a touch darker.
+    let threat = 0;
+    if (me?.alive && f.id !== myId) {
+      if (f.mass >= me.mass * C.eatRatio) threat = -1;
+      else if (me.mass >= f.mass * C.eatRatio) threat = 1;
+    }
+    v.threat += (threat - v.threat) * settle;
+    v.tint(v.threat);
   }
-  const me = state?.players.find((p) => p.id === myId),
-    v = me && visuals.get(me.id);
-  if (v) {
+  const mine = me && visuals.get(me.id);
+  if (mine) {
     const d = direction(input),
       r = radius(me.mass),
-      p = v.root.position;
+      p = mine.root.position;
     const desired = new B.Vector3(
       p.x - d.x * (7 + r * 3),
       p.y + 2 + r * 0.4 - d.y * (7 + r * 3),

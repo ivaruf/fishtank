@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { World, canEat } from "../server/game/world.js";
-import { CONFIG as C, radius } from "../shared/config.js";
+import { CONFIG as C, radius, wrap } from "../shared/config.js";
 function setup() {
   const w = new World(() => 0.5),
     p = w.addPlayer("one", "One");
@@ -130,4 +130,91 @@ test("stale movement input expires and respawns clear held input", () => {
   w.spawn(p);
   assert.equal(p.input.forward, 0);
   assert.equal(p.input.strafe, 0);
+});
+test("a wild fish big enough to eat a player does so, is named, and the player respawns", () => {
+  const { w, p } = setup();
+  const giant = {
+    id: "giant",
+    npc: true,
+    color: 2,
+    mass: 20,
+    x: 0,
+    y: 15,
+    z: -1.2,
+    yaw: 0,
+    pitch: 0,
+    alive: true,
+    protection: 0,
+    decision: 10,
+    turn: 0,
+    vertical: 0,
+  };
+  w.npcs = [giant];
+  w.tick(0);
+  assert.equal(p.alive, false);
+  assert.equal(p.killedBy, "a wild pufferfish");
+  assert.equal(giant.mass, 20 + C.startMass * C.growth);
+  assert.deepEqual(
+    w.events.filter((e) => e.type === "PLAYER_EATEN"),
+    [{ type: "PLAYER_EATEN", predator: "giant", prey: "one" }],
+  );
+  w.tick(C.respawnDelay + 0.1);
+  assert.equal(p.alive, true);
+  assert.equal(p.mass, C.startMass);
+});
+test("small or protected fish are safe from wild predators", () => {
+  const { w, p } = setup();
+  const giant = {
+    id: "giant",
+    npc: true,
+    color: 0,
+    mass: 20,
+    x: 0,
+    y: 15,
+    z: -1.2,
+    yaw: 0,
+    pitch: 0,
+    alive: true,
+    protection: 0,
+    decision: 10,
+    turn: 0,
+    vertical: 0,
+  };
+  w.npcs = [{ ...giant, mass: 10 }];
+  w.tick(0);
+  assert.equal(p.alive, true);
+  w.npcs = [giant];
+  p.protection = 1;
+  w.tick(0);
+  assert.equal(p.alive, true);
+});
+test("big wild fish turn toward nearby smaller players; small ones ignore them", () => {
+  const { w, p } = setup();
+  const away = Math.PI;
+  const npc = (id, mass) => ({
+    id,
+    npc: true,
+    color: 1,
+    mass,
+    x: 0,
+    y: 15,
+    z: -6,
+    yaw: away,
+    pitch: 0,
+    alive: true,
+    protection: 0,
+    decision: 10,
+    turn: 0,
+    vertical: 0,
+  });
+  const hunter = npc("hunter", 20),
+    grazer = npc("grazer", 3),
+    distant = { ...npc("distant", 20), z: -25 };
+  w.npcs = [hunter, grazer, distant];
+  for (let i = 0; i < 10; i++) w.tick(0.1);
+  assert.ok(Math.abs(wrap(hunter.yaw)) < Math.PI - 0.5, "hunter turns");
+  assert.equal(hunter.hunting, true);
+  assert.equal(grazer.yaw, away);
+  assert.equal(distant.yaw, away);
+  assert.ok(hunter.z > grazer.z, "hunter also swims faster");
 });
