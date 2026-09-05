@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover"
+    />
+    <title>Fishtank — A little fish. A big adventure.</title>
+    <link rel="stylesheet" href="/css/style.css" />
+  </head>
+  <body>
+    <canvas id="game" tabindex="0" aria-label="3D aquarium"></canvas>
+    <div class="vignette"></div>
+    <header>
+      <a class="brand" href="/"
+        >◈ fishtank<span>A SMALL WORLD, BELOW THE SURFACE</span></a
+      >
+      <div class="header-tools">
+        <div class="connection" id="connection">● YOUR NEXT ADVENTURE</div>
+        <div class="display-controls">
+          <label class="resolution-label"
+            ><span>Resolution</span>
+            <select id="resolution" aria-label="Render resolution">
+              <option value="battery">Battery saver</option>
+              <option value="balanced" selected>Balanced</option>
+              <option value="sharp">Sharper</option>
+            </select>
+          </label>
+          <button
+            id="fullscreen"
+            class="secondary fullscreen-toggle"
+            type="button"
+            aria-label="Enter fullscreen"
+            aria-pressed="false"
+            title="Enter fullscreen"
+            hidden
+          >
+            ⛶
+          </button>
+        </div>
+        <div id="fullscreen-status" role="status" hidden></div>
+      </div>
+    </header>
+    <main id="menu" class="panel">
+      <div class="eyebrow">WELCOME TO THE FOOD CHAIN</div>
+      <h1>Small fish.<br />Big <em>possibilities.</em></h1>
+      <p>
+        Find your fins in a living little ocean.<br />Eat, grow, and try not to
+        become lunch.
+      </p>
+      <label for="name">WHAT SHOULD WE CALL YOU?</label
+      ><input
+        id="name"
+        maxlength="18"
+        placeholder="Little fish"
+        autocomplete="nickname"
+      />
+      <div class="buttons">
+        <button id="solo">Dive in solo <span>↗</span></button
+        ><button id="multi" class="secondary">
+          Play with friends <span>→</span>
+        </button>
+      </div>
+      <div class="hint">
+        ONE AQUARIUM · UP TO 8 FRIENDS · FIVE MINUTE ROUNDS
+      </div>
+      <p class="error" id="error" role="alert"></p>
+    </main>
+    <section id="hud" hidden>
+      <div class="stats glass">
+        <div><small>MASS</small><b id="mass">8.0</b></div>
+        <div><small>SCORE</small><b id="score">0</b></div>
+        <div><small>ROUND</small><b id="timer">5:00</b></div>
+      </div>
+      <aside class="glass leaderboard">
+        <div class="eyebrow">THE BIG FISH <span id="count"></span></div>
+        <ol id="leaders"></ol>
+      </aside>
+      <div class="aim">·</div>
+      <div id="toast" aria-live="polite"></div>
+      <button id="leave" class="exit secondary">Leave tank</button>
+    </section>
+    <section id="overlay" class="glass overlay" hidden>
+      <div class="eyebrow" id="overlay-tag"></div>
+      <h2 id="overlay-title"></h2>
+      <p id="overlay-text"></p>
+    </section>
+    <footer>
+      <div>
+        <span class="key">W</span><span class="key">S</span> forward / back
+        <span class="key">A</span><span class="key">D</span> strafe
+        <span class="divider">/</span> Mouse to aim · Click to capture · Esc to
+        release
+      </div>
+      <span>THE AQUARIUM · 001</span>
+    </footer>
+    <div id="touch" hidden>
+      <div class="touch-control movement-pad">
+        <div
+          id="move-stick"
+          class="joystick"
+          role="group"
+          aria-label="Movement stick"
+        >
+          <div class="stick"></div>
+        </div>
+        <span>MOVE</span>
+      </div>
+      <div class="touch-control camera-pad">
+        <div
+          id="look-stick"
+          class="joystick"
+          role="group"
+          aria-label="Camera stick"
+        >
+          <div class="stick"></div>
+        </div>
+        <span>LOOK</span>
+      </div>
+      <div class="landscape-hint">
+        Rotate your phone for more swimming room ↻
+      </div>
+    </div>
+    <script src="/vendor/babylon.js"></script>
+    <script src="/vendor/loaders.js"></script>
+    <script type="module" src="/js/main.js"></script>
+  </body>
+</html>
