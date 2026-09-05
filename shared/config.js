@@ -7,7 +7,9 @@ export const CONFIG = Object.freeze({
   turnSpeed: 3.5,
   inputTimeout: 0.35,
   npcCount: 100,
-  eatRatio: 1.35,
+  // Heavier eats lighter, full stop: with 1 the food chain is binary and only
+  // an exact tie (two fresh spawns) leaves two fish neutral to each other.
+  eatRatio: 1,
   growth: 0.75,
   // Wild fish large enough to eat a player drift toward one this close (plus
   // their own radius) and swim a little faster while doing so.
@@ -15,7 +17,8 @@ export const CONFIG = Object.freeze({
   npcHuntSpeed: 1.3,
   roundLength: 300,
   intermission: 12,
-  respawnDelay: 3,
+  // Long enough to watch yourself get eaten and still read the banner.
+  respawnDelay: 5,
   spawnProtection: 3,
   tickRate: 30,
   broadcastRate: 15,
@@ -25,6 +28,8 @@ export const CONFIG = Object.freeze({
 // tell when it is talking to a server process started from older code.
 export const PROTOCOL = 2;
 export const radius = (mass) => Math.cbrt(mass) * 0.48;
+export const outweighs = (predator, prey) =>
+  predator.mass > prey.mass * CONFIG.eatRatio;
 export const direction = (fish) => ({
   x: Math.sin(fish.yaw) * Math.cos(fish.pitch),
   y: Math.sin(fish.pitch),
@@ -46,3 +51,23 @@ export const SPECIES = Object.freeze([
 ]);
 export const speciesLabel = (species = "fish") =>
   String(species).replaceAll("-", " ");
+// Kelp clusters across the tank. A fish low enough inside one is hidden from
+// hunters; the client grows the same clusters so cover looks like cover.
+export const PLANTS = Object.freeze(
+  Array.from({ length: 13 }, (_, i) => {
+    // Golden-angle spiral; the reach permutation spreads clusters evenly.
+    const angle = i * 2.39996,
+      reach = 5 + ((i * 7) % 13) * 2;
+    return Object.freeze({
+      x: Math.round(Math.cos(angle) * reach * 10) / 10,
+      z: Math.round(Math.sin(angle) * reach * 10) / 10,
+      radius: 3 + (i % 3) * 0.9,
+      height: 9 + (i % 4) * 3,
+    });
+  }),
+);
+export const inCover = (fish) =>
+  PLANTS.some(
+    (p) =>
+      fish.y < p.height && Math.hypot(fish.x - p.x, fish.z - p.z) < p.radius,
+  );

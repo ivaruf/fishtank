@@ -36,6 +36,10 @@ test("HTTP, two clients, input authority, solo isolation and reconnect", async (
     assert.equal((await fetch(`${base}/server.js`)).status, 404);
     const model = await fetch(`${base}/assets/models/clownfish.glb`);
     assert.equal(model.status, 200);
+    assert.equal(
+      (await fetch(`${base}/assets/models/clownfish-hd.glb`)).status,
+      200,
+    );
     assert.equal(model.headers.get("content-type"), "model/gltf-binary");
     async function join(mode = "multiplayer", species) {
       const s = new WebSocket(base.replace("http", "ws") + "/ws");
@@ -63,6 +67,9 @@ test("HTTP, two clients, input authority, solo isolation and reconnect", async (
       SPECIES.includes(state.players.find((p) => p.id === b.playerId).species),
     );
     assert.ok(state.npcs.every((n) => SPECIES.includes(n.species)));
+    const sound = await fetch(`${base}/assets/audio/click.m4a`);
+    assert.equal(sound.status, 200);
+    assert.equal(sound.headers.get("content-type"), "audio/mp4");
     const thumb = await fetch(`${base}/assets/thumbs/clownfish.png`);
     assert.equal(thumb.status, 200);
     assert.equal(thumb.headers.get("content-type"), "image/png");

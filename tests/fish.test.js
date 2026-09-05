@@ -18,16 +18,24 @@ function headless() {
   new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
   return { engine, scene };
 }
-const fromDisk = (scene) => (species) =>
+const fromDisk = (scene) => (species, detail) =>
   BABYLON.LoadAssetContainerAsync(
     new Uint8Array(
       readFileSync(
-        new URL(`../client/assets/models/${species}.glb`, import.meta.url),
+        new URL(
+          `../client/assets/models/${species}${detail === "hd" ? "-hd" : ""}.glb`,
+          import.meta.url,
+        ),
       ),
     ),
     scene,
     { pluginExtension: ".glb" },
   );
+const vertices = (fish) =>
+  fish.root
+    .getChildMeshes()
+    .filter((m) => m.sourceMesh)
+    .reduce((sum, m) => sum + m.sourceMesh.getTotalVertices(), 0);
 function worldZ(fish) {
   const meshes = fish.root.getChildMeshes().filter((m) => m.getTotalVertices());
   const boxes = meshes.map((m) => {
@@ -43,13 +51,19 @@ function worldZ(fish) {
 function checkAnimations(fish) {
   assert.equal(fish.update(0.1), false);
   assert.equal(fish.pose.position.z, 0);
+  assert.equal(fish.mouth.isEnabled(), false, "maw hidden at rest");
   fish.bite();
-  assert.equal(fish.update(0.1), false);
+  assert.equal(fish.update(0.15), false);
   assert.ok(fish.pose.position.z > 0.1, "bite lunges forward");
   assert.ok(fish.pose.scaling.z > 1, "bite stretches the body");
+  assert.ok(fish.pose.rotation.x < -0.1, "head rears back while gaping");
+  assert.ok(fish.mouth.isEnabled() && fish.mouth.scaling.y > 0.2, "maw gapes");
+  fish.update(0.25);
+  assert.ok(fish.pose.rotation.x > 0, "then snaps down");
   fish.update(0.5);
   assert.equal(fish.pose.position.z, 0);
   assert.equal(fish.pose.scaling.z, 1);
+  assert.equal(fish.mouth.isEnabled(), false, "maw hidden after the chomp");
   fish.die("predator");
   assert.equal(fish.eatenBy, "predator");
   assert.equal(fish.update(0.2), true);
@@ -57,6 +71,9 @@ function checkAnimations(fish) {
   fish.bite();
   assert.equal(fish.pose.position.z, 0, "no bite while dying");
   assert.equal(fish.update(1), false);
+  fish.die("slow", 2);
+  assert.equal(fish.update(1), true, "a longer swallow is still going");
+  assert.equal(fish.update(1.1), false);
   fish.reset();
   assert.equal(fish.pose.scaling.x, 1);
   assert.equal(fish.pose.rotation.z, 0);
@@ -66,7 +83,11 @@ test("Blender fish load, face +Z, share instanced geometry, swim, tint and dispo
   const { engine, scene } = headless();
   try {
     const result = await loadFishModels(scene, fromDisk(scene));
-    assert.deepEqual(result, { loaded: SPECIES, failed: [] });
+    assert.deepEqual(result, {
+      loaded: SPECIES,
+      failed: [],
+      detail: "standard",
+    });
     const baseline = { meshes: scene.meshes.length, groups: 0 };
     for (const [color, species] of SPECIES.entries()) {
       const fish = createFish(scene, species, false, color);
@@ -129,6 +150,41 @@ test("Blender fish load, face +Z, share instanced geometry, swim, tint and dispo
     engine.dispose();
   }
 });
+test("Ultra loads denser models for every species and swaps out the previous set", async () => {
+  const { engine, scene } = headless();
+  try {
+    await loadFishModels(scene, fromDisk(scene), "standard");
+    const standard = Object.fromEntries(
+      SPECIES.map((s) => {
+        const fish = createFish(scene, s, true);
+        const count = vertices(fish);
+        fish.dispose();
+        return [s, count];
+      }),
+    );
+    const stale = createFish(scene, "shark", true);
+    const meshesBefore = scene.meshes.length;
+    const result = await loadFishModels(scene, fromDisk(scene), "hd");
+    assert.deepEqual(result, { loaded: SPECIES, failed: [], detail: "hd" });
+    // The old set is gone, including the instances a stale fish still held.
+    assert.ok(scene.meshes.length < meshesBefore);
+    assert.equal(
+      stale.root.getChildMeshes().filter((m) => m.sourceMesh).length,
+      0,
+    );
+    stale.dispose();
+    for (const species of SPECIES) {
+      const fish = createFish(scene, species, true);
+      assert.ok(
+        vertices(fish) > standard[species] * 2,
+        `${species}: hd ${vertices(fish)} vs standard ${standard[species]}`,
+      );
+      fish.dispose();
+    }
+  } finally {
+    engine.dispose();
+  }
+});
 test("missing models fall back to a procedural fish with the same contract", () => {
   const { engine, scene } = headless();
   try {
@@ -150,7 +206,11 @@ test("missing models fall back to a procedural fish with the same contract", () 
     checkAnimations(fish);
     fish.dispose();
     assert.equal(scene.meshes.length, 0);
-    assert.equal(scene.materials.length, 0);
+    // Only the per-scene shared maw material may remain.
+    assert.deepEqual(
+      scene.materials.map((m) => m.name),
+      ["maw"],
+    );
   } finally {
     engine.dispose();
   }

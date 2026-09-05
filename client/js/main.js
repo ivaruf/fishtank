@@ -1,7 +1,9 @@
 import { setupFullscreen } from "./fullscreen.js";
 import { createAquarium } from "./world.js";
 import { createFish, loadFishModels } from "./fish.js";
+import { modelDetail } from "./rendering.js";
 import { createPuffs } from "./effects.js";
+import { createAudio } from "./audio.js";
 import { createControls } from "./controls.js";
 import { connect } from "./networking.js";
 import {
@@ -13,9 +15,18 @@ import {
   clamp,
   wrap,
   speciesLabel,
+  outweighs,
 } from "/shared/config.js";
 const B = window.BABYLON,
   $ = (id) => document.getElementById(id);
+// The quality choice survives reloads; restore it before the engine reads it.
+try {
+  const saved = localStorage.getItem("fishtank.quality");
+  if ([...$("resolution").options].some((o) => o.value === saved))
+    $("resolution").value = saved;
+} catch {
+  /* Storage unavailable: keep the default. */
+}
 let aquarium;
 try {
   aquarium = createAquarium($("game"));
@@ -31,11 +42,50 @@ const { engine, scene, camera } = aquarium,
   }),
   visuals = new Map();
 setupFullscreen(() => engine.resize());
+// Sound: browsers only start audio after a gesture, so unlock on the first one.
+const audio = createAudio();
+for (const type of ["pointerdown", "keydown"])
+  window.addEventListener(type, () => audio.unlock(), { capture: true });
+function syncMute() {
+  const on = audio.muted,
+    label = on ? "Unmute sound" : "Mute sound";
+  $("mute").textContent = on ? "🔇" : "🔊";
+  $("mute").setAttribute("aria-pressed", String(on));
+  $("mute").setAttribute("aria-label", label);
+  $("mute").title = label;
+}
+$("mute").addEventListener("click", () => {
+  audio.setMuted(!audio.muted);
+  syncMute();
+  audio.play("click");
+});
+syncMute();
+audio.music("menu");
 // Fish drawn before the Blender models arrive are rebuilt once they are cached.
-loadFishModels(scene).then(({ failed }) => {
-  if (failed.length)
-    console.warn(`Using procedural fish for: ${failed.join(", ")}`);
-  clearFish();
+// Ultra swaps in the high-detail exports; loads are chained so the last choice
+// always wins even if the player flips the selector quickly.
+let modelsLoading = Promise.resolve(),
+  loadedDetail = null;
+function loadModels() {
+  const detail = modelDetail($("resolution").value);
+  if (detail === loadedDetail) return;
+  loadedDetail = detail;
+  modelsLoading = modelsLoading
+    .then(() => loadFishModels(scene, undefined, detail))
+    .then(({ failed }) => {
+      if (failed.length)
+        console.warn(`Using procedural fish for: ${failed.join(", ")}`);
+      clearFish();
+    });
+}
+loadModels();
+$("resolution").addEventListener("change", () => {
+  try {
+    localStorage.setItem("fishtank.quality", $("resolution").value);
+  } catch {
+    /* Not remembered this time. */
+  }
+  loadModels();
 });
 let network = null,
   myId = null,
@@ -43,7 +93,11 @@ let network = null,
   joining = false,
   time = 0,
   toastUntil = 0,
-  lastSend = 0;
+  lastSend = 0,
+  lastDanger = 0,
+  deathCam = null;
+// How long the camera lingers on the predator before the banner appears.
+const DEATH_CAM_SECONDS = 2.2;
 const demos = Array.from({ length: 18 }, (_, i) => ({
   id: `demo-${i}`,
   color: i % 5,
@@ -75,6 +129,7 @@ $("species").replaceChildren(
     input.value = species;
     input.checked = species === chosenSpecies;
     input.addEventListener("change", () => {
+      audio.play("click");
       chosenSpecies = species;
       try {
         localStorage.setItem("fishtank.species", species);
@@ -120,7 +175,7 @@ function showHero(dt) {
       .add(
         camera
           .getDirection(B.Vector3.Up())
-          .scale((wide ? -0.1 : 3.5) + Math.sin(time * 1.1) * 0.15),
+          .scale((wide ? 2.2 : 3.5) + Math.sin(time * 1.1) * 0.15),
       ),
   );
   // Three-quarter view that slowly swings between profile and face-on.
@@ -143,6 +198,7 @@ function leave(message = "") {
   myId = null;
   state = null;
   joining = false;
+  deathCam = null;
   clearFish();
   $("menu").hidden = false;
   $("hud").hidden = true;
@@ -150,6 +206,7 @@ function leave(message = "") {
   $("touch").hidden = true;
   $("error").textContent = message;
   $("connection").textContent = "● YOUR NEXT ADVENTURE";
+  audio.music("menu");
 }
 function join(mode) {
   if (joining || network) return;
@@ -169,6 +226,7 @@ function join(mode) {
       $("hud").hidden = false;
       $("error").textContent = "";
       $("touch").hidden = !matchMedia("(pointer:coarse)").matches;
+      audio.music("game");
       $("connection").textContent =
         mode === "single" ? "● SOLO AQUARIUM" : "● LAN MULTIPLAYER";
       if (protocol !== PROTOCOL) {
@@ -186,15 +244,40 @@ function join(mode) {
         (!before || (!before.alive && me.alive) || next.round !== state?.round)
       )
         controls.orient(me.yaw, me.pitch);
+      if (before && !before.alive && me?.alive) {
+        audio.play("respawn");
+        deathCam = null;
+      }
       controls.setActive(!!me?.alive && next.phase === "playing");
       state = next;
       updateUI();
       for (const e of next.events) {
+        if (e.type === "ROUND_END") audio.play("round-end");
         if (!e.prey) continue;
+        if (e.predator === myId) audio.play("chomp");
+        else if (e.prey === myId) {
+          audio.play("eaten");
+          deathCam = {
+            predator: e.predator,
+            start: performance.now(),
+            chews: 0,
+            done: false,
+            side: 0,
+            look: camera.getTarget().clone(),
+          };
+        } else {
+          // Someone else's meal: a pop that fades with distance from my fish.
+          const at = visuals.get(e.prey)?.root.position,
+            from = visuals.get(myId)?.root.position ?? camera.position;
+          audio.play("nearby", {
+            distance: at ? B.Vector3.Distance(at, from) : 0,
+          });
+        }
         visuals.get(e.predator)?.bite();
         const prey = visuals.get(e.prey);
         if (prey) {
-          prey.die(e.predator);
+          // The player's own swallow runs longer so the death cam can watch it.
+          prey.die(e.predator, e.prey === myId ? 1.6 : undefined);
           puffs.burst(prey.root.position, prey.root.scaling.x);
         }
         if (e.predator === myId) {
@@ -213,9 +296,18 @@ function join(mode) {
   });
   network = connection;
 }
-$("solo").onclick = () => join("single");
-$("multi").onclick = () => join("multiplayer");
-$("leave").onclick = () => leave();
+$("solo").onclick = () => {
+  audio.play("click");
+  join("single");
+};
+$("multi").onclick = () => {
+  audio.play("click");
+  join("multiplayer");
+};
+$("leave").onclick = () => {
+  audio.play("click");
+  leave();
+};
 function updateUI() {
   const me = state.players.find((p) => p.id === myId);
   if (!me) return;
@@ -224,6 +316,7 @@ function updateUI() {
   $("timer").textContent =
     `${Math.floor(Math.max(0, state.remaining) / 60)}:${String(Math.floor(Math.max(0, state.remaining) % 60)).padStart(2, "0")}`;
   $("count").textContent = `· ${state.players.length}`;
+  $("cover").hidden = !me.hidden;
   const ranked = [...state.players].sort(
     (a, b) => b.score - a.score || b.mass - a.mass,
   );
@@ -237,7 +330,8 @@ function updateUI() {
       return li;
     }),
   );
-  $("overlay").hidden = me.alive && state.phase === "playing";
+  $("overlay").hidden =
+    (me.alive && state.phase === "playing") || !!(deathCam && !deathCam.done);
   if (state.phase === "results") {
     $("overlay-tag").textContent = `ROUND ${state.round} COMPLETE`;
     $("overlay-title").textContent = `${ranked[0]?.name || "Nobody"} wins!`;
@@ -258,6 +352,107 @@ function mouth(v) {
   return v.root.position.add(
     new B.Vector3(d.x, d.y, d.z).scale(v.root.scaling.x * 0.8),
   );
+}
+// Other players' names float above their fish: HTML labels projected from 3D
+// each frame, faded with distance and hidden while the player is in cover.
+const labels = new Map();
+function placeLabels() {
+  const players = state?.players ?? [],
+    seen = new Set(),
+    canvas = $("game"),
+    width = canvas.clientWidth,
+    height = canvas.clientHeight,
+    viewport = camera.viewport.toGlobal(width, height),
+    transform = scene.getTransformMatrix(),
+    forward = camera.getDirection(B.Vector3.Forward());
+  for (const p of players) {
+    if (p.id === myId) continue;
+    seen.add(p.id);
+    let label = labels.get(p.id);
+    if (!label) {
+      label = document.createElement("div");
+      label.className = "label";
+      $("labels").append(label);
+      labels.set(p.id, label);
+    }
+    if (label.textContent !== p.name) label.textContent = p.name;
+    const v = visuals.get(p.id);
+    if (!p.alive || p.hidden || !v?.root.isEnabled()) {
+      label.hidden = true;
+      continue;
+    }
+    const point = v.root.position.add(
+      new B.Vector3(0, radius(p.mass) * 1.6 + 0.4, 0),
+    );
+    const onScreen = B.Vector3.Project(
+      point,
+      B.Matrix.IdentityReadOnly,
+      transform,
+      viewport,
+    );
+    const ahead = B.Vector3.Dot(point.subtract(camera.position), forward) > 0.5;
+    if (
+      !ahead ||
+      onScreen.x < -60 ||
+      onScreen.x > width + 60 ||
+      onScreen.y < -30 ||
+      onScreen.y > height + 30
+    ) {
+      label.hidden = true;
+      continue;
+    }
+    label.hidden = false;
+    label.style.transform = `translate(${onScreen.x.toFixed(1)}px, ${onScreen.y.toFixed(1)}px) translate(-50%, -100%)`;
+    label.style.opacity = Math.max(
+      0.3,
+      1 - B.Vector3.Distance(point, camera.position) / 70,
+    ).toFixed(2);
+  }
+  for (const [id, label] of labels)
+    if (!seen.has(id)) {
+      label.remove();
+      labels.delete(id);
+    }
+}
+// Death cam: swing to the predator's mouth from the side and watch it chew.
+function deathCamera(dt, now) {
+  const elapsed = (now - deathCam.start) / 1000,
+    predator = visuals.get(deathCam.predator),
+    anchor = predator?.root.isEnabled() ? predator : visuals.get(myId);
+  if (!anchor) return;
+  const yaw = anchor.root.rotation.y,
+    forward = new B.Vector3(Math.sin(yaw), 0, Math.cos(yaw)),
+    right = new B.Vector3(Math.cos(yaw), 0, -Math.sin(yaw)),
+    focus = (anchor === predator && mouth(predator)) || anchor.root.position,
+    span = 4 + anchor.root.scaling.x * 3;
+  // Stay on the side the camera is already on so it never swings through the fish.
+  if (!deathCam.side)
+    deathCam.side =
+      B.Vector3.Dot(camera.position.subtract(focus), right) >= 0 ? 1 : -1;
+  const desired = focus
+    .add(right.scale(deathCam.side * span * 0.9))
+    .add(new B.Vector3(0, span * 0.35, 0))
+    .subtract(forward.scale(span * 0.15));
+  desired.x = clamp(desired.x, -35, 35);
+  desired.y = clamp(desired.y, 1.5, 29);
+  desired.z = clamp(desired.z, -35, 35);
+  camera.position = B.Vector3.Lerp(
+    camera.position,
+    desired,
+    1 - Math.exp(-dt * 4),
+  );
+  deathCam.look = B.Vector3.Lerp(deathCam.look, focus, 1 - Math.exp(-dt * 6));
+  camera.setTarget(deathCam.look);
+  // Two more visible chews while the meal goes down.
+  if (predator && deathCam.chews < 2 && elapsed > 0.55 * (deathCam.chews + 1)) {
+    deathCam.chews++;
+    predator.bite();
+    audio.play("chomp", { volume: 0.6 });
+  }
+  if (!deathCam.done && elapsed > DEATH_CAM_SECONDS) {
+    deathCam.done = true;
+    updateUI();
+  }
 }
 engine.runRenderLoop(() => {
   const dt = Math.min(engine.getDeltaTime() / 1000, 0.05);
@@ -329,14 +524,26 @@ engine.runRenderLoop(() => {
     // Subtle cue: food looks a touch brighter, threats a touch darker.
     let threat = 0;
     if (me?.alive && f.id !== myId) {
-      if (f.mass >= me.mass * C.eatRatio) threat = -1;
-      else if (me.mass >= f.mass * C.eatRatio) threat = 1;
+      if (outweighs(f, me)) threat = -1;
+      else if (outweighs(me, f)) threat = 1;
     }
     v.threat += (threat - v.threat) * settle;
+    // A low warning when something that can eat me swims close.
+    if (
+      threat === -1 &&
+      !me.hidden &&
+      now - lastDanger > 6000 &&
+      Math.hypot(f.x - me.x, f.y - me.y, f.z - me.z) < 10 + r
+    ) {
+      lastDanger = now;
+      audio.play("danger");
+    }
     v.tint(v.threat);
   }
+  placeLabels();
   const mine = me && visuals.get(me.id);
-  if (mine) {
+  if (deathCam && me && !me.alive) deathCamera(dt, now);
+  else if (mine) {
     const d = direction(input),
       r = radius(me.mass),
       p = mine.root.position;

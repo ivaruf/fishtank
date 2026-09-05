@@ -18,7 +18,7 @@ export function material(scene, name, color, emissive = 0) {
   m.emissiveColor = m.diffuseColor.scale(emissive);
   return m;
 }
-const BITE_TIME = 0.4,
+const BITE_TIME = 0.6,
   DEATH_TIME = 0.7;
 // Threat cue tints: food a touch brighter and warmer, threats darker and cooler.
 const NEUTRAL = new B.Color3(1, 1, 1),
@@ -28,32 +28,63 @@ const NEUTRAL = new B.Color3(1, 1, 1),
 // Blender fish exported by tools/blender/create_fish.py: +Z forward, +Y up,
 // ~2-unit body, a "Tail" pivot carrying the swim clip.
 const models = new WeakMap(),
-  crests = new WeakMap();
+  crests = new WeakMap(),
+  maws = new WeakMap();
+// Where each model's nose ends (+Z), so the cartoon maw sits on the mouth.
+const NOSE = {
+  clownfish: 1.04,
+  "blue-tang": 1.0,
+  pufferfish: 0.93,
+  angelfish: 0.8,
+  goldfish: 0.88,
+  betta: 0.98,
+  shark: 1.02,
+};
+function shared(map, scene, make) {
+  if (!map.has(scene)) map.set(scene, make());
+  return map.get(scene);
+}
 const modelsFor = (scene) => {
   if (!models.has(scene)) models.set(scene, new Map());
   return models.get(scene);
 };
 // Load every species once into an asset container. Fish are then GPU instances
 // sharing geometry and materials, so a hundred fish cost a handful of draw calls.
+// detail "hd" picks the denser exports behind the Ultra quality setting. A
+// reload swaps the whole set at once and disposes the previous models, so the
+// caller must rebuild any fish created from them afterwards.
+export const modelUrl = (species, detail = "standard") =>
+  `/assets/models/${species}${detail === "hd" ? "-hd" : ""}.glb`;
 export async function loadFishModels(
   scene,
-  load = (species) =>
-    B.LoadAssetContainerAsync(`/assets/models/${species}.glb`, scene),
+  load = (species, detail) =>
+    B.LoadAssetContainerAsync(modelUrl(species, detail), scene),
+  detail = "standard",
 ) {
-  const failed = [];
+  const failed = [],
+    next = new Map();
   await Promise.all(
     SPECIES.map(async (species) => {
       try {
-        const container = await load(species);
+        let container;
+        try {
+          container = await load(species, detail);
+        } catch (error) {
+          if (detail === "standard") throw error;
+          console.warn(`No ${detail} model for "${species}"; using standard`);
+          container = await load(species, "standard");
+        }
         prepare(container, scene);
-        modelsFor(scene).set(species, container);
+        next.set(species, container);
       } catch (error) {
         failed.push(species);
         console.warn(`Fish model "${species}" failed to load`, error);
       }
     }),
   );
-  return { loaded: SPECIES.filter((s) => modelsFor(scene).has(s)), failed };
+  for (const container of modelsFor(scene).values()) container.dispose();
+  models.set(scene, next);
+  return { loaded: SPECIES.filter((s) => next.has(s)), failed, detail };
 }
 function prepare(container, scene) {
   // The glTF loader auto-plays the first clip on the hidden source model.
@@ -108,16 +139,33 @@ export function createFish(scene, species, npc = false, color = 0) {
     crest.parent = pose;
     crest.material = crests.get(scene);
   }
+  // A dark cartoon maw that only shows while the fish chomps.
+  const mouth = B.MeshBuilder.CreateSphere(
+    "maw",
+    { segments: 6, diameter: 1 },
+    scene,
+  );
+  mouth.parent = pose;
+  mouth.position.set(0, -0.08, (model ? NOSE[species] : 1.2) - 0.02);
+  mouth.scaling.set(0.34, 0.02, 0.16);
+  mouth.material = shared(maws, scene, () => {
+    const m = material(scene, "maw", "#0b1013");
+    m.specularColor = new B.Color3(0.05, 0.05, 0.05);
+    return m;
+  });
+  mouth.setEnabled(false);
   const { swim } = body;
   swim.start(true, 1);
   if (swim.isStarted)
     swim.goToFrame(swim.from + Math.random() * (swim.to - swim.from));
   let bite = -1,
-    death = -1;
+    death = -1,
+    deathLength = DEATH_TIME;
   const tint = new B.Color3();
   const fish = {
     root,
     pose,
+    mouth,
     swim,
     wasAlive: false,
     threat: 0,
@@ -125,16 +173,20 @@ export function createFish(scene, species, npc = false, color = 0) {
     bite() {
       if (death >= 0) return;
       bite = 0;
+      mouth.setEnabled(true);
       swim.speedRatio = 4;
     },
-    die(predator = null) {
+    // seconds stretches the swallow, used for the player's own death cam.
+    die(predator = null, seconds = DEATH_TIME) {
       fish.eatenBy = predator;
       death = 0;
+      deathLength = seconds;
       bite = -1;
     },
     reset() {
       bite = death = -1;
       fish.eatenBy = null;
+      mouth.setEnabled(false);
       pose.position.setAll(0);
       pose.rotation.setAll(0);
       pose.scaling.setAll(1);
@@ -142,8 +194,9 @@ export function createFish(scene, species, npc = false, color = 0) {
     // Advances bite and death animations; true while a death is still playing.
     update(dt) {
       if (death >= 0) {
+        mouth.setEnabled(false);
         death += dt;
-        const t = Math.min(1, death / DEATH_TIME);
+        const t = Math.min(1, death / deathLength);
         // Roll belly-up, tumble and shrink away as the predator swallows.
         pose.rotation.z = t * t * 7;
         pose.rotation.x = t * 1.5;
@@ -158,13 +211,30 @@ export function createFish(scene, species, npc = false, color = 0) {
           pose.position.z = 0;
           pose.rotation.x = 0;
           pose.scaling.setAll(1);
+          mouth.setEnabled(false);
         } else {
-          // Lunge forward with a nod, stretching then squashing the body.
-          const lunge = Math.sin(Math.PI * t),
-            chomp = Math.sin(2 * Math.PI * t) * (1 - t);
-          pose.position.z = lunge * 0.45;
-          pose.rotation.x = lunge * 0.18;
-          pose.scaling.set(1 - chomp * 0.12, 1 - chomp * 0.12, 1 + chomp * 0.3);
+          // Cartoon chomp: rear back with the maw gaping, snap shut past
+          // neutral with a squash, then settle while lunging forward.
+          const gape =
+              t < 0.55
+                ? Math.sin(((t / 0.55) * Math.PI) / 2)
+                : Math.max(0, 1 - (t - 0.55) / 0.1),
+            snap =
+              t > 0.55 && t < 0.85 ? Math.sin(((t - 0.55) / 0.3) * Math.PI) : 0,
+            lunge = Math.sin(Math.PI * Math.min(1, t / 0.9));
+          pose.position.z = lunge * 0.5;
+          pose.rotation.x = -gape * 0.35 + snap * 0.25;
+          pose.scaling.set(
+            1 + gape * 0.05 - snap * 0.14,
+            1 + gape * 0.14 - snap * 0.12,
+            1 + gape * 0.2 + snap * 0.14,
+          );
+          mouth.scaling.set(
+            0.34 + gape * 0.14,
+            0.02 + gape * 0.46,
+            0.16 + gape * 0.08,
+          );
+          mouth.position.y = -0.08 - gape * 0.18;
         }
       }
       return false;

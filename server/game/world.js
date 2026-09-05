@@ -6,13 +6,15 @@ import {
   wrap,
   SPECIES,
   speciesLabel,
+  inCover,
+  outweighs,
 } from "../../shared/config.js";
 import { movementVector, parseInput } from "../../shared/movement.js";
 export function canEat(a, b) {
   if (
     !a.alive ||
     !b.alive ||
-    a.mass < b.mass * C.eatRatio ||
+    !outweighs(a, b) ||
     a.protection > 0 ||
     b.protection > 0
   )
@@ -96,12 +98,14 @@ export class World {
     f.y = clamp(f.y + d.y * speed * dt, r + 0.5, C.height - r);
     f.z = clamp(f.z + d.z * speed * dt, -C.depth / 2 + r, C.depth / 2 - r);
   }
-  // Nearest player this wild fish could eat and is close enough to bother with.
+  // Nearest player this wild fish could eat and is close enough to bother
+  // with. Players tucked into the kelp are not hunted, though a fish that
+  // blunders into them still eats them.
   huntTarget(npc) {
     let best = null,
       reach = C.npcHuntRange + radius(npc.mass);
     for (const p of this.players.values()) {
-      if (!p.alive || p.protection > 0 || npc.mass < p.mass * C.eatRatio)
+      if (!p.alive || p.protection > 0 || !outweighs(npc, p) || inCover(p))
         continue;
       const distance = Math.hypot(p.x - npc.x, p.y - npc.y, p.z - npc.z);
       if (distance < reach) {
@@ -231,6 +235,7 @@ export class World {
       protection: f.protection,
       respawn: f.respawn,
       killedBy: f.killedBy,
+      hidden: f.npc ? undefined : inCover(f),
     });
     return {
       type: "WORLD_STATE",

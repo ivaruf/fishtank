@@ -1,7 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { World, canEat } from "../server/game/world.js";
-import { CONFIG as C, radius, wrap } from "../shared/config.js";
+import {
+  CONFIG as C,
+  PLANTS,
+  inCover,
+  radius,
+  wrap,
+} from "../shared/config.js";
 function setup() {
   const w = new World(() => 0.5),
     p = w.addPlayer("one", "One");
@@ -17,6 +23,10 @@ test("size comparison and mouth collision exclude tails and protected fish", () 
   assert.equal(canEat(p, { ...prey, z: -2 }), false);
   assert.equal(canEat(p, { ...prey, protection: 1 }), false);
   assert.equal(canEat(p, { ...prey, alive: false }), false);
+  // Binary: any weight advantage is enough, and only a dead tie is neutral.
+  assert.equal(canEat(p, { ...prey, mass: p.mass - 0.1 }), true);
+  assert.equal(canEat(p, { ...prey, mass: p.mass }), false);
+  assert.equal(canEat({ ...prey, mass: p.mass + 0.1, yaw: Math.PI }, p), true);
 });
 test("eating grows predator once and respawns NPC", () => {
   const { w, p } = setup();
@@ -182,13 +192,47 @@ test("small or protected fish are safe from wild predators", () => {
     turn: 0,
     vertical: 0,
   };
-  w.npcs = [{ ...giant, mass: 10 }];
+  w.npcs = [{ ...giant, mass: 7 }];
   w.tick(0);
   assert.equal(p.alive, true);
   w.npcs = [giant];
   p.protection = 1;
   w.tick(0);
   assert.equal(p.alive, true);
+});
+test("kelp hides players from hunters but not from a fish that swims into them", () => {
+  const { w, p } = setup();
+  const kelp = PLANTS[0];
+  Object.assign(p, { x: kelp.x, y: 2, z: kelp.z });
+  assert.equal(inCover(p), true);
+  const tallest = Math.max(...PLANTS.map((k) => k.height));
+  assert.equal(inCover({ ...p, y: tallest + 1 }), false);
+  const hunter = {
+    id: "hunter",
+    npc: true,
+    color: 1,
+    species: "shark",
+    mass: 20,
+    x: kelp.x,
+    y: 2,
+    z: kelp.z - 6,
+    yaw: Math.PI,
+    pitch: 0,
+    alive: true,
+    protection: 0,
+    decision: 10,
+    turn: 0,
+    vertical: 0,
+  };
+  w.npcs = [hunter];
+  for (let i = 0; i < 10; i++) w.tick(0.1);
+  assert.equal(hunter.hunting, false, "hidden player is not hunted");
+  assert.equal(hunter.yaw, Math.PI, "hunter keeps wandering");
+  assert.equal(w.snapshot().players[0].hidden, true);
+  // Contact still counts: put the hunter's mouth on the hidden player.
+  Object.assign(hunter, { z: kelp.z - 1.2, yaw: 0 });
+  w.tick(0);
+  assert.equal(p.alive, false);
 });
 test("big wild fish turn toward nearby smaller players; small ones ignore them", () => {
   const { w, p } = setup();

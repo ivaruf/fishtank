@@ -1,6 +1,8 @@
 """Rebuild our original stylized fish with Blender's bundled Python.
-Run: blender --background --factory-startup --python tools/blender/create_fish.py [-- kinds... | -- --thumbnails-only kinds...]
-Without kinds every species is built. --thumbnails-only re-renders menu thumbnails from the saved .blend files.
+Run: blender --background --factory-startup --python tools/blender/create_fish.py [-- kinds...] [-- --thumbnails-only | --hd-only kinds...]
+Without kinds every species is built, each as a standard .glb plus a denser -hd.glb for the Ultra quality
+setting. --thumbnails-only re-renders menu thumbnails from the saved .blend files; --hd-only exports only the
+high-detail models.
 Authoring coordinates below are X right, Y up, Z forward; convert to Blender Z up.
 """
 import bpy
@@ -16,6 +18,12 @@ SOURCE = ROOT / 'assets/blender'
 DOCS = ROOT / 'docs'
 for path in [OUT, THUMBS, SOURCE, DOCS]: path.mkdir(parents=True, exist_ok=True)
 KINDS = ['clownfish', 'blue-tang', 'pufferfish', 'angelfish', 'goldfish', 'betta', 'shark']
+# Tessellation per quality tier: (segments, rings) for spheres, bevel/curve resolution for fins and rays.
+DETAIL = {
+    'standard': dict(body=(32, 24), sphere=(20, 12), small=(12, 8), tiny=(10, 6), bevel=2, curve=1, suffix=''),
+    'hd': dict(body=(72, 54), sphere=(36, 20), small=(16, 10), tiny=(14, 8), bevel=4, curve=3, suffix='-hd'),
+}
+LEVEL = DETAIL['standard']
 
 def vec(p): return Vector((p[0], -p[2], p[1]))
 def mat(name, color, rough=.4):
@@ -37,7 +45,8 @@ def mesh(name, vertices, faces, material, parent):
     obj.data.materials.append(material)
     return obj
 
-def sphere(name, pos, scale, material, parent, segments=20, rings=12):
+def sphere(name, pos, scale, material, parent, segments=None, rings=None):
+    segments, rings = (segments, rings) if segments else LEVEL['sphere']
     bpy.ops.mesh.primitive_uv_sphere_add(segments=segments, ring_count=rings, location=vec(pos))
     obj = bpy.context.object
     obj.name = name
@@ -51,7 +60,7 @@ def sphere(name, pos, scale, material, parent, segments=20, rings=12):
 def body(parent, scale, materials, kind):
     w,h,l = scale
     vertices=[]; faces=[]; indices=[]
-    sides=32; rings=24
+    sides,rings=LEVEL['body']
     for row in range(rings+1):
         t=math.pi*row/rings
         z=l*math.cos(t)
@@ -87,7 +96,7 @@ def fin(name, points, material, edge, parent, thickness=.035):
     obj=mesh(name,vertices,faces,material,parent)
     obj.data.materials.append(edge)
     for p in list(obj.data.polygons)[2:]:p.material_index=1
-    bevel=obj.modifiers.new('Soft fin edges','BEVEL');bevel.width=.025;bevel.segments=2
+    bevel=obj.modifiers.new('Soft fin edges','BEVEL');bevel.width=.025;bevel.segments=LEVEL['bevel']
     bevel.affect='EDGES'
     bpy.context.view_layer.objects.active=obj;obj.select_set(True)
     bpy.ops.object.modifier_apply(modifier=bevel.name)
@@ -96,7 +105,7 @@ def fin(name, points, material, edge, parent, thickness=.035):
 
 def line(name, points, material, parent, width=.012):
     data=bpy.data.curves.new(name,'CURVE');data.dimensions='3D';data.resolution_u=1
-    data.bevel_depth=width;data.bevel_resolution=1
+    data.bevel_depth=width;data.bevel_resolution=LEVEL['curve']
     spline=data.splines.new('POLY');spline.points.add(len(points)-1)
     for p,v in zip(spline.points,points):p.co=(*vec(v),1)
     obj=bpy.data.objects.new(name,data);bpy.context.collection.objects.link(obj)
@@ -109,7 +118,7 @@ def eyes(parent, width, y, z, cream, dark, iris):
         sphere('Eye white',(side*(width+.055),y+.012,z+.035),(.166,.185,.17),cream,parent)
         sphere('Iris',(side*(width+.155),y+.015,z+.073),(.077,.12,.108),iris,parent)
         sphere('Pupil',(side*(width+.19),y+.015,z+.094),(.052,.079,.073),dark,parent)
-        sphere('Eye sparkle',(side*(width+.221),y+.058,z+.11),(.02,.034,.029),cream,parent,12,8)
+        sphere('Eye sparkle',(side*(width+.221),y+.058,z+.11),(.02,.034,.029),cream,parent,*LEVEL['small'])
 
 def merge_parts(parent,name):
     # One static mesh and one tail mesh; retain material slots for GPU instancing.
@@ -130,7 +139,9 @@ def merge_parts(parent,name):
     obj.select_set(False)
     return obj
 
-def build(kind):
+def build(kind, detail='standard'):
+    global LEVEL
+    LEVEL=DETAIL[detail]
     bpy.ops.wm.read_factory_settings(use_empty=True)
     scene=bpy.context.scene;scene.render.fps=24;scene.frame_start=1;scene.frame_end=25
     cream=mat('Pearl',(1,.91,.72));dark=mat('Ink',(.018,.032,.055),.3)
@@ -173,12 +184,12 @@ def build(kind):
             a=i*2.39996;t=.32+(i%7)/7*1.6
             p=(.774*math.sin(t)*math.cos(a),.774*math.sin(t)*math.sin(a),.905*math.cos(t))
             if p[1]<-.18 or p[2]>.68:continue
-            sphere('Freckle',p,(.052,.047,.046),spot,root,12,8)
+            sphere('Freckle',p,(.052,.047,.046),spot,root,*LEVEL['small'])
         for i in range(16):
             a=i*2.39996;z=-.6+(i%6)*.21;r=math.sqrt(1-(z/.91)**2)
             p=(.78*r*math.cos(a),.78*r*math.sin(a),z)
             if p[1]<-.25:continue
-            sphere('Soft spine',p,(.065,.065,.065),cream,root,10,6)
+            sphere('Soft spine',p,(.065,.065,.065),cream,root,*LEVEL['tiny'])
         sphere('Muzzle',(0,-.025,.865),(.18,.135,.09),cream,root)
         sphere('Mouth',(0,-.035,.946),(.07,.065,.016),dark,root)
         tailmat=gold;edge=orange;tailheight=.32
@@ -250,7 +261,8 @@ def build(kind):
     bpy.ops.object.select_all(action='DESELECT')
     for o in [root,static,tail,tailmesh]:o.select_set(True)
     bpy.context.view_layer.objects.active=root
-    bpy.ops.export_scene.gltf(filepath=str(OUT/f'{kind}.glb'),export_format='GLB',use_selection=True,export_animations=True,export_animation_mode='ACTIVE_ACTIONS',export_frame_range=True,export_yup=True,export_cameras=False,export_lights=False)
+    bpy.ops.export_scene.gltf(filepath=str(OUT/f"{kind}{LEVEL['suffix']}.glb"),export_format='GLB',use_selection=True,export_animations=True,export_animation_mode='ACTIVE_ACTIONS',export_frame_range=True,export_yup=True,export_cameras=False,export_lights=False)
+    if detail!='standard': return kind
     # Source files include studio lighting and a camera for easy inspection.
     studio(scene)
     bpy.ops.wm.save_as_mainfile(filepath=str(SOURCE/f'{kind}.blend'))
@@ -289,6 +301,9 @@ if '--thumbnails-only' in args:
         bpy.ops.wm.open_mainfile(filepath=str(SOURCE/f'{kind}.blend'))
         thumbnail(kind)
     print(f'FISHTANK: Thumbnails rendered for {", ".join(kinds)}.')
+elif '--hd-only' in args:
+    for kind in kinds:build(kind,'hd')
+    print(f'FISHTANK: High-detail models exported for {", ".join(kinds)}.')
 else:
-    for kind in kinds:build(kind)
-    print(f'FISHTANK: Built {", ".join(kinds)} (Blender sources, GLBs, previews, thumbnails).')
+    for kind in kinds:build(kind);build(kind,'hd')
+    print(f'FISHTANK: Built {", ".join(kinds)} (Blender sources, standard and HD GLBs, previews, thumbnails).')

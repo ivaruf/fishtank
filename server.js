@@ -13,6 +13,7 @@ const mime = {
   ".css": "text/css",
   ".glb": "model/gltf-binary",
   ".png": "image/png",
+  ".m4a": "audio/mp4",
 };
 const vendors = {
   "/vendor/babylon.js": "node_modules/babylonjs/babylon.js",

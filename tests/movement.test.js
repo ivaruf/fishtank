@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { movementVector, parseInput } from "../shared/movement.js";
-import { hardwareScaling } from "../client/js/rendering.js";
+import { hardwareScaling, modelDetail } from "../client/js/rendering.js";
 
 test("camera-relative diagonals do not exceed speed and analogue magnitude survives", () => {
   for (const yaw of [0, 1, 2, 3])
@@ -39,4 +39,10 @@ test("high-DPI screens render above CSS resolution with bounded quality choices"
   assert.equal(hardwareScaling("sharp", 3), 0.5);
   assert.equal(hardwareScaling("battery", 3), 1);
   assert.equal(hardwareScaling("sharp", 1), 1);
+  // Ultra supersamples past the display density but stays bounded.
+  assert.equal(hardwareScaling("ultra", 1), 1 / 1.5);
+  assert.equal(hardwareScaling("ultra", 2), 1 / 3);
+  assert.equal(hardwareScaling("ultra", 4), 1 / 3);
+  assert.equal(modelDetail("ultra"), "hd");
+  assert.equal(modelDetail("sharp"), "standard");
 });

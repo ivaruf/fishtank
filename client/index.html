@@ -20,13 +20,24 @@
         <div class="connection" id="connection">● YOUR NEXT ADVENTURE</div>
         <div class="display-controls">
           <label class="resolution-label"
-            ><span>Resolution</span>
-            <select id="resolution" aria-label="Render resolution">
+            ><span>Quality</span>
+            <select id="resolution" aria-label="Render quality">
               <option value="battery">Battery saver</option>
               <option value="balanced" selected>Balanced</option>
               <option value="sharp">Sharper</option>
+              <option value="ultra">Ultra</option>
             </select>
           </label>
+          <button
+            id="mute"
+            class="secondary sound-toggle"
+            type="button"
+            aria-label="Mute sound"
+            aria-pressed="false"
+            title="Mute sound"
+          >
+            🔊
+          </button>
           <button
             id="fullscreen"
             class="secondary fullscreen-toggle"
@@ -85,6 +96,8 @@
         <ol id="leaders"></ol>
       </aside>
       <div class="aim">·</div>
+      <div id="cover" class="cover" hidden>HIDDEN IN THE KELP</div>
+      <div id="labels" class="labels"></div>
       <div id="toast" aria-live="polite"></div>
       <button id="leave" class="exit secondary">Leave tank</button>
     </section>
