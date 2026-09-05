@@ -755,3 +755,83 @@ select {
     height: 34px;
   }
 }
+@media (max-height: 520px) and (orientation: landscape) {
+  /* Phone-sized HUD: tuck the panels under the header and keep them small. */
+  .stats {
+    top: 56px;
+    left: max(14px, env(safe-area-inset-left));
+    padding: 7px 12px;
+    gap: 16px;
+    border-radius: 10px;
+  }
+  .stats small {
+    font-size: 7px;
+    letter-spacing: 1.4px;
+  }
+  .stats b {
+    font-size: 15px;
+    margin-top: 3px;
+  }
+  .leaderboard {
+    top: 56px;
+    right: max(14px, env(safe-area-inset-right));
+    width: 150px;
+    padding: 8px 10px;
+    border-radius: 10px;
+  }
+  .leaderboard .eyebrow {
+    font-size: 7px;
+    letter-spacing: 1.6px;
+  }
+  .leaderboard ol {
+    padding-left: 14px;
+    margin-top: 4px;
+  }
+  .leaderboard li {
+    font-size: 9px;
+    padding: 2px 0;
+  }
+  /* Only the top three fit comfortably on a phone. */
+  .leaderboard li:nth-child(n + 4) {
+    display: none;
+  }
+  #toast {
+    top: 16%;
+    font-size: 13px;
+  }
+  .overlay {
+    padding: 14px 20px;
+    min-width: 240px;
+    max-width: 70vw;
+  }
+  .overlay h2 {
+    font-size: 20px;
+    margin: 6px 0;
+  }
+  .overlay p {
+    font-size: 11px;
+    margin: 6px 0;
+  }
+  #next-round {
+    margin-top: 8px;
+    padding: 9px 12px;
+  }
+  .cover {
+    top: 66%;
+    padding: 5px 10px;
+    font-size: 8px;
+  }
+  .label {
+    font-size: 9px;
+    padding: 1px 7px;
+  }
+  .playing .exit {
+    padding: 8px 12px;
+    font-size: 10px;
+    bottom: max(10px, env(safe-area-inset-bottom));
+  }
+  .zone-hint {
+    bottom: max(8px, env(safe-area-inset-bottom));
+    font-size: 8px;
+  }
+}

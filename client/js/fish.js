@@ -188,7 +188,8 @@ export function createFish(scene, species, npc = false, color = 0) {
     swim.goToFrame(swim.from + Math.random() * (swim.to - swim.from));
   let bite = -1,
     death = -1,
-    deathLength = DEATH_TIME;
+    deathLength = DEATH_TIME,
+    jolting = false;
   const tint = new B.Color3();
   const fish = {
     root,
@@ -220,8 +221,20 @@ export function createFish(scene, species, npc = false, color = 0) {
       pose.rotation.setAll(0);
       pose.scaling.setAll(1);
     },
+    // Stunned by the zapper: twitch until it wears off.
+    jolt(on) {
+      if (jolting && !on) {
+        pose.rotation.z = 0;
+        pose.position.x = 0;
+      }
+      jolting = on;
+    },
     // Advances bite and death animations; true while a death is still playing.
     update(dt) {
+      if (jolting && death < 0) {
+        pose.rotation.z = (Math.random() - 0.5) * 0.4;
+        pose.position.x = (Math.random() - 0.5) * 0.14;
+      }
       if (death >= 0) {
         mouth.setEnabled(false);
         death += dt;

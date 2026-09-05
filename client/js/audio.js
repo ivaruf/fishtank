@@ -13,6 +13,9 @@ const EFFECTS = [
   "round-end",
   "click",
   "danger",
+  "pad",
+  "buzz",
+  "zap",
 ];
 export function createAudio({ base = "/assets/audio/" } = {}) {
   let context = null,

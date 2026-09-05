@@ -21,6 +21,9 @@ export const PIECES = {
   "round-end": {},
   click: {},
   danger: {},
+  pad: {},
+  buzz: {},
+  zap: {},
 };
 const [wavDir, outDir = "client/assets/audio"] = process.argv.slice(2);
 if (!wavDir) {

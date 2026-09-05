@@ -1,6 +1,6 @@
 import { material } from "./fish.js";
 import { hardwareScaling } from "./rendering.js";
-import { PLANTS } from "../../shared/config.js";
+import { PLANTS, FILTER } from "../../shared/config.js";
 const B = window.BABYLON;
 // The tank is 72 x 30 x 72 units with the sand at y = 0. It stands on a cabinet
 // in an evening office roughly 300 x 150 x 400 units; the camera never leaves
@@ -100,6 +100,7 @@ export function createAquarium(canvas) {
     engine,
     scene,
     camera,
+    glow,
     animate(dt) {
       time += dt;
       for (const b of bubbles) {
@@ -153,7 +154,9 @@ function buildTank(scene, glow) {
   }
   for (let i = 0; i < 9; i++)
     rockSpots.push([(rnd() - 0.5) * 50, (rnd() - 0.5) * 50]);
-  rockSpots.forEach(([x, z], i) => {
+  // Keep the filter's corner clear of rubble.
+  const clear = ([x, z]) => Math.hypot(x - FILTER.x, z - FILTER.z) > 8;
+  rockSpots.filter(clear).forEach(([x, z], i) => {
     const rock = B.MeshBuilder.CreateSphere(
       "rock",
       { segments: 12, diameter: 2, updatable: true },

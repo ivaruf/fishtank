@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { World, canEat } from "../server/game/world.js";
 import {
   CONFIG as C,
+  FILTER,
   PLANTS,
   inCover,
   radius,
@@ -268,4 +269,83 @@ test("big wild fish turn toward nearby smaller players; small ones ignore them",
   assert.equal(grazer.yaw, away);
   assert.equal(distant.yaw, away);
   assert.ok(hunter.z > grazer.z, "hunter also swims faster");
+});
+test("the filter is dead for a minute, then zaps the heaviest fish per press with a recharge", () => {
+  const { w, p } = setup();
+  w.npcs = [];
+  const giant = w.addPlayer("giant", "Giant");
+  Object.assign(giant, { x: 20, y: 15, z: -20, mass: 200, protection: 0 });
+  const press = () => {
+    Object.assign(p, { ...FILTER.button });
+    w.tick(1 / 30);
+    Object.assign(p, { x: 0, y: 15, z: 0 });
+    w.tick(1 / 30);
+  };
+  press();
+  assert.ok(
+    w.events.some((e) => e.type === "BUZZ"),
+    "too early only buzzes",
+  );
+  assert.ok(!w.events.some((e) => e.type === "ZAP"));
+  assert.equal(giant.mass, 200);
+  w.remaining = C.roundLength - FILTER.armAfter;
+  w.tick(1 / 30);
+  assert.ok(w.events.some((e) => e.type === "FILTER_ARMED"));
+  assert.equal(w.snapshot().filter.armed, true);
+  press();
+  const zap = w.events.find((e) => e.type === "ZAP");
+  assert.equal(zap?.target, "giant");
+  assert.equal(zap?.by, "one");
+  assert.equal(giant.mass, 140, "loses 30%");
+  assert.ok(giant.stunned > FILTER.stun - 0.1);
+  assert.equal(w.snapshot().filter.cooldown, FILTER.cooldown);
+  const chunks = w.npcs.filter((n) => n.chunk);
+  assert.equal(chunks.length, 12);
+  assert.ok(
+    chunks.every(
+      (n) => n.species === giant.species && n.mass <= FILTER.chunkMass,
+    ),
+  );
+  assert.ok(
+    chunks.reduce((s, n) => s + n.mass, 0) <= 60,
+    "food never exceeds what was lost",
+  );
+  // Stunned fish do not move; the button only buzzes while recharging.
+  w.setInput(giant.id, { forward: 1, strafe: 0, yaw: 0, pitch: 0 });
+  const frozen = [giant.x, giant.z];
+  w.tick(0.5);
+  assert.deepEqual([giant.x, giant.z], frozen);
+  w.events.length = 0;
+  press();
+  assert.ok(
+    w.events.some((e) => e.type === "BUZZ") &&
+      !w.events.some((e) => e.type === "ZAP"),
+  );
+  w.tick(FILTER.cooldown);
+  press();
+  assert.equal(
+    w.events.filter((e) => e.type === "ZAP").length,
+    1,
+    "zaps again after the recharge",
+  );
+  assert.equal(giant.mass, 98);
+  // Eating a chunk removes it for good.
+  const snack = chunks[0];
+  Object.assign(snack, { x: 0, y: 15, z: 1, alive: true });
+  Object.assign(p, { x: 0, y: 15, z: 0, yaw: 0, pitch: 0 });
+  w.tick(0);
+  assert.ok(!w.npcs.includes(snack));
+});
+test("alone, the filter zaps the heaviest wild fish", () => {
+  const { w, p } = setup();
+  const big = w.npcs.reduce((x, y) => (y.mass > x.mass ? y : x), w.npcs[0]);
+  const before = big.mass;
+  // The seeded tank stacks every NPC at the centre; wait by the filter instead.
+  Object.assign(p, { x: FILTER.x, y: 4, z: FILTER.z - 8 });
+  w.remaining = C.roundLength - FILTER.armAfter;
+  w.tick(1 / 30);
+  Object.assign(p, { ...FILTER.button });
+  w.tick(1 / 30);
+  assert.equal(w.events.find((e) => e.type === "ZAP")?.target, big.id);
+  assert.ok(big.mass < before && big.stunned > 0);
 });

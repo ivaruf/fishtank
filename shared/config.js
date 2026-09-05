@@ -25,7 +25,7 @@ export const CONFIG = Object.freeze({
 });
 // Bumped whenever snapshots or join messages change shape, so a client can
 // tell when it is talking to a server process started from older code.
-export const PROTOCOL = 2;
+export const PROTOCOL = 3;
 export const radius = (mass) => Math.cbrt(mass) * 0.48;
 export const outweighs = (predator, prey) =>
   predator.mass > prey.mass * CONFIG.eatRatio;
@@ -65,6 +65,29 @@ export const PLANTS = Object.freeze(
     });
   }),
 );
+// The faulty filter in the back-left corner. Dead for the first minute of a
+// round, then its red button zaps the heaviest player (heaviest wild fish
+// when playing alone): stunned, shrunk, the lost mass scattered as food. It
+// needs a recharge between presses, so being the biggest fish stays risky.
+export const FILTER = Object.freeze({
+  x: -31,
+  z: 31,
+  button: Object.freeze({ x: -31, y: 4, z: 28.4 }),
+  buttonRadius: 2.2,
+  armAfter: 60,
+  cooldown: 15,
+  shrink: 0.7,
+  stun: 2.5,
+  // Food chunks stay small enough for a fresh spawn to eat.
+  chunkMass: 3,
+});
+export const onButton = (fish) =>
+  Math.hypot(
+    fish.x - FILTER.button.x,
+    fish.y - FILTER.button.y,
+    fish.z - FILTER.button.z,
+  ) <
+  FILTER.buttonRadius + radius(fish.mass) * 0.6;
 export const inCover = (fish) =>
   PLANTS.some(
     (p) =>

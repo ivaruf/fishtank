@@ -2,7 +2,8 @@ import { setupFullscreen } from "./fullscreen.js";
 import { createAquarium } from "./world.js";
 import { createFish, loadFishModels } from "./fish.js";
 import { modelDetail } from "./rendering.js";
-import { createPuffs } from "./effects.js";
+import { createPuffs, createSparks, createStream } from "./effects.js";
+import { createFilter } from "./filter.js";
 import { createAudio } from "./audio.js";
 import { createControls } from "./controls.js";
 import { connect } from "./networking.js";
@@ -16,6 +17,7 @@ import {
   wrap,
   speciesLabel,
   outweighs,
+  FILTER,
 } from "/shared/config.js";
 const B = window.BABYLON,
   $ = (id) => document.getElementById(id);
@@ -37,10 +39,13 @@ try {
 }
 const { engine, scene, camera } = aquarium,
   puffs = createPuffs(scene),
+  sparks = createSparks(scene),
+  filter = createFilter(scene, aquarium.glow, sparks),
   controls = createControls($("game"), () => {
     if (network && myId) network.send(controls.read());
   }),
   visuals = new Map();
+createStream(scene, filter.spout);
 setupFullscreen(() => engine.resize());
 // Sound: browsers only start audio after a gesture, so unlock on the first one.
 const audio = createAudio();
@@ -152,6 +157,10 @@ $("species").replaceChildren(
     return option;
   }),
 );
+function toast(text, ms = 1400) {
+  toastUntil = performance.now() + ms;
+  $("toast").textContent = text;
+}
 function clearFish() {
   for (const v of visuals.values()) v.dispose();
   visuals.clear();
@@ -276,6 +285,27 @@ function join(mode) {
       updateUI();
       for (const e of next.events) {
         if (e.type === "ROUND_END") audio.play("round-end");
+        if (e.type === "FILTER_ARMED") {
+          audio.play("pad");
+          toast(
+            "⚡ The filter is sparking. Hit its red button to zap the biggest fish.",
+            3500,
+          );
+        }
+        if (e.type === "BUZZ" && e.by === myId) audio.play("buzz");
+        if (e.type === "ZAP") {
+          audio.play("zap");
+          const victim = [...next.players, ...next.npcs].find(
+            (f) => f.id === e.target,
+          );
+          const who =
+            e.target === myId
+              ? "You got zapped"
+              : `${victim?.npc ? `A wild ${speciesLabel(victim.species)}` : (victim?.name ?? "The big fish")} got zapped`;
+          toast(`⚡ ${who}! ${e.lost} mass scattered as snacks`, 2600);
+          const at = visuals.get(e.target)?.root.position;
+          if (at) filter.zap(at);
+        }
         if (!e.prey) continue;
         if (e.predator === myId) audio.play("chomp");
         else if (e.prey === myId) {
@@ -303,10 +333,7 @@ function join(mode) {
           prey.die(e.predator, e.prey === myId ? 1.6 : undefined);
           puffs.burst(prey.root.position, prey.root.scaling.x);
         }
-        if (e.predator === myId) {
-          toastUntil = performance.now() + 1400;
-          $("toast").textContent = "A little bigger. A little bolder. +";
-        }
+        if (e.predator === myId) toast("A little bigger. A little bolder. +");
       }
     },
     onError(message) {
@@ -526,6 +553,7 @@ engine.runRenderLoop(() => {
     lastSend = now;
   }
   $("toast").hidden = now > toastUntil;
+  filter.update(state?.filter, dt);
   const fish = state
     ? [...state.npcs, ...state.players]
     : demos.map((f, i) => ({
@@ -600,6 +628,8 @@ engine.runRenderLoop(() => {
     }
     v.tint(v.threat);
     if (!f.npc) v.setCrown(f.id === leaderId);
+    v.jolt(f.stunned > 0);
+    if (f.stunned > 0) sparks.burst(v.root.position, 2, r);
   }
   placeLabels();
   const mine = me && visuals.get(me.id);
@@ -624,6 +654,9 @@ engine.runRenderLoop(() => {
     desired.x = Math.max(-35, Math.min(35, desired.x));
     desired.y = Math.max(1.5, Math.min(29, desired.y));
     desired.z = Math.max(-35, Math.min(35, desired.z));
+    // Never park the camera inside the filter canister in the corner.
+    if (desired.x < FILTER.x + 3.5 && desired.z > FILTER.z - 3.5)
+      desired.z = FILTER.z - 3.5;
     camera.position = B.Vector3.Lerp(
       camera.position,
       desired,

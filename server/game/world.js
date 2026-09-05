@@ -8,6 +8,8 @@ import {
   speciesLabel,
   inCover,
   outweighs,
+  FILTER,
+  onButton,
 } from "../../shared/config.js";
 import { movementVector, parseInput } from "../../shared/movement.js";
 export function canEat(a, b) {
@@ -39,6 +41,7 @@ export class World {
     this.phase = "playing";
     this.remaining = C.roundLength;
     this.round = 1;
+    this.filter = { armed: false, cooldown: 0, on: [] };
     this.seedNPCs();
   }
   spawn(fish) {
@@ -119,6 +122,7 @@ export class World {
     predator.mass = Math.min(1800, predator.mass + prey.mass * C.growth);
     if (!predator.npc) predator.score += Math.round(prey.mass * 10);
     prey.alive = false;
+    if (prey.chunk) prey.gone = true;
     prey.respawn = prey.npc ? 2 + this.random() * 3 : C.respawnDelay;
     prey.killedBy = predator.npc
       ? `a wild ${speciesLabel(predator.species)}`
@@ -129,12 +133,82 @@ export class World {
       prey: prey.id,
     });
   }
+  // The filter arms a minute into the round. A press is a fish arriving on
+  // its button; when live it zaps, otherwise it just buzzes.
+  pressFilter(dt) {
+    const f = this.filter;
+    f.cooldown = Math.max(0, f.cooldown - dt);
+    if (!f.armed && C.roundLength - this.remaining >= FILTER.armAfter) {
+      f.armed = true;
+      this.events.push({ type: "FILTER_ARMED" });
+    }
+    const players = [...this.players.values()].filter((p) => p.alive);
+    const now = players.filter((p) => onButton(p)).map((p) => p.id);
+    const arrivals = now.filter((id) => !f.on.includes(id));
+    f.on = now;
+    for (const id of arrivals) {
+      if (f.armed && f.cooldown <= 0) this.zap(id);
+      else this.events.push({ type: "BUZZ", by: id });
+    }
+  }
+  // The heaviest player takes the hit, or the heaviest wild fish when alone.
+  zap(by) {
+    this.filter.cooldown = FILTER.cooldown;
+    const players = [...this.players.values()].filter((p) => p.alive);
+    const pool =
+      players.length > 1
+        ? players
+        : this.npcs.filter((n) => n.alive && !n.chunk);
+    const target = pool.reduce((a, b) => (b.mass > a.mass ? b : a), pool[0]);
+    if (!target) return;
+    const lost =
+      target.mass - Math.max(C.startMass, target.mass * FILTER.shrink);
+    target.mass -= lost;
+    target.stunned = FILTER.stun;
+    if (!target.npc) {
+      target.input.forward = 0;
+      target.input.strafe = 0;
+    }
+    // The lost mass scatters as minnows of the same species that anyone can
+    // eat (capped small enough for a fresh spawn); they never respawn.
+    const count = Math.min(
+      12,
+      Math.max(2, Math.round(lost / FILTER.chunkMass)),
+    );
+    for (let i = 0; i < count; i++) {
+      const a = (i / count) * Math.PI * 2 + this.random(),
+        r = radius(target.mass) + 2 + this.random() * 2;
+      const f = {
+        id: `chunk-${this.round}-${this.remaining.toFixed(2)}-${i}`,
+        npc: true,
+        chunk: true,
+        mass: Math.min(FILTER.chunkMass, Math.max(0.6, lost / count)),
+        color: i % 5,
+        species: target.species,
+        decision: 0,
+      };
+      this.spawn(f);
+      Object.assign(f, {
+        x: clamp(target.x + Math.cos(a) * r, -34, 34),
+        y: clamp(target.y + (this.random() - 0.5) * 3, 1.5, 28),
+        z: clamp(target.z + Math.sin(a) * r, -34, 34),
+      });
+      this.npcs.push(f);
+    }
+    this.events.push({
+      type: "ZAP",
+      target: target.id,
+      by,
+      lost: +lost.toFixed(1),
+    });
+  }
   // Results stay up until a player asks for the next round.
   nextRound() {
     if (this.phase !== "results") return false;
     this.phase = "playing";
     this.remaining = C.roundLength;
     this.round++;
+    this.filter = { armed: false, cooldown: 0, on: [] };
     this.seedNPCs();
     for (const p of this.players.values()) {
       p.mass = C.startMass;
@@ -162,6 +236,10 @@ export class World {
         continue;
       }
       f.protection = Math.max(0, f.protection - dt);
+      if (f.stunned > 0) {
+        f.stunned = Math.max(0, f.stunned - dt);
+        continue;
+      }
       if (f.npc) {
         f.decision -= dt;
         if (f.decision <= 0) {
@@ -210,6 +288,7 @@ export class World {
         : C.speed / (1 + Math.max(0, radius(f.mass) - 1) * 0.08);
       this.move(f, dt, speed, f.npc ? direction(f) : movementVector(f.input));
     }
+    this.pressFilter(dt);
     const players = [...this.players.values()];
     for (const p of players)
       for (const f of [...this.npcs, ...players])
@@ -217,6 +296,8 @@ export class World {
     // Wild fish only ever eat players, so the food supply stays steady.
     for (const n of this.npcs)
       for (const p of players) if (canEat(n, p)) this.eat(n, p);
+    if (this.npcs.some((n) => n.gone))
+      this.npcs = this.npcs.filter((n) => !n.gone);
   }
   snapshot() {
     const encode = (f) => ({
@@ -237,6 +318,7 @@ export class World {
       respawn: f.respawn,
       killedBy: f.killedBy,
       hidden: f.npc ? undefined : inCover(f),
+      stunned: f.stunned > 0 ? f.stunned : undefined,
     });
     return {
       type: "WORLD_STATE",
@@ -245,6 +327,10 @@ export class World {
       remaining: this.remaining,
       players: [...this.players.values()].map(encode),
       npcs: this.npcs.map(encode),
+      filter: {
+        armed: this.filter.armed,
+        cooldown: Math.ceil(this.filter.cooldown),
+      },
     };
   }
 }
