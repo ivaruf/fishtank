@@ -134,6 +134,16 @@ let network = null,
   deathCam = null,
   touchMode = false,
   leaderId = null;
+// Installable, and playable with no network: solo already runs entirely in the
+// tab, so caching the files is the last piece. Registration is deliberately
+// fire-and-forget — the game must work exactly the same if it fails, and
+// service workers need a secure context, so plain-http LAN play simply skips it.
+if ("serviceWorker" in navigator && window.isSecureContext)
+  window.addEventListener("load", () =>
+    navigator.serviceWorker
+      .register("/sw.js")
+      .catch((error) => console.info("Offline support unavailable:", error)),
+  );
 // Which build is serving us, shown on the menu so a deploy can be confirmed
 // without guessing. Read from the server rather than baked into the page: it
 // is the server that gets replaced, and /healthz is never cached.

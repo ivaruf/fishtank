@@ -23,6 +23,7 @@ const mime = {
   ".glb": "model/gltf-binary",
   ".png": "image/png",
   ".m4a": "audio/mp4",
+  ".webmanifest": "application/manifest+json",
 };
 const vendors = {
   "/vendor/babylon.js": "node_modules/babylonjs/babylon.js",
@@ -49,7 +50,14 @@ const BUILD = (() => {
 })();
 const STARTED = new Date().toISOString();
 // PNG and M4A are already compressed; measured 0% gain and pure CPU cost.
-const COMPRESSIBLE = new Set([".html", ".js", ".css", ".glb", ".json"]);
+const COMPRESSIBLE = new Set([
+  ".html",
+  ".js",
+  ".css",
+  ".glb",
+  ".json",
+  ".webmanifest",
+]);
 const brotli = promisify(zlib.brotliCompress);
 const gzip = promisify(zlib.gzip);
 // One entry per file per process: its content hash, and the pre-compressed

@@ -478,3 +478,62 @@ test("idle sockets are reaped and quiet rooms broadcast slowly", async () => {
     await new Promise((resolve) => server.close(resolve));
   }
 });
+
+test("the app is installable and its offline shell is complete", async () => {
+  const { server, wss } = createGameServer();
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const base = `http://127.0.0.1:${server.address().port}`;
+  try {
+    const res = await fetch(`${base}/manifest.webmanifest`);
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get("content-type"), "application/manifest+json");
+    const manifest = await res.json();
+    assert.equal(manifest.start_url, "/");
+    assert.equal(manifest.display, "standalone");
+    // Landscape-only is a real constraint of the game, not a preference.
+    assert.equal(manifest.orientation, "landscape");
+    assert.ok(
+      manifest.icons.some((i) => i.purpose === "maskable"),
+      "Android crops icons, so one must be maskable",
+    );
+    // Every icon the manifest promises has to exist, or install silently fails.
+    for (const icon of manifest.icons) {
+      const hit = await fetch(`${base}${icon.src}`);
+      assert.equal(hit.status, 200, `${icon.src} is missing`);
+      assert.equal(hit.headers.get("content-type"), "image/png");
+    }
+    // The page has to point at the manifest and carry the iOS-only icon.
+    const html = await (await fetch(base)).text();
+    assert.match(html, /rel="manifest"/);
+    assert.match(html, /apple-touch-icon/);
+    assert.equal(
+      (await fetch(`${base}/assets/icons/apple-touch-icon.png`)).status,
+      200,
+    );
+
+    // The worker itself must be served, and from the root so its scope covers
+    // the whole game.
+    const sw = await fetch(`${base}/sw.js`);
+    assert.equal(sw.status, 200);
+    assert.match(sw.headers.get("content-type"), /javascript/);
+    const source = await sw.text();
+    // Every precached path must actually resolve, or the install rejects and
+    // the game silently loses offline support. Read the SHELL list itself
+    // rather than every quoted path: /ws and /healthz appear in the worker
+    // precisely because they are excluded from caching.
+    const list = source.match(/const SHELL = \[([\s\S]*?)\];/);
+    assert.ok(list, "could not find the precache list");
+    const shell = [...list[1].matchAll(/"([^"]+)"/g)]
+      .map((m) => m[1])
+      .filter((p) => p !== "/");
+    for (const path of shell)
+      assert.equal((await fetch(`${base}${path}`)).status, 200, `${path} 404s`);
+    // Solo has to be in the shell, or an offline launch cannot start a game.
+    assert.ok(shell.includes("/js/local.js"));
+    assert.ok(shell.includes("/shared/world.js"));
+  } finally {
+    await new Promise((resolve) => wss.close(resolve));
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
