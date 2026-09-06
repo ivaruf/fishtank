@@ -14,16 +14,14 @@
     <div class="vignette"></div>
     <header>
       <a class="brand" href="/">
-        <!-- The mark is the game: a big fish closing on a smaller one. -->
-        <svg class="mark" viewBox="-2 0 58 34" aria-hidden="true">
-          <g class="prey" transform="translate(36.4 9.18) scale(.46)">
-            <path d="M6 17 0 9 2.5 17 0 25Z" />
-            <path d="M4 17Q19 4 34 17 19 30 4 17Z" />
-            <circle class="pupil" cx="27" cy="14.5" r="2" />
-          </g>
-          <path d="M6 17 0 9 2.5 17 0 25Z" />
-          <path d="M4 17Q19 4 34 17 19 30 4 17Z" />
-          <circle class="pupil" cx="27" cy="14.5" r="2" />
+        <svg class="mark" viewBox="0 0 48 48" aria-hidden="true">
+          <path class="mark-ring" d="M36 8A20 20 0 1 0 43 25" />
+          <path
+            class="mark-fish"
+            d="M12 24 7 17v14l5-7c7-10 18-10 27 0-9 10-20 10-27 0Z"
+          />
+          <circle class="pupil" cx="31" cy="22" r="1.6" />
+          <path class="mark-current" d="M33 7h9m-5 5h7" />
         </svg>
         <span class="wordmark">fishtank</span>
       </a>
@@ -47,7 +45,14 @@
             aria-pressed="false"
             title="Mute sound"
           >
-            🔊
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M11 5 6 9H3v6h3l5 4Z" />
+              <path
+                class="sound-waves"
+                d="M15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"
+              />
+              <path class="sound-slash" d="m15 9 6 6m0-6-6 6" />
+            </svg>
           </button>
           <button
             id="fullscreen"
@@ -58,7 +63,9 @@
             title="Enter fullscreen"
             hidden
           >
-            ⛶
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M9 3H3v6m12-6h6v6M3 15v6h6m12-6v6h-6" />
+            </svg>
           </button>
         </div>
         <div id="fullscreen-status" role="status" hidden></div>
@@ -117,10 +124,19 @@
         <ol id="leaders"></ol>
       </aside>
       <div class="aim">·</div>
-      <div id="cover" class="cover" hidden>HIDDEN IN THE KELP</div>
       <div id="labels" class="labels"></div>
       <div id="toast" aria-live="polite"></div>
-      <button id="leave" class="exit secondary">Leave tank</button>
+      <button
+        id="leave"
+        class="exit secondary"
+        type="button"
+        aria-label="Open game menu"
+        title="Game menu (Esc)"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="m6 6 12 12M18 6 6 18" />
+        </svg>
+      </button>
     </section>
     <section id="lobby" class="glass lobby" hidden>
       <div class="eyebrow">THE LOBBY <span id="lobby-count"></span></div>
@@ -155,12 +171,30 @@
         Start the next round <span>→</span>
       </button>
     </section>
+    <dialog
+      id="leave-dialog"
+      aria-labelledby="leave-title"
+      aria-describedby="leave-description"
+    >
+      <div class="eyebrow">FISHTANK</div>
+      <h2 id="leave-title">Taking a breather?</h2>
+      <p id="leave-description">
+        Stay for another swim or return to the main menu. The tank keeps running
+        while you decide.
+      </p>
+      <div class="dialog-actions">
+        <button id="continue" type="button" autofocus>Continue</button>
+        <button id="confirm-leave" class="secondary" type="button">
+          Leave fish tank
+        </button>
+      </div>
+    </dialog>
     <footer>
       <div>
         <span class="key">W</span><span class="key">S</span> forward / back
         <span class="key">A</span><span class="key">D</span> strafe
-        <span class="divider">/</span> Mouse to aim · Click to capture · Esc to
-        release
+        <span class="divider">/</span> Mouse to aim · Click to capture · Esc for
+        menu
       </div>
     </footer>
     <div id="touch" hidden>

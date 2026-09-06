@@ -54,7 +54,7 @@ for (const type of ["pointerdown", "keydown"])
 function syncMute() {
   const on = audio.muted,
     label = on ? "Unmute sound" : "Mute sound";
-  $("mute").textContent = on ? "🔇" : "🔊";
+
   $("mute").setAttribute("aria-pressed", String(on));
   $("mute").setAttribute("aria-label", label);
   $("mute").title = label;
@@ -250,7 +250,56 @@ function showHero(dt) {
   hero.root.scaling.setAll(wide ? (short ? 1.1 : 2) : 1.15);
   hero.update(dt);
 }
+let leavePromptOpen = false;
+function openGameMenu() {
+  if (!myId || $("hud").hidden || leavePromptOpen) return;
+  leavePromptOpen = true;
+  controls.setActive(false);
+  $("leave-dialog").showModal();
+}
+function continueGame() {
+  leavePromptOpen = false;
+  $("leave-dialog").close();
+  syncControls(
+    state?.players.find((p) => p.id === myId),
+    state?.phase,
+  );
+  $("game").focus();
+}
+$("continue").onclick = continueGame;
+$("leave-dialog").addEventListener("cancel", (event) => {
+  event.preventDefault();
+  continueGame();
+});
+window.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !event.repeat && !leavePromptOpen) {
+    event.preventDefault();
+    openGameMenu();
+  }
+});
+// Browsers consume Escape when releasing pointer lock.
+let wasPointerLocked = false;
+document.addEventListener("pointerlockchange", () => {
+  const locked = document.pointerLockElement === $("game");
+  if (
+    wasPointerLocked &&
+    !locked &&
+    state?.phase === "playing" &&
+    state.players.find((p) => p.id === myId)?.alive &&
+    !portrait.matches
+  )
+    openGameMenu();
+  wasPointerLocked = locked;
+});
+document.querySelector(".brand").addEventListener("click", (event) => {
+  if (myId) {
+    event.preventDefault();
+    openGameMenu();
+  }
+});
 function leave(message = "") {
+  leavePromptOpen = false;
+  $("leave-dialog").close();
   controls.setActive(false);
   controls.setTouchMode(false);
   touchMode = false;
@@ -395,7 +444,8 @@ $("multi").onclick = () => {
   audio.play("click");
   join("multiplayer");
 };
-$("leave").onclick = () => {
+$("leave").onclick = openGameMenu;
+$("confirm-leave").onclick = () => {
   audio.play("click");
   leave();
 };
@@ -480,7 +530,6 @@ function updateUI() {
   $("timer").textContent =
     `${Math.floor(Math.max(0, state.remaining) / 60)}:${String(Math.floor(Math.max(0, state.remaining) % 60)).padStart(2, "0")}`;
   $("count").textContent = `· ${state.players.length}`;
-  $("cover").hidden = !me.hidden;
   const ranked = [...state.players].sort(
     (a, b) => b.score - a.score || b.mass - a.mass,
   );
@@ -656,7 +705,9 @@ function deathCamera(dt, now) {
 // holds still until the phone is turned.
 const portrait = matchMedia("(pointer: coarse) and (orientation: portrait)");
 function syncControls(me, phase) {
-  controls.setActive(!!me?.alive && phase === "playing" && !portrait.matches);
+  controls.setActive(
+    !!me?.alive && phase === "playing" && !portrait.matches && !leavePromptOpen,
+  );
 }
 portrait.addEventListener("change", () => {
   syncControls(

@@ -1029,3 +1029,199 @@ select {
     font-size: 8px;
   }
 }
+
+/* A quieter identity and a single visual language for the menus. */
+.brand {
+  gap: 10px;
+  font-weight: 600;
+  letter-spacing: -1.3px;
+}
+.brand .mark {
+  width: 42px;
+  height: 42px;
+  fill: none;
+  filter: none;
+}
+.brand .mark-ring {
+  stroke: #9ed9c5;
+  stroke-width: 1.5;
+  fill: none;
+}
+.brand .mark-fish {
+  fill: #d1ed9e;
+}
+.brand .mark-current {
+  fill: none;
+  stroke: #d1ed9e;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+.brand:hover .mark {
+  fill: none;
+}
+.display-controls {
+  gap: 6px;
+  padding: 5px;
+  border: 1px solid #badbcd26;
+  border-radius: 14px;
+  background: #072c32d9;
+  box-shadow: 0 6px 24px #001c2426;
+}
+.resolution-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 9px;
+}
+.resolution-label > span {
+  font-size: 10px;
+  letter-spacing: 0.5px;
+}
+.resolution-label select {
+  height: 36px;
+  max-width: 135px;
+  margin: 0;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 8px;
+  font-size: 12px;
+  letter-spacing: 0;
+  background: #24474a;
+}
+.sound-toggle,
+.fullscreen-toggle {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+}
+button svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vertical-align: middle;
+  pointer-events: none;
+}
+.sound-slash,
+.sound-toggle[aria-pressed="true"] .sound-waves {
+  display: none;
+}
+.sound-toggle[aria-pressed="true"] .sound-slash {
+  display: initial;
+}
+.sound-toggle[aria-pressed="true"] {
+  opacity: 1;
+  color: #a3bcb7;
+}
+button:focus-visible,
+a:focus-visible,
+select:focus-visible {
+  outline: 2px solid #d1ed9e;
+  outline-offset: 4px;
+}
+.panel input {
+  background: #092f36d9;
+  border-color: #83afa35c;
+  border-radius: 12px;
+}
+.species-option {
+  border-color: #83afa33d;
+  background: #092f36c9;
+  border-radius: 12px;
+}
+.species-option[aria-checked="true"] {
+  border-color: #d1ed9e;
+  box-shadow: inset 0 0 0 1px #d1ed9e;
+}
+.panel .buttons button,
+.lobby .buttons button {
+  border-radius: 12px;
+}
+.secondary {
+  border-color: #83afa35c;
+}
+.playing header {
+  padding-right: 56px;
+}
+#leave.exit {
+  transform: none;
+  position: fixed;
+  top: 39px;
+  right: 42px;
+  bottom: auto;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 12px;
+  background: #072c32ed;
+  z-index: 20;
+}
+#leave-dialog {
+  width: min(420px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  padding: 30px;
+  border: 1px solid #83afa35c;
+  border-radius: 22px;
+  background: #0b3036;
+  color: #edf8ef;
+  box-shadow: 0 24px 100px #0008;
+}
+#leave-dialog::backdrop {
+  background: #00191db3;
+  backdrop-filter: blur(8px);
+}
+#leave-dialog h2 {
+  margin: 14px 0 10px;
+  font-size: 28px;
+  letter-spacing: -0.8px;
+}
+#leave-dialog p {
+  margin: 0 0 24px;
+  font-size: 14px;
+}
+.dialog-actions {
+  display: grid;
+  gap: 10px;
+}
+.dialog-actions button {
+  border-radius: 10px;
+}
+@media (max-width: 650px), (max-height: 520px) {
+  .brand .mark {
+    width: 32px;
+    height: 32px;
+  }
+  .brand {
+    gap: 7px;
+    font-size: 24px;
+  }
+  .resolution-label > span {
+    display: none;
+  }
+  .resolution-label {
+    padding-left: 0;
+  }
+  .resolution-label select {
+    max-width: 108px;
+  }
+  .display-controls {
+    padding: 3px;
+    gap: 2px;
+  }
+  .playing header {
+    padding-right: 48px;
+  }
+  #leave.exit {
+    top: max(12px, env(safe-area-inset-top));
+    right: max(15px, env(safe-area-inset-right));
+  }
+  #leave-dialog {
+    padding: 22px;
+  }
+}

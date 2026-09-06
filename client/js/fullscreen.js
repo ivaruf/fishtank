@@ -11,7 +11,7 @@ export function setupFullscreen(onResize) {
     button.setAttribute("aria-label", label);
     button.setAttribute("aria-pressed", String(active));
     button.title = label;
-    button.textContent = active ? "↙" : "⛶";
+
     status.hidden = true;
     requestAnimationFrame(onResize);
   }
