@@ -19,6 +19,25 @@ SOURCE = ROOT / 'assets/blender'
 DOCS = ROOT / 'docs'
 for path in [OUT, THUMBS, SOURCE, DOCS]: path.mkdir(parents=True, exist_ok=True)
 KINDS = ['clownfish', 'blue-tang', 'pufferfish', 'angelfish', 'goldfish', 'betta', 'shark', 'butterflyfish', 'lionfish', 'wrasse', 'seahorse', 'manta-ray', 'royal-gramma', 'triggerfish']
+# Species with authored four-tier detail, mapped to the module supplying their
+# enhance(builder, root, kind, detail, palette) and tail(...) layers. Anything
+# listed here builds low/standard/high/hd; the rest stay standard plus HD.
+DETAIL_MODULES = {
+    'clownfish': 'clownfish_detail',
+    'blue-tang': 'reef_detail',
+    'pufferfish': 'reef_detail',
+    'goldfish': 'flowing_detail',
+    'betta': 'flowing_detail',
+    'angelfish': 'flowing_detail',
+    'butterflyfish': 'patterned_detail',
+    'wrasse': 'patterned_detail',
+    'royal-gramma': 'patterned_detail',
+    'triggerfish': 'patterned_detail',
+    'lionfish': 'pelagic_detail',
+    'seahorse': 'pelagic_detail',
+    'manta-ray': 'pelagic_detail',
+    'shark': 'pelagic_detail',
+}
 # Tessellation per quality tier: (segments, rings) for spheres, bevel/curve resolution for fins and rays.
 DETAIL = {
     'low': dict(body=(20,14), sphere=(12,8), small=(10,6), tiny=(8,4), bevel=1, curve=0, suffix='-low'),
@@ -27,10 +46,14 @@ DETAIL = {
     'hd': dict(body=(72, 54), sphere=(36, 20), small=(16, 10), tiny=(14, 8), bevel=4, curve=3, suffix='-hd'),
 }
 LEVEL = DETAIL['standard']
+# Every material built for the current species, keyed by name, so detail modules
+# can reach both the shared palette and a species' own colors without wiring.
+PALETTE = {}
 
 def vec(p): return Vector((p[0], -p[2], p[1]))
 def mat(name, color, rough=.4):
     m = bpy.data.materials.new(name)
+    PALETTE[name] = m
     m.diffuse_color = (*color, 1)
     m.use_nodes = True
     bsdf = m.node_tree.nodes.get('Principled BSDF')
@@ -155,6 +178,7 @@ def merge_parts(parent,name):
 def build(kind, detail='standard', models_only=False):
     global LEVEL
     LEVEL=DETAIL[detail]
+    PALETTE.clear()
     bpy.ops.wm.read_factory_settings(use_empty=True)
     scene=bpy.context.scene;scene.render.fps=24;scene.frame_start=1;scene.frame_end=25
     cream=mat('Pearl',(1,.91,.72));dark=mat('Ink',(.018,.032,.055),.3)
@@ -355,7 +379,7 @@ def build(kind, detail='standard', models_only=False):
     elif kind=='manta-ray':
         # One closed, softly cambered diamond with a pale underside and long whip tail.
         ocean=mat('Ocean slate',(.055,.20,.29));belly=mat('Cloud belly',(.80,.89,.84))
-        vertices=[];faces=[];nx=32 if detail=='standard' else 64;nz=16 if detail=='standard' else 32
+        vertices=[];faces=[];nx,nz=LEVEL['body'][0],max(8,LEVEL['body'][1]*2//3)
         for lower in [False,True]:
             for i in range(nx+1):
                 u=-1+2*i/nx;a=abs(u);leading=.88*(1-a)-.17*a;trailing=-.78+.53*a
@@ -402,21 +426,16 @@ def build(kind, detail='standard', models_only=False):
         tailmat=slate;edge=dark;tailheight=.60
         tailshapes=[[(0,.10,-.83),(0,.78,-1.55),(0,.62,-1.62),(0,.05,-1.25),(0,-.45,-1.50),(0,-.55,-1.45),(0,-.10,-.83)]]
         rays=[]
+    # Authored detail layers replace the blocky fins above on every tier but Low.
+    layers=None
+    if kind in DETAIL_MODULES and detail!='low':
+        sys.path.insert(0,str(Path(__file__).parent))
+        layers=__import__(DETAIL_MODULES[kind])
+        fin_highlight=layers.enhance(sys.modules[__name__],root,kind,detail,PALETTE)
     # Keep tail pivot local to its attachment for exported swim animation.
-    if kind=='clownfish' and detail!='low':
-        sys.path.insert(0,str(Path(__file__).parent))
-        import clownfish_detail
-        fin_highlight=clownfish_detail.enhance(sys.modules[__name__],root,detail,orange,cream,dark,gold)
-    if kind in ['blue-tang','pufferfish'] and detail!='low':
-        sys.path.insert(0,str(Path(__file__).parent))
-        import reef_detail
-        fin_highlight=reef_detail.enhance(sys.modules[__name__],root,kind,detail,cream,dark,gold,blue,mint)
     tail=bpy.data.objects.new('Tail',None);bpy.context.collection.objects.link(tail);tail.parent=root
-    if kind=='clownfish' and detail!='low':
-        clownfish_detail.tail(sys.modules[__name__],tail,detail,orange,cream,dark,fin_highlight)
-        rays=[]
-    elif kind in ['blue-tang','pufferfish'] and detail!='low':
-        reef_detail.tail(sys.modules[__name__],tail,kind,detail,tailmat,edge,fin_highlight)
+    if layers:
+        layers.tail(sys.modules[__name__],tail,kind,detail,tailmat,edge,fin_highlight)
         rays=[]
     elif tailcurve:
         curve=line('Curved tail',tailcurve,tailmat,tail,tailwidth)
@@ -437,7 +456,7 @@ def build(kind, detail='standard', models_only=False):
     for o in [root,*root.children_recursive]:o.select_set(True)
     bpy.context.view_layer.objects.active=root
     bpy.ops.export_scene.gltf(filepath=str(OUT/f"{kind}{LEVEL['suffix']}.glb"),export_format='GLB',use_selection=True,export_animations=True,export_animation_mode='ACTIVE_ACTIONS',export_frame_range=True,export_yup=True,export_cameras=False,export_lights=False)
-    if detail!='standard' and kind not in ['clownfish','blue-tang','pufferfish']: return kind
+    if detail!='standard' and kind not in DETAIL_MODULES: return kind
     # Source files include studio lighting and a camera for easy inspection.
     studio(scene)
     bpy.ops.wm.save_as_mainfile(filepath=str(SOURCE/f"{kind}{LEVEL['suffix']}.blend"))
@@ -482,7 +501,7 @@ elif '--hd-only' in args:
     print(f'FISHTANK: High-detail models exported for {", ".join(kinds)}.')
 else:
     for kind in kinds:
-        if kind in ['clownfish','blue-tang','pufferfish']:
+        if kind in DETAIL_MODULES:
             for detail in ['low','standard','high','hd']:build(kind,detail,models_only='--models-only' in args)
         else:build(kind,models_only='--models-only' in args);build(kind,'hd')
     print(f'FISHTANK: Built {", ".join(kinds)} (Blender sources, standard and HD GLBs).')

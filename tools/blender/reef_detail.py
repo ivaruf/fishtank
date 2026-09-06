@@ -3,8 +3,10 @@ import bpy
 import math
 
 
-def enhance(b, root, kind, detail, cream, dark, gold, blue, mint):
+def enhance(b, root, kind, detail, palette):
     tier={'standard':1,'high':2,'hd':3}[detail]
+    cream, dark, gold = palette['Pearl'], palette['Ink'], palette['Honey']
+    blue, mint = palette['Lagoon'], palette['Seafoam']
     tang=kind=='blue-tang'
     skin=blue if tang else mint
     rays=b.mat('Reef fin rays',(.26,.65,.96) if tang else (1,.72,.21),.28)
@@ -98,7 +100,7 @@ def enhance(b, root, kind, detail, cream, dark, gold, blue, mint):
     return rays
 
 
-def tail(b,parent,kind,detail,base,edge,rays):
+def tail(b, parent, kind, detail, base, edge, rays):
     tier={'standard':1,'high':2,'hd':3}[detail]
     h=.54 if kind=='blue-tang' else .34
     outline=[]

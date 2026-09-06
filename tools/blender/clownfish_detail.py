@@ -5,8 +5,10 @@ import bpy
 import math
 
 
-def enhance(b, root, detail, orange, cream, dark, gold):
+def enhance(b, root, kind, detail, palette):
     tier = {'standard': 1, 'high': 2, 'hd': 3}[detail]
+    orange, cream = palette['Tangerine'], palette['Pearl']
+    dark, gold = palette['Ink'], palette['Honey']
     # Replace slab fins with rounded, curved silhouettes at every tier above Low.
     for obj in list(root.children):
         if obj.name.startswith(('Dorsal', 'Ventral', 'Pectoral')):
@@ -78,8 +80,9 @@ def enhance(b, root, detail, orange, cream, dark, gold):
     return highlight
 
 
-def tail(b, parent, detail, orange, cream, dark, highlight):
+def tail(b, parent, kind, detail, orange, dark, highlight):
     tier={'standard':1,'high':2,'hd':3}[detail]
+    cream=b.PALETTE['Pearl']
     count=12 if tier==1 else 24 if tier==2 else 40
     outline=[]
     for i in range(count+1):

@@ -1,30 +1,29 @@
 # Fish detail upgrades — handoff
 
-Updated 2026-09-06. The roster contains 14 species. Three have authored four-tier upgrades; eleven remain. Work in small batches to conserve session usage. Do not rebuild or redesign all fish at once.
+Updated 2026-09-06. The roster contains 14 species and all of them now have authored four-tier upgrades. Work in small batches to conserve session usage. Do not rebuild or redesign all fish at once.
 
 ## Completed
 
 - [x] Clownfish: rounded/scalloped fins, gills and lips, scale arcs, iris detail, animated pectorals.
 - [x] Blue tang: swept sails, gill covers, scales, bilateral fin rays, animated flippers.
 - [x] Pufferfish: muzzle and gills, belly ridges, tapered spines, fine freckles, animated flippers.
+- [x] Goldfish: split curved fantail, scalloped dorsal/anal membranes, fin rays, gill plates, lips, scale arcs, animated pectorals and pelvics.
+- [x] Betta: ruffled halfmoon caudal and veil fins, layered rays, sheen scale arcs, gill beard, independently fluttering dorsal/anal/pectorals.
+- [x] Angelfish: thin curved sails with fine rays, forked caudal with filaments, sculpted gills and snout, flank scales between the bars, swaying pelvic streamers.
+- [x] Butterflyfish: tapered forceps snout and lips, eyespot sunk into the skin, scalloped dorsal/anal with rays, gill crease, flank scales, animated pectorals.
+- [x] Wrasse: conical fusiform body, flush cheek bands, forked caudal, low dorsal with trailing filaments, fine scales, fluttering pectorals.
+- [x] Royal gramma: interlocking purple/gold seam, gill and eye stripe in the skin, split scalloped dorsal, two-tone scales, iris filaments.
+- [x] Triggerfish: pearl spots flattened into the skin, sculpted lips and gill slit, golden saddle, tapered trigger spine and latch, caudal rays.
+- [x] Lionfish: curved tapered dorsal and anal spines with sagging webs, radiating pectoral fans on their own slow hinges, pinstriped band edges, brow tassels, webbed pelvics.
+- [x] Seahorse: tapered tubular snout, curling coronet, bony ring plates with corner spines and running ridges, plated prehensile spiral, fluttering dorsal fan and beating ear fins.
+- [x] Manta ray: cambered wings with upswept tips on independent flap hinges, raised body pod, curled cephalic lobes, ventral gill slits, mottled spots and a tapered whip tail.
+- [x] Shark: blunt snout with a wrapping grin and teeth, five curved gill slits, swept fins on hinges, asymmetric notched caudal on a tapered peduncle, lateral line and denticles.
 
-Each has `-low.glb`, `.glb`, `-high.glb`, `-hd.glb`, matching editable `.blend` files, comparison PNGs, and a menu thumbnail. Existing standard and HD exports for the species below are still basic models; extra tessellation alone does not count as an upgrade.
+Each has `-low.glb`, `.glb`, `-high.glb`, `-hd.glb`, matching editable `.blend` files, comparison PNGs, and a menu thumbnail. Extra tessellation alone does not count as an upgrade.
 
-## Remaining species, suggested order
+## Remaining species
 
-| Done | Species       | Visible upgrade to pursue                                                                                                           |
-| ---- | ------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| [ ]  | Goldfish      | Curved split fantail, scalloped membranes, fin rays, gill plates and subtle scales; flowing fin motion.                             |
-| [ ]  | Betta         | Wavy veil edges, layered rays, richer body sheen, and independently fluttering large fins.                                          |
-| [ ]  | Angelfish     | Thin curved sails, fine rays, sculpted gills, delicate pelvic streamers and gentle fin movement.                                    |
-| [ ]  | Butterflyfish | Refined snout, flatter integrated eyespot, curved dorsal/anal edges, fine scales and fin rays.                                      |
-| [ ]  | Wrasse        | Better tapered silhouette, flush cheek markings, subtle scales, long dorsal rays and pectoral flutter.                              |
-| [ ]  | Royal gramma  | Refined purple/yellow transition, gills, scalloped dorsal, fine scales and richer eyes.                                             |
-| [ ]  | Triggerfish   | Flatten spots against skin, sculpt lips and gill opening, detailed trigger spine and caudal rays.                                   |
-| [ ]  | Lionfish      | Curved tapered spines, thin radiating fan membranes, finer banding and slow fan movement.                                           |
-| [ ]  | Seahorse      | Refined coronet and snout, segmented body plates, smooth tapered spiral and fluttering dorsal fan. Preserve upright anatomy.        |
-| [ ]  | Manta ray     | Refine wing camber and cephalic lobes, underside gill slits, tail taper; add independent wing flaps (current clip only moves tail). |
-| [ ]  | Shark         | Sculpt gills/mouth, swept fins and asymmetric caudal fin, subtle surface variation and body/tail flex.                              |
+All fourteen species are done. No species remain on the basic standard/HD-only path.
 
 ## Quality contract
 
@@ -39,7 +38,7 @@ Each has `-low.glb`, `.glb`, `-high.glb`, `-hd.glb`, matching editable `.blend` 
 ## Implementation pattern
 
 1. Inspect current files and git status; other tasks may have changed the repo. Preserve unrelated work.
-2. Author species-specific layers using `tools/blender/clownfish_detail.py` or `reef_detail.py` as references. Helpers and shared export settings are in `create_fish.py`.
+2. Author species-specific layers using `tools/blender/clownfish_detail.py`, `reef_detail.py` or `patterned_detail.py` as references. Helpers and shared export settings are in `create_fish.py`.
 3. Add the species to the four-tier build/source-save routing in `create_fish.py`, and `DETAILED_SPECIES` in `client/js/fish.js`. `rendering.js` already maps all four quality settings. Other species intentionally stay standard/HD.
 4. Keep +Z forward, +Y up in GLB, centered body root, and existing mouth/crest conventions. Seahorse's mouth sits higher; avoid universal anatomical assumptions.
 5. Keep meshes/materials shared for Babylon instances. Extra animated fins should have their own named pivots, local origins, and an action merged into the exported swim clip. Export the entire fish hierarchy.

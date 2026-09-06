@@ -9,7 +9,7 @@ const BABYLON = require("babylonjs");
 globalThis.BABYLON = BABYLON;
 require("babylonjs-loaders");
 globalThis.window = Object.assign(new EventTarget(), { BABYLON });
-const { createFish, loadFishModels, modelUrl } =
+const { createFish, loadFishModels, modelUrl, DETAILED_SPECIES } =
   await import("../client/js/fish.js");
 function headless() {
   const engine = new BABYLON.NullEngine(),
@@ -228,7 +228,7 @@ test("upgraded fish quality tiers change geometry and preserve animated instance
     const previous = {};
     for (const detail of ["low", "standard", "high", "hd"]) {
       await loadFishModels(scene, fromDisk(scene), detail);
-      for (const species of ["clownfish", "blue-tang", "pufferfish"]) {
+      for (const species of DETAILED_SPECIES) {
         const fish = createFish(scene, species, true);
         assert.ok(
           vertices(fish) > (previous[species] ?? 0),
@@ -242,8 +242,12 @@ test("upgraded fish quality tiers change geometry and preserve animated instance
         fish.dispose();
       }
     }
-    assert.equal(modelUrl("shark", "low"), modelUrl("shark", "standard"));
-    assert.equal(modelUrl("shark", "high"), modelUrl("shark", "standard"));
+    // Species without authored tiers collapse low/high onto the standard model.
+    const basic = SPECIES.filter((s) => !DETAILED_SPECIES.has(s));
+    for (const species of basic) {
+      assert.equal(modelUrl(species, "low"), modelUrl(species, "standard"));
+      assert.equal(modelUrl(species, "high"), modelUrl(species, "standard"));
+    }
   } finally {
     engine.dispose();
   }

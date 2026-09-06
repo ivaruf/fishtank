@@ -52,7 +52,24 @@ function shared(map, scene, make) {
   if (!map.has(scene)) map.set(scene, make());
   return map.get(scene);
 }
-const DETAILED_SPECIES = new Set(["clownfish", "blue-tang", "pufferfish"]);
+// Species with authored low/high tiers in tools/blender/create_fish.py's
+// DETAIL_MODULES; the rest resolve every tier to standard or HD.
+export const DETAILED_SPECIES = new Set([
+  "clownfish",
+  "blue-tang",
+  "pufferfish",
+  "goldfish",
+  "betta",
+  "angelfish",
+  "butterflyfish",
+  "wrasse",
+  "royal-gramma",
+  "triggerfish",
+  "lionfish",
+  "seahorse",
+  "manta-ray",
+  "shark",
+]);
 const modelsFor = (scene) => {
   if (!models.has(scene)) models.set(scene, new Map());
   return models.get(scene);
