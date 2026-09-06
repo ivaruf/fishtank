@@ -371,7 +371,10 @@ function join(mode) {
           prey.die(e.predator, e.prey === myId ? 1.6 : undefined);
           puffs.burst(prey.root.position, prey.root.scaling.x);
         }
-        if (e.predator === myId) toast("A little bigger. A little bolder. +");
+        if (e.predator === myId)
+          toast(
+            `Ate ${e.label ?? "a snack"}, grew ${(e.grew ?? 0).toFixed(1)}`,
+          );
       }
     },
     onError(message) {

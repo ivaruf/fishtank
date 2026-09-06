@@ -172,7 +172,15 @@ test("a wild fish big enough to eat a player does so, is named, and the player r
   assert.equal(giant.mass, 20 + C.startMass * C.growth);
   assert.deepEqual(
     w.events.filter((e) => e.type === "PLAYER_EATEN"),
-    [{ type: "PLAYER_EATEN", predator: "giant", prey: "one" }],
+    [
+      {
+        type: "PLAYER_EATEN",
+        predator: "giant",
+        prey: "one",
+        label: "One",
+        grew: 6,
+      },
+    ],
   );
   w.tick(C.respawnDelay + 0.1);
   assert.equal(p.alive, true);

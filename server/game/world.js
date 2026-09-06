@@ -166,6 +166,7 @@ export class World {
     return best;
   }
   eat(predator, prey) {
+    const before = predator.mass;
     predator.mass = Math.min(1800, predator.mass + prey.mass * C.growth);
     if (!predator.npc) predator.score += Math.round(prey.mass * 10);
     prey.alive = false;
@@ -178,6 +179,9 @@ export class World {
       type: prey.npc ? "NPC_EATEN" : "PLAYER_EATEN",
       predator: predator.id,
       prey: prey.id,
+      // What was eaten and how much the eater grew, for the eater's toast.
+      label: prey.npc ? speciesLabel(prey.species) : prey.name,
+      grew: +(predator.mass - before).toFixed(1),
     });
   }
   // The filter arms a minute into the round. A press is a fish arriving on
