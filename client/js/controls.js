@@ -1,20 +1,29 @@
 import { clamp, wrap } from "../../shared/config.js";
 
-// Desktop: WASD plus mouse aim, and the fish swims where you look. Touch: the
-// fish always swims; one thumb steers with a floating stick relative to the
-// camera, the other drags up or down for depth (and the fish levels out when
-// released), and main.js keeps the camera behind the fish. Both produce the
-// same {forward, strafe, yaw, pitch} for the server.
+// Desktop: WASD plus mouse aim, and the fish swims where you look. Touch: one
+// thumb steers with a floating stick relative to the camera, the other drags up
+// or down for depth (and the fish levels out when released), and main.js keeps
+// the camera behind the fish. Both produce the same {forward, strafe, yaw,
+// pitch} for the server.
+//
+// Two touch styles. "always" is the default: the fish swims constantly so a
+// player only has to steer, which is deliberately the simpler scheme for
+// mobile. "hold" moves only while a thumb is pushing the stick, like every
+// other virtual stick, for players who find a fish that never stops hard to
+// control and want the stop-and-go feel of the keyboard.
 const TURN = 2.4, // rad/s the touch heading may change
   ASSIST = 0.9, // rad/s the bite assist may nudge when the thumb is idle
   LEVEL = 1.2, // 1/s pitch decay back to level on touch
   STICK = 48, // px of thumb travel for full deflection
-  DEPTH = 150; // px of drag for a full dive or climb
+  DEPTH = 150, // px of drag for a full dive or climb
+  DEAD = 0.2, // stick deflection below this is treated as centred
+  FULL = 0.8; // deflection at which the fish is at full speed
 export function createControls(canvas, onStop = () => {}) {
   const keys = new Set();
   const aim = { yaw: 0, pitch: 0 };
   let active = false,
     touchMode = false,
+    moveStyle = "always",
     assist = null;
   const allowed = [
     "w",
@@ -56,6 +65,18 @@ export function createControls(canvas, onStop = () => {}) {
     keys.delete(e.key.toLowerCase());
     if (active) onStop();
   });
+  // Safari reports pinches as gesture events rather than as touch-action, so
+  // several fingers landing at once zooms the page and leaves the game
+  // misaligned. Block it while playing; the menu stays zoomable for anyone who
+  // needs that.
+  for (const type of ["gesturestart", "gesturechange", "gestureend"])
+    document.addEventListener(
+      type,
+      (e) => {
+        if (active) e.preventDefault();
+      },
+      { passive: false },
+    );
   window.addEventListener("blur", reset);
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) reset();
@@ -164,6 +185,11 @@ export function createControls(canvas, onStop = () => {}) {
       touchMode = value;
       if (!value) for (const zone of [steer, depth]) release(zone);
     },
+    // "always" (the fish never stops) or "hold" (moves only while pushed).
+    setMoveStyle(value) {
+      moveStyle = value === "hold" ? "hold" : "always";
+      onStop();
+    },
     // A {yaw, pitch} to drift toward while the thumb is idle, or null.
     assist(target) {
       assist = target;
@@ -174,20 +200,26 @@ export function createControls(canvas, onStop = () => {}) {
     },
     // cameraYaw makes stick directions screen-relative on touch.
     read(dt = 0, cameraYaw = aim.yaw) {
+      const push = Math.hypot(steer.x, steer.y);
+      const held = steer.pointer !== null && push > DEAD;
+      // A fish that is standing still must stay still: the bite assist may
+      // only nudge the heading of a fish that is actually swimming, or a
+      // parked fish would slowly rotate on its own.
+      const swimming = moveStyle === "always" || held;
       if (active && touchMode) {
-        if (steer.pointer !== null && Math.hypot(steer.x, steer.y) > 0.2) {
+        if (held) {
           const wanted = cameraYaw + Math.atan2(steer.x, -steer.y);
           aim.yaw = wrap(
             aim.yaw + clamp(wrap(wanted - aim.yaw), -TURN * dt, TURN * dt),
           );
-        } else if (assist) {
+        } else if (assist && swimming) {
           aim.yaw = wrap(
             aim.yaw +
               clamp(wrap(assist.yaw - aim.yaw), -ASSIST * dt, ASSIST * dt),
           );
         }
         if (depth.pointer !== null) aim.pitch = depth.value;
-        else if (assist)
+        else if (assist && swimming)
           aim.pitch += clamp(
             assist.pitch - aim.pitch,
             -ASSIST * dt,
@@ -195,8 +227,15 @@ export function createControls(canvas, onStop = () => {}) {
           );
         else aim.pitch *= Math.exp(-dt * LEVEL);
       }
+      // On touch "always" swims at full speed regardless of the thumb, while
+      // "hold" ramps from a standstill at the deadzone up to full at FULL, so
+      // letting go stops the fish outright.
       const forward = touchMode
-        ? 1
+        ? moveStyle === "always"
+          ? 1
+          : held
+            ? Math.min(1, (push - DEAD) / (FULL - DEAD))
+            : 0
         : Number(keys.has("w") || keys.has("arrowup")) -
           Number(keys.has("s") || keys.has("arrowdown"));
       const strafe = touchMode

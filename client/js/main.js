@@ -29,6 +29,16 @@ try {
 } catch {
   /* Storage unavailable: keep the default. */
 }
+// Touch swimming style: "always" keeps the fish moving, "hold" only swims
+// while a thumb pushes the stick. Restored before the first frame so a player
+// who needs stop-and-go never sees the other one.
+try {
+  const saved = localStorage.getItem("fishtank.movestyle");
+  if ([...$("movestyle").options].some((o) => o.value === saved))
+    $("movestyle").value = saved;
+} catch {
+  /* Storage unavailable: keep the default. */
+}
 let aquarium;
 try {
   aquarium = createAquarium($("game"));
@@ -92,6 +102,22 @@ $("resolution").addEventListener("change", () => {
   }
   loadModels();
 });
+function syncMoveStyle() {
+  const style = $("movestyle").value;
+  controls.setMoveStyle(style);
+  $("steer-hint").textContent =
+    style === "hold" ? "STEER · HOLD TO SWIM" : "STEER · TOUCH AND DRAG";
+}
+$("movestyle").addEventListener("change", () => {
+  try {
+    localStorage.setItem("fishtank.movestyle", $("movestyle").value);
+  } catch {
+    /* Not remembered this time. */
+  }
+  syncMoveStyle();
+  audio.play("click");
+});
+syncMoveStyle();
 let network = null,
   myId = null,
   state = null,

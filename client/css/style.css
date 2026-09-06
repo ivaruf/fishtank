@@ -10,6 +10,28 @@
 body {
   margin: 0;
   overflow: hidden;
+  /* Kills double-tap-to-zoom, which fires constantly when a player taps
+     quickly. Pinch is handled separately in controls.js, and only while
+     playing, so the menu can still be zoomed by anyone who needs to. */
+  touch-action: manipulation;
+  -webkit-text-size-adjust: 100%;
+}
+/* Mashing the screen should never pop the text-selection magnifier or select
+   the HUD. The name field opts back in below. */
+header,
+#hud,
+#touch,
+.games,
+.lobby,
+.overlay {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+input,
+#name {
+  -webkit-user-select: text;
+  user-select: text;
 }
 canvas {
   width: 100vw;
@@ -339,7 +361,7 @@ button span {
   font-weight: bold;
   font-size: 18px;
 }
-`#touch {
+#touch {
   position: absolute;
   inset: 0;
   z-index: 1;
@@ -965,6 +987,16 @@ select {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+/* The swim style only affects the touch sticks, so it is hidden where there
+   are none rather than confusing a keyboard player. */
+.touch-only {
+  display: none;
+}
+@media (pointer: coarse) {
+  .touch-only {
+    display: revert;
+  }
 }
 .fullscreen-toggle,
 .sound-toggle {

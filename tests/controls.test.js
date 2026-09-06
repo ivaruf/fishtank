@@ -151,3 +151,70 @@ test("touch always swims, steers relative to the camera, dives by dragging and l
     globalThis.document = originalDocument;
   }
 });
+
+// "Hold to swim" exists because a fish that never stops is hard to control for
+// some players. Releasing the stick must genuinely stop the fish, including
+// the bite assist that is allowed to steer a swimming one.
+test("hold-to-swim stops the fish when the thumb lifts", () => {
+  const originalWindow = globalThis.window,
+    originalDocument = globalThis.document;
+  try {
+    const { zones, controls } = setup();
+    const move = zones["move-zone"];
+    controls.setActive(true);
+    controls.setTouchMode(true);
+    controls.setMoveStyle("hold");
+    controls.orient(0, 0);
+    assert.equal(
+      controls.read(0.1, 0).forward,
+      0,
+      "still until a thumb pushes",
+    );
+
+    // Pushing past the deadzone ramps up; a full push is full speed.
+    dispatch(move, "pointerdown", { pointerId: 1, clientX: 200, clientY: 400 });
+    dispatch(move, "pointermove", { pointerId: 1, clientX: 214, clientY: 400 });
+    const nudge = controls.read(0.1, 0).forward;
+    assert.ok(
+      nudge > 0 && nudge < 1,
+      `partial push is partial speed: ${nudge}`,
+    );
+    dispatch(move, "pointermove", { pointerId: 1, clientX: 300, clientY: 400 });
+    assert.equal(controls.read(0.1, 0).forward, 1, "full push is full speed");
+
+    // A tiny push inside the deadzone must not creep forward.
+    dispatch(move, "pointermove", { pointerId: 1, clientX: 204, clientY: 400 });
+    assert.equal(controls.read(0.1, 0).forward, 0, "deadzone means stopped");
+
+    // Releasing stops it, and the heading stays put so the camera settles.
+    dispatch(move, "pointermove", { pointerId: 1, clientX: 300, clientY: 400 });
+    const facing = controls.read(0.1, 0).yaw;
+    dispatch(move, "pointerup", { pointerId: 1 });
+    assert.equal(controls.read(0.5, 0).forward, 0, "released means stopped");
+    assert.equal(
+      controls.read(0.5, 0).yaw,
+      facing,
+      "heading holds when parked",
+    );
+
+    // The bite assist may not rotate a parked fish, or it would drift by itself.
+    controls.assist({ yaw: facing + 1, pitch: 0.5 });
+    assert.equal(
+      controls.read(0.5, 0).yaw,
+      facing,
+      "assist must not steer a stopped fish",
+    );
+    assert.equal(controls.read(0.5, 0).forward, 0);
+
+    // Back in "always" the same assist does steer, so it is gated, not broken.
+    controls.setMoveStyle("always");
+    assert.ok(
+      controls.read(0.2, 0).yaw > facing,
+      "assist still nudges a swimming fish",
+    );
+    assert.equal(controls.read(0.1, 0).forward, 1);
+  } finally {
+    globalThis.window = originalWindow;
+    globalThis.document = originalDocument;
+  }
+});

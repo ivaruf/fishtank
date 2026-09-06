@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta
       name="viewport"
-      content="width=device-width,initial-scale=1,viewport-fit=cover"
+      content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover"
     />
     <title>Fishtank — Welcome to the foodchain</title>
     <link rel="stylesheet" href="/css/style.css" />
@@ -28,6 +28,13 @@
       <div class="header-tools">
         <div class="connection" id="connection"></div>
         <div class="display-controls">
+          <label class="resolution-label touch-only" id="movestyle-label"
+            ><span>Swim</span>
+            <select id="movestyle" aria-label="Touch swimming style">
+              <option value="always">Always swimming</option>
+              <option value="hold">Hold to swim</option>
+            </select>
+          </label>
           <label class="resolution-label"
             ><span>Quality</span>
             <select id="resolution" aria-label="Render quality">
@@ -220,7 +227,7 @@
         <div id="move-stick" class="joystick floating" hidden>
           <div class="knob"></div>
         </div>
-        <span class="zone-hint">STEER · TOUCH AND DRAG</span>
+        <span class="zone-hint" id="steer-hint">STEER · TOUCH AND DRAG</span>
       </div>
       <div id="depth-zone" class="touch-zone depth-zone" aria-label="Depth">
         <div id="depth-gauge" class="depth-gauge floating" hidden>
