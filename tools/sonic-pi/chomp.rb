@@ -1,35 +1,25 @@
-# You eat something. Two bites: each is a wet jaw slam followed by a crunch
-# made of dozens of tiny resonant noise grains (shell splinters) through a
-# bitcrusher, then a descending gulp.
+# You eat something: one cartoon crunch and a gulp. Kept simple and friendly.
 use_random_seed 7
 
-define :bite do |amp|
-  # Jaw slam: low thump plus a wet squelch.
-  sample :drum_heavy_kick, rate: 0.7, amp: amp * 0.9
-  sample :bd_boom, rate: 1.4, amp: amp * 0.5
-  sample :elec_blup, rate: 0.5, amp: amp * 0.6
-  # Crunch: a burst of tiny broken-up noise grains, brightest first.
-  with_fx :bitcrusher, bits: 6, sample_rate: 9000, mix: 0.55 do
-    with_fx :hpf, cutoff: 55 do
-      sample :drum_snare_hard, rate: 0.55, amp: amp * 0.5
+with_fx :reverb, room: 0.35, mix: 0.12 do
+  # Soft jaw thump.
+  sample :drum_heavy_kick, rate: 0.8, amp: 0.55
+  # Crunch: a short shower of tiny resonant noise grains, gently crunched.
+  with_fx :bitcrusher, bits: 8, sample_rate: 12000, mix: 0.35 do
+    with_fx :hpf, cutoff: 65 do
       use_synth :cnoise
-      26.times do |i|
-        fade = 1.0 - i / 30.0
-        play 60, attack: 0.001, release: 0.018 + rrand(0, 0.025),
-             cutoff: rrand(72, 118), res: 0.78,
-             amp: amp * fade * rrand(0.35, 1.0)
-        sleep rrand(0.006, 0.013)
+      18.times do |i|
+        fade = 1.0 - i / 22.0
+        play 60, attack: 0.001, release: 0.015 + rrand(0, 0.02),
+             cutoff: rrand(80, 118), res: 0.75,
+             amp: 0.8 * fade * rrand(0.4, 1.0)
+        sleep rrand(0.007, 0.013)
       end
     end
   end
-end
-
-with_fx :reverb, room: 0.4, mix: 0.15 do
-  bite 1.0
   sleep 0.06
-  bite 0.75
-  sleep 0.05
+  # Gulp.
   use_synth :sine
-  s = play 55, note_slide: 0.18, release: 0.32, amp: 0.5
-  control s, note: 40
+  s = play 57, note_slide: 0.16, release: 0.3, amp: 0.5
+  control s, note: 43
 end
