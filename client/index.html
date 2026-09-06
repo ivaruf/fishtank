@@ -29,10 +29,10 @@
         <div class="connection" id="connection"></div>
         <div class="display-controls">
           <label class="resolution-label touch-only" id="movestyle-label"
-            ><span>Swim</span>
-            <select id="movestyle" aria-label="Touch swimming style">
+            ><span>Controls</span>
+            <select id="movestyle" aria-label="Touch controls">
+              <option value="stick">Stick and look</option>
               <option value="always">Always swimming</option>
-              <option value="hold">Hold to swim</option>
             </select>
           </label>
           <label class="resolution-label"
@@ -233,7 +233,7 @@
         <div id="depth-gauge" class="depth-gauge floating" hidden>
           <div class="knob"></div>
         </div>
-        <span class="zone-hint">DIVE · DRAG DOWN OR UP</span>
+        <span class="zone-hint" id="depth-hint">DIVE · DRAG DOWN OR UP</span>
       </div>
     </div>
     <div id="rotate" class="rotate" role="dialog" aria-live="polite">

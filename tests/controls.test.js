@@ -92,6 +92,8 @@ test("touch always swims, steers relative to the camera, dives by dragging and l
       dive = zones["depth-zone"];
     controls.setActive(true);
     controls.setTouchMode(true);
+    // The stick scheme is the default now, so ask for the older one by name.
+    controls.setMoveStyle("always");
     controls.orient(0, 0);
     assert.equal(controls.read(0.1, 0).forward, 1, "swims with no input");
     assert.equal(controls.read(0.1, 0).strafe, 0);
@@ -152,67 +154,71 @@ test("touch always swims, steers relative to the camera, dives by dragging and l
   }
 });
 
-// "Hold to swim" exists because a fish that never stops is hard to control for
-// some players. Releasing the stick must genuinely stop the fish, including
-// the bite assist that is allowed to steer a swimming one.
-test("hold-to-swim stops the fish when the thumb lifts", () => {
+// The default touch scheme is Roblox-style: the left stick is WASD and the
+// right side is the mouse. Movement and aim are independent, and letting go of
+// the stick stops the fish outright.
+test("stick scheme moves with the left thumb and aims with the right", () => {
   const originalWindow = globalThis.window,
     originalDocument = globalThis.document;
   try {
     const { zones, controls } = setup();
-    const move = zones["move-zone"];
+    const move = zones["move-zone"],
+      look = zones["depth-zone"];
     controls.setActive(true);
     controls.setTouchMode(true);
-    controls.setMoveStyle("hold");
     controls.orient(0, 0);
-    assert.equal(
-      controls.read(0.1, 0).forward,
-      0,
-      "still until a thumb pushes",
-    );
+    assert.equal(controls.read(0.1, 0).forward, 0, "still by default");
+    assert.equal(controls.read(0.1, 0).strafe, 0);
 
-    // Pushing past the deadzone ramps up; a full push is full speed.
+    // Push the stick straight up: full forward, no sideways drift.
     dispatch(move, "pointerdown", { pointerId: 1, clientX: 200, clientY: 400 });
-    dispatch(move, "pointermove", { pointerId: 1, clientX: 214, clientY: 400 });
-    const nudge = controls.read(0.1, 0).forward;
-    assert.ok(
-      nudge > 0 && nudge < 1,
-      `partial push is partial speed: ${nudge}`,
-    );
-    dispatch(move, "pointermove", { pointerId: 1, clientX: 300, clientY: 400 });
-    assert.equal(controls.read(0.1, 0).forward, 1, "full push is full speed");
+    dispatch(move, "pointermove", { pointerId: 1, clientX: 200, clientY: 340 });
+    let input = controls.read(0.1, 0);
+    assert.equal(input.forward, 1, "stick up is full forward");
+    assert.equal(input.strafe, 0);
 
-    // A tiny push inside the deadzone must not creep forward.
+    // Push it straight right: pure strafe, which touch never had before.
+    dispatch(move, "pointermove", { pointerId: 1, clientX: 260, clientY: 400 });
+    input = controls.read(0.1, 0);
+    assert.equal(input.strafe, 1, "stick right strafes");
+    assert.equal(input.forward, 0, "and does not creep forward");
+
+    // Inside the deadzone the fish is parked.
     dispatch(move, "pointermove", { pointerId: 1, clientX: 204, clientY: 400 });
     assert.equal(controls.read(0.1, 0).forward, 0, "deadzone means stopped");
 
-    // Releasing stops it, and the heading stays put so the camera settles.
-    dispatch(move, "pointermove", { pointerId: 1, clientX: 300, clientY: 400 });
+    // Aim does not move on its own while the stick is pushed.
+    dispatch(move, "pointermove", { pointerId: 1, clientX: 260, clientY: 400 });
     const facing = controls.read(0.1, 0).yaw;
+    assert.equal(controls.read(0.3, 0).yaw, facing, "the stick never aims");
+
+    // Releasing stops the fish and leaves the aim untouched.
     dispatch(move, "pointerup", { pointerId: 1 });
-    assert.equal(controls.read(0.5, 0).forward, 0, "released means stopped");
-    assert.equal(
-      controls.read(0.5, 0).yaw,
-      facing,
-      "heading holds when parked",
-    );
+    input = controls.read(0.5, 0);
+    assert.equal(input.forward, 0, "released means stopped");
+    assert.equal(input.strafe, 0);
+    assert.equal(input.yaw, facing);
 
-    // The bite assist may not rotate a parked fish, or it would drift by itself.
-    controls.assist({ yaw: facing + 1, pitch: 0.5 });
+    // The right side is the mouse: drag to aim, with no gauge in the way.
+    dispatch(look, "pointerdown", { pointerId: 2, clientX: 700, clientY: 400 });
     assert.equal(
-      controls.read(0.5, 0).yaw,
-      facing,
-      "assist must not steer a stopped fish",
+      zones["depth-gauge"].hidden,
+      true,
+      "free look shows no depth gauge",
     );
-    assert.equal(controls.read(0.5, 0).forward, 0);
+    dispatch(look, "pointermove", { pointerId: 2, clientX: 760, clientY: 400 });
+    const turned = controls.read(0.1, 0).yaw;
+    assert.ok(turned > facing, `drag right looks right: ${turned}`);
+    dispatch(look, "pointermove", { pointerId: 2, clientX: 760, clientY: 340 });
+    assert.ok(controls.read(0.1, 0).pitch > 0, "drag up looks up");
+    // Looking around must never move a parked fish.
+    assert.equal(controls.read(0.1, 0).forward, 0, "aiming is not moving");
 
-    // Back in "always" the same assist does steer, so it is gated, not broken.
-    controls.setMoveStyle("always");
-    assert.ok(
-      controls.read(0.2, 0).yaw > facing,
-      "assist still nudges a swimming fish",
-    );
-    assert.equal(controls.read(0.1, 0).forward, 1);
+    // Nothing steers but the thumb: the bite assist stays out of free look.
+    dispatch(look, "pointerup", { pointerId: 2 });
+    const aimed = controls.read(0.1, 0).yaw;
+    controls.assist({ yaw: aimed + 1, pitch: 0.5 });
+    assert.equal(controls.read(0.5, 0).yaw, aimed, "assist never fights aim");
   } finally {
     globalThis.window = originalWindow;
     globalThis.document = originalDocument;

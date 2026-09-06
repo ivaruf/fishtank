@@ -105,8 +105,13 @@ $("resolution").addEventListener("change", () => {
 function syncMoveStyle() {
   const style = $("movestyle").value;
   controls.setMoveStyle(style);
-  $("steer-hint").textContent =
-    style === "hold" ? "STEER · HOLD TO SWIM" : "STEER · TOUCH AND DRAG";
+  const stick = style === "stick";
+  $("steer-hint").textContent = stick
+    ? "MOVE · PUSH THE STICK"
+    : "STEER · TOUCH AND DRAG";
+  $("depth-hint").textContent = stick
+    ? "LOOK · DRAG ANYWHERE HERE"
+    : "DIVE · DRAG DOWN OR UP";
 }
 $("movestyle").addEventListener("change", () => {
   try {
@@ -117,7 +122,6 @@ $("movestyle").addEventListener("change", () => {
   syncMoveStyle();
   audio.play("click");
 });
-syncMoveStyle();
 let network = null,
   myId = null,
   state = null,
@@ -131,6 +135,10 @@ let network = null,
   leaderId = null;
 // Touch camera: settles in behind the fish's own heading instead of an aim.
 const follow = { yaw: 0, pitch: 0 };
+// Applied here rather than beside the listener above: setMoveStyle reports a
+// stop through the controls callback, which reads `network`, so it cannot run
+// before that binding exists.
+syncMoveStyle();
 // How long the camera lingers on the predator before the banner appears.
 const DEATH_CAM_SECONDS = 2.2;
 const demos = Array.from({ length: 18 }, (_, i) => ({
@@ -981,7 +989,10 @@ engine.runRenderLoop(() => {
     const r = radius(me.mass),
       p = mine.root.position;
     let d;
-    if (touchMode) {
+    // "always" trails the camera behind the fish's own heading, because the
+    // thumb steers the fish rather than the view. With the stick scheme the
+    // right thumb aims the camera directly, exactly like the mouse.
+    if (touchMode && !controls.freeLook) {
       const k = 1 - Math.exp(-dt * 3);
       follow.yaw = wrap(
         follow.yaw + wrap(mine.root.rotation.y - follow.yaw) * k,
