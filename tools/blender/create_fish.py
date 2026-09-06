@@ -407,9 +407,16 @@ def build(kind, detail='standard', models_only=False):
         sys.path.insert(0,str(Path(__file__).parent))
         import clownfish_detail
         fin_highlight=clownfish_detail.enhance(sys.modules[__name__],root,detail,orange,cream,dark,gold)
+    if kind in ['blue-tang','pufferfish'] and detail!='low':
+        sys.path.insert(0,str(Path(__file__).parent))
+        import reef_detail
+        fin_highlight=reef_detail.enhance(sys.modules[__name__],root,kind,detail,cream,dark,gold,blue,mint)
     tail=bpy.data.objects.new('Tail',None);bpy.context.collection.objects.link(tail);tail.parent=root
     if kind=='clownfish' and detail!='low':
         clownfish_detail.tail(sys.modules[__name__],tail,detail,orange,cream,dark,fin_highlight)
+        rays=[]
+    elif kind in ['blue-tang','pufferfish'] and detail!='low':
+        reef_detail.tail(sys.modules[__name__],tail,kind,detail,tailmat,edge,fin_highlight)
         rays=[]
     elif tailcurve:
         curve=line('Curved tail',tailcurve,tailmat,tail,tailwidth)
@@ -430,7 +437,7 @@ def build(kind, detail='standard', models_only=False):
     for o in [root,*root.children_recursive]:o.select_set(True)
     bpy.context.view_layer.objects.active=root
     bpy.ops.export_scene.gltf(filepath=str(OUT/f"{kind}{LEVEL['suffix']}.glb"),export_format='GLB',use_selection=True,export_animations=True,export_animation_mode='ACTIVE_ACTIONS',export_frame_range=True,export_yup=True,export_cameras=False,export_lights=False)
-    if detail!='standard' and kind!='clownfish': return kind
+    if detail!='standard' and kind not in ['clownfish','blue-tang','pufferfish']: return kind
     # Source files include studio lighting and a camera for easy inspection.
     studio(scene)
     bpy.ops.wm.save_as_mainfile(filepath=str(SOURCE/f"{kind}{LEVEL['suffix']}.blend"))
@@ -475,7 +482,7 @@ elif '--hd-only' in args:
     print(f'FISHTANK: High-detail models exported for {", ".join(kinds)}.')
 else:
     for kind in kinds:
-        if kind=='clownfish':
+        if kind in ['clownfish','blue-tang','pufferfish']:
             for detail in ['low','standard','high','hd']:build(kind,detail,models_only='--models-only' in args)
         else:build(kind,models_only='--models-only' in args);build(kind,'hd')
     print(f'FISHTANK: Built {", ".join(kinds)} (Blender sources, standard and HD GLBs).')

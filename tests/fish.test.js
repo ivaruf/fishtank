@@ -222,20 +222,25 @@ test("missing models fall back to a procedural fish with the same contract", () 
   }
 });
 
-test("clownfish quality tiers change geometry and preserve animated instances", async () => {
+test("upgraded fish quality tiers change geometry and preserve animated instances", async () => {
   const { engine, scene } = headless();
   try {
-    let previous = 0;
+    const previous = {};
     for (const detail of ["low", "standard", "high", "hd"]) {
       await loadFishModels(scene, fromDisk(scene), detail);
-      const fish = createFish(scene, "clownfish", true);
-      assert.ok(vertices(fish) > previous, `${detail} adds visible geometry`);
-      previous = vertices(fish);
-      assert.ok(
-        fish.swim.targetedAnimations.length >=
-          (detail === "high" || detail === "hd" ? 3 : 1),
-      );
-      fish.dispose();
+      for (const species of ["clownfish", "blue-tang", "pufferfish"]) {
+        const fish = createFish(scene, species, true);
+        assert.ok(
+          vertices(fish) > (previous[species] ?? 0),
+          `${species} ${detail} adds geometry`,
+        );
+        previous[species] = vertices(fish);
+        assert.ok(
+          fish.swim.targetedAnimations.length >=
+            (detail === "high" || detail === "hd" ? 3 : 1),
+        );
+        fish.dispose();
+      }
     }
     assert.equal(modelUrl("shark", "low"), modelUrl("shark", "standard"));
     assert.equal(modelUrl("shark", "high"), modelUrl("shark", "standard"));

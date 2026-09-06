@@ -52,20 +52,21 @@ function shared(map, scene, make) {
   if (!map.has(scene)) map.set(scene, make());
   return map.get(scene);
 }
+const DETAILED_SPECIES = new Set(["clownfish", "blue-tang", "pufferfish"]);
 const modelsFor = (scene) => {
   if (!models.has(scene)) models.set(scene, new Map());
   return models.get(scene);
 };
 // Load every species once into an asset container. Fish are then GPU instances
 // sharing geometry and materials, so a hundred fish cost a handful of draw calls.
-// detail "hd" picks the denser exports behind the Ultra quality setting. A
+// Upgraded species use low/standard/high/hd; others use standard or HD. A
 // reload swaps the whole set at once and disposes the previous models, so the
 // caller must rebuild any fish created from them afterwards.
 export const modelUrl = (species, detail = "standard") => {
   const suffix =
     detail === "hd"
       ? "-hd"
-      : species === "clownfish" && ["low", "high"].includes(detail)
+      : DETAILED_SPECIES.has(species) && ["low", "high"].includes(detail)
         ? `-${detail}`
         : "";
   return `/assets/models/${species}${suffix}.glb`;
@@ -118,7 +119,7 @@ function prepare(container, scene, species, detail) {
       const base = (pbr.albedoColor ?? B.Color3.White()).toGammaSpace();
       const m = material(scene, pbr.name, base.scale(0.3));
       m.emissiveColor = base.scale(0.4);
-      if (species === "clownfish" && detail !== "low") {
+      if (DETAILED_SPECIES.has(species) && detail !== "low") {
         // Preserve authored roughness as a wet highlight without changing the
         // shared instance-color shader or washing out the painted stripes.
         const roughness = pbr.roughness ?? 0.4;

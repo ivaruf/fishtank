@@ -6,7 +6,7 @@ export function hardwareScaling(mode, devicePixelRatio = 1) {
   const cap = { battery: 1, balanced: 1.5, sharp: 2 }[mode] ?? 1.5;
   return 1 / Math.min(dpr, cap);
 }
-// The clownfish has authored tiers; other fish retain standard/HD models.
+// Upgraded species have authored tiers; other fish retain standard/HD models.
 export const modelDetail = (mode) =>
   ({ battery: "low", balanced: "standard", sharp: "high", ultra: "hd" })[
     mode
