@@ -68,12 +68,30 @@
         autocomplete="nickname"
       />
       <div class="group-label" id="species-label">PICK YOUR FISH</div>
-      <div
-        id="species"
-        class="species"
-        role="radiogroup"
-        aria-labelledby="species-label"
-      ></div>
+      <div class="species-strip">
+        <button
+          class="species-nav"
+          type="button"
+          data-dir="-1"
+          aria-label="Previous fish"
+        >
+          ‹
+        </button>
+        <div
+          id="species"
+          class="species"
+          role="radiogroup"
+          aria-labelledby="species-label"
+        ></div>
+        <button
+          class="species-nav"
+          type="button"
+          data-dir="1"
+          aria-label="Next fish"
+        >
+          ›
+        </button>
+      </div>
       <div class="buttons">
         <button id="solo">Dive in solo <span>↗</span></button
         ><button id="multi" class="secondary">

@@ -128,6 +128,30 @@ try {
 } catch {
   /* Private mode or blocked storage: keep the default. */
 }
+// On short landscape phones the picker is a one-row carousel.
+const carousel = matchMedia("(max-height: 520px) and (orientation: landscape)");
+function revealSpecies(option) {
+  if (!carousel.matches || !option) return;
+  // Scroll only the strip, never the panel around it.
+  const strip = $("species"),
+    box = strip.getBoundingClientRect(),
+    card = option.getBoundingClientRect();
+  strip.scrollTo({
+    left:
+      strip.scrollLeft + (card.left - box.left) - (box.width - card.width) / 2,
+    behavior: "smooth",
+  });
+}
+for (const nav of document.querySelectorAll(".species-nav"))
+  nav.addEventListener("click", () => {
+    audio.play("click");
+    const strip = $("species"),
+      card = strip.firstElementChild?.getBoundingClientRect().width ?? 56;
+    strip.scrollBy({
+      left: Number(nav.dataset.dir) * card * 3,
+      behavior: "smooth",
+    });
+  });
 $("species").replaceChildren(
   ...SPECIES.map((species) => {
     const option = document.createElement("label");
@@ -140,6 +164,7 @@ $("species").replaceChildren(
     input.addEventListener("change", () => {
       audio.play("click");
       chosenSpecies = species;
+      revealSpecies(option);
       try {
         localStorage.setItem("fishtank.species", species);
       } catch {
@@ -161,6 +186,13 @@ $("species").replaceChildren(
     return option;
   }),
 );
+// After layout, and again if the phone turns, bring the chosen fish into view.
+const revealChosen = () =>
+  revealSpecies(
+    document.querySelector('input[name="species"]:checked')?.parentElement,
+  );
+requestAnimationFrame(revealChosen);
+carousel.addEventListener("change", () => requestAnimationFrame(revealChosen));
 function toast(text, ms = 1400) {
   toastUntil = performance.now() + ms;
   $("toast").textContent = text;
