@@ -28,10 +28,10 @@ export function connect({
       if (socket.readyState === WebSocket.OPEN)
         socket.send(JSON.stringify({ type: "INPUT", ...input }));
     },
-    // Bare requests such as NEXT_ROUND.
-    request(type) {
+    // Small requests such as NEXT_ROUND, READY {ready}, SETTINGS {duration}, START.
+    request(type, payload = {}) {
       if (socket.readyState === WebSocket.OPEN)
-        socket.send(JSON.stringify({ type }));
+        socket.send(JSON.stringify({ type, ...payload }));
     },
     close() {
       socket.close();

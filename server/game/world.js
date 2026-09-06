@@ -33,16 +33,62 @@ export function canEat(a, b) {
   );
 }
 export class World {
-  constructor(random = Math.random) {
+  // A lobby room waits in phase "lobby" until everyone is ready and the host
+  // (the first player in) presses start; solo rooms play straight away.
+  constructor(random = Math.random, { lobby = false } = {}) {
     this.random = random;
     this.players = new Map();
     this.npcs = [];
     this.events = [];
-    this.phase = "playing";
+    this.roundLength = C.roundLength;
+    this.lobby = lobby ? { duration: C.roundLength, ready: new Set() } : null;
+    this.phase = lobby ? "lobby" : "playing";
     this.remaining = C.roundLength;
     this.round = 1;
     this.filter = { armed: false, cooldown: 0, on: [] };
     this.seedNPCs();
+  }
+  get host() {
+    return this.players.keys().next().value ?? null;
+  }
+  removePlayer(id) {
+    this.players.delete(id);
+    this.lobby?.ready.delete(id);
+  }
+  setReady(id, ready) {
+    if (!this.lobby || this.phase !== "lobby" || !this.players.has(id))
+      return false;
+    if (ready) this.lobby.ready.add(id);
+    else this.lobby.ready.delete(id);
+    return true;
+  }
+  // Host only: match length between one and five minutes.
+  setDuration(id, seconds) {
+    if (!this.lobby || this.phase !== "lobby" || id !== this.host) return false;
+    if (!Number.isFinite(seconds)) return false;
+    this.lobby.duration = clamp(Math.round(seconds), 60, 300);
+    return true;
+  }
+  // Host only, and only once every player in the lobby is ready.
+  start(id) {
+    if (!this.lobby || this.phase !== "lobby" || id !== this.host) return false;
+    if ([...this.players.keys()].some((k) => !this.lobby.ready.has(k)))
+      return false;
+    this.roundLength = this.lobby.duration;
+    this.lobby.ready.clear();
+    this.beginRound();
+    return true;
+  }
+  beginRound() {
+    this.phase = "playing";
+    this.remaining = this.roundLength;
+    this.filter = { armed: false, cooldown: 0, on: [] };
+    this.seedNPCs();
+    for (const p of this.players.values()) {
+      p.mass = C.startMass;
+      p.score = 0;
+      this.spawn(p);
+    }
   }
   spawn(fish) {
     Object.assign(fish, {
@@ -85,6 +131,7 @@ export class World {
       color: this.players.size % 8,
     };
     this.spawn(p);
+    if (this.phase === "lobby") p.alive = false;
     this.players.set(id, p);
     return p;
   }
@@ -203,22 +250,63 @@ export class World {
     });
   }
   // Results stay up until a player asks for the next round.
+  // Results stay up until someone asks for the next round. Lobby rooms go back
+  // to the lobby to ready up again; solo rooms start straight away.
   nextRound() {
     if (this.phase !== "results") return false;
-    this.phase = "playing";
-    this.remaining = C.roundLength;
     this.round++;
-    this.filter = { armed: false, cooldown: 0, on: [] };
-    this.seedNPCs();
-    for (const p of this.players.values()) {
-      p.mass = C.startMass;
-      p.score = 0;
-      this.spawn(p);
+    if (this.lobby) {
+      this.phase = "lobby";
+      this.lobby.ready.clear();
+      for (const p of this.players.values()) p.alive = false;
+      return true;
     }
+    this.beginRound();
     return true;
   }
+  // Wild fish wander, and the big ones drift toward a lighter player nearby.
+  steerNPC(f, dt) {
+    f.decision -= dt;
+    if (f.decision <= 0) {
+      f.turn = (this.random() - 0.5) * 1.5;
+      f.vertical = (this.random() - 0.5) * 0.4;
+      f.decision = 1 + this.random() * 3;
+    }
+    const prey = this.phase === "playing" ? this.huntTarget(f) : null;
+    f.hunting = !!prey;
+    if (prey) {
+      const dx = prey.x - f.x,
+        dy = prey.y - f.y,
+        dz = prey.z - f.z;
+      f.turn = clamp(wrap(Math.atan2(dx, dz) - f.yaw) * 3, -1.5, 1.5);
+      f.vertical = clamp(
+        (Math.atan2(dy, Math.hypot(dx, dz)) - f.pitch) * 2,
+        -0.6,
+        0.6,
+      );
+    }
+    if (Math.abs(f.x) > 29 || Math.abs(f.z) > 29) {
+      const target = Math.atan2(-f.x, -f.z);
+      f.turn = clamp(wrap(target - f.yaw), -1.5, 1.5);
+    }
+    f.yaw += f.turn * dt;
+    f.pitch = clamp(f.pitch + f.vertical * dt, -0.45, 0.45);
+    if (f.y < 3) f.pitch = 0.35;
+    if (f.y > 26) f.pitch = -0.35;
+  }
   tick(dt) {
-    if (!this.players.size || this.phase !== "playing") return;
+    if (!this.players.size) return;
+    if (this.phase === "lobby") {
+      // The tank keeps living behind the lobby: wild fish swim, nothing eats.
+      this.remaining = this.lobby.duration;
+      for (const f of this.npcs)
+        if (f.alive) {
+          this.steerNPC(f, dt);
+          this.move(f, dt, 2.4 + 1 / radius(f.mass));
+        }
+      return;
+    }
+    if (this.phase !== "playing") return;
     this.remaining -= dt;
     if (this.remaining <= 0) {
       this.phase = "results";
@@ -240,35 +328,8 @@ export class World {
         f.stunned = Math.max(0, f.stunned - dt);
         continue;
       }
-      if (f.npc) {
-        f.decision -= dt;
-        if (f.decision <= 0) {
-          f.turn = (this.random() - 0.5) * 1.5;
-          f.vertical = (this.random() - 0.5) * 0.4;
-          f.decision = 1 + this.random() * 3;
-        }
-        const prey = this.huntTarget(f);
-        f.hunting = !!prey;
-        if (prey) {
-          const dx = prey.x - f.x,
-            dy = prey.y - f.y,
-            dz = prey.z - f.z;
-          f.turn = clamp(wrap(Math.atan2(dx, dz) - f.yaw) * 3, -1.5, 1.5);
-          f.vertical = clamp(
-            (Math.atan2(dy, Math.hypot(dx, dz)) - f.pitch) * 2,
-            -0.6,
-            0.6,
-          );
-        }
-        if (Math.abs(f.x) > 29 || Math.abs(f.z) > 29) {
-          const target = Math.atan2(-f.x, -f.z);
-          f.turn = clamp(wrap(target - f.yaw), -1.5, 1.5);
-        }
-        f.yaw += f.turn * dt;
-        f.pitch = clamp(f.pitch + f.vertical * dt, -0.45, 0.45);
-        if (f.y < 3) f.pitch = 0.35;
-        if (f.y > 26) f.pitch = -0.35;
-      } else {
+      if (f.npc) this.steerNPC(f, dt);
+      else {
         f.inputAge += dt;
         if (f.inputAge > C.inputTimeout) {
           f.input.forward = 0;
@@ -331,6 +392,13 @@ export class World {
         armed: this.filter.armed,
         cooldown: Math.ceil(this.filter.cooldown),
       },
+      lobby: this.lobby
+        ? {
+            host: this.host,
+            duration: this.lobby.duration,
+            ready: [...this.lobby.ready],
+          }
+        : undefined,
     };
   }
 }

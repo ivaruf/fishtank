@@ -349,3 +349,57 @@ test("alone, the filter zaps the heaviest wild fish", () => {
   assert.equal(w.events.find((e) => e.type === "ZAP")?.target, big.id);
   assert.ok(big.mass < before && big.stunned > 0);
 });
+test("a lobby room waits for everyone ready and the host's start, then returns to the lobby after results", () => {
+  const w = new World(() => 0.5, { lobby: true });
+  const a = w.addPlayer("a", "Host"),
+    b = w.addPlayer("b", "Guest");
+  assert.equal(w.phase, "lobby");
+  assert.equal(w.host, "a");
+  assert.ok(!a.alive && !b.alive, "nobody swims in the lobby");
+  const npcZ = w.npcs[0].z;
+  w.tick(1);
+  assert.equal(w.phase, "lobby");
+  assert.notEqual(
+    w.npcs[0].z,
+    npcZ,
+    "wild fish keep swimming behind the lobby",
+  );
+  assert.equal(w.start("b"), false, "only the host starts");
+  assert.equal(w.start("a"), false, "not before everyone is ready");
+  assert.equal(w.setDuration("b", 60), false, "only the host sets the length");
+  assert.equal(w.setDuration("a", 240), true);
+  assert.equal(w.setDuration("a", 5000), true);
+  assert.equal(w.lobby.duration, 300, "clamped to five minutes");
+  w.setDuration("a", 240);
+  w.setReady("a", true);
+  assert.equal(w.start("a"), false);
+  w.setReady("b", true);
+  assert.deepEqual(w.snapshot().lobby, {
+    host: "a",
+    duration: 240,
+    ready: ["a", "b"],
+  });
+  assert.equal(w.start("a"), true);
+  assert.equal(w.phase, "playing");
+  assert.equal(w.remaining, 240);
+  assert.ok(a.alive && b.alive);
+  assert.equal(w.start("a"), false, "start is a lobby action");
+  // Round ends: results, then next round means back to the lobby, not straight in.
+  w.remaining = 0.01;
+  w.tick(0.02);
+  assert.equal(w.phase, "results");
+  assert.equal(w.nextRound(), true);
+  assert.equal(w.phase, "lobby");
+  assert.equal(w.round, 2);
+  assert.deepEqual(w.snapshot().lobby.ready, []);
+  assert.ok(!a.alive && !b.alive);
+  // The host leaving hands the crown to the next player.
+  w.removePlayer("a");
+  assert.equal(w.host, "b");
+  assert.equal(w.setDuration("b", 60), true);
+  // Solo rooms never see a lobby.
+  const solo = new World(() => 0.5);
+  solo.addPlayer("s", "Solo");
+  assert.equal(solo.phase, "playing");
+  assert.equal(solo.snapshot().lobby, undefined);
+});

@@ -99,6 +99,31 @@
       <div id="toast" aria-live="polite"></div>
       <button id="leave" class="exit secondary">Leave tank</button>
     </section>
+    <section id="lobby" class="glass lobby" hidden>
+      <div class="eyebrow">THE LOBBY <span id="lobby-count"></span></div>
+      <h2 id="lobby-title">Waiting for the shoal</h2>
+      <ol id="lobby-players"></ol>
+      <label class="lobby-duration" for="lobby-slider"
+        ><span>MATCH LENGTH · <b id="lobby-minutes">2 min</b></span>
+        <input
+          id="lobby-slider"
+          type="range"
+          min="1"
+          max="5"
+          step="1"
+          value="2"
+          aria-label="Match length in minutes"
+        />
+      </label>
+      <p class="lobby-hint" id="lobby-hint"></p>
+      <div class="buttons">
+        <button id="ready" class="secondary" type="button">I'm ready</button>
+        <button id="start" type="button" hidden>
+          Start the game <span>→</span>
+        </button>
+        <button id="lobby-leave" class="secondary" type="button">Leave</button>
+      </div>
+    </section>
     <section id="overlay" class="glass overlay" hidden>
       <div class="eyebrow" id="overlay-tag"></div>
       <h2 id="overlay-title"></h2>

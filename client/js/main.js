@@ -152,7 +152,11 @@ $("species").replaceChildren(
     thumb.width = 58;
     thumb.height = 48;
     const name = document.createElement("span");
-    name.textContent = speciesLabel(species);
+    // Long single-word names may break before "fish" on narrow cards.
+    name.textContent = speciesLabel(species).replace(
+      /^(.{6,})fish$/,
+      "$1\u00adfish",
+    );
     option.append(input, thumb, name);
     return option;
   }),
@@ -229,6 +233,7 @@ function leave(message = "") {
   clearFish();
   $("menu").hidden = false;
   $("hud").hidden = true;
+  $("lobby").hidden = true;
   $("overlay").hidden = true;
   $("touch").hidden = true;
   $("error").textContent = message;
@@ -283,6 +288,7 @@ function join(mode) {
       controls.setActive(!!me?.alive && next.phase === "playing");
       state = next;
       updateUI();
+      audio.music(next.phase === "lobby" ? "menu" : "game");
       for (const e of next.events) {
         if (e.type === "ROUND_END") audio.play("round-end");
         if (e.type === "FILTER_ARMED") {
@@ -362,9 +368,78 @@ $("next-round").onclick = () => {
   audio.play("click");
   network?.request("NEXT_ROUND");
 };
+$("ready").onclick = () => {
+  audio.play("click");
+  const mine = state?.lobby?.ready.includes(myId);
+  network?.request("READY", { ready: !mine });
+};
+$("start").onclick = () => {
+  audio.play("click");
+  network?.request("START");
+};
+$("lobby-leave").onclick = () => {
+  audio.play("click");
+  leave();
+};
+$("lobby-slider").addEventListener("pointerdown", () => (dragging = true));
+$("lobby-slider").addEventListener("pointerup", () => (dragging = false));
+$("lobby-slider").addEventListener("input", () => {
+  $("lobby-minutes").textContent = `${$("lobby-slider").value} min`;
+  network?.request("SETTINGS", {
+    duration: Number($("lobby-slider").value) * 60,
+  });
+});
+// Lobby panel: who is in, who is ready, the host's match length, and start.
+let dragging = false;
+function updateLobby(me) {
+  const lobby = state.lobby,
+    inLobby = state.phase === "lobby" && !!lobby;
+  $("lobby").hidden = !inLobby;
+  if (!inLobby) return;
+  const iAmHost = lobby.host === myId,
+    ready = new Set(lobby.ready),
+    allReady = state.players.every((p) => ready.has(p.id));
+  $("lobby-count").textContent = `· ${state.players.length} IN`;
+  $("lobby-players").replaceChildren(
+    ...state.players.map((p) => {
+      const li = document.createElement("li"),
+        name = document.createElement("b"),
+        flag = document.createElement("span");
+      name.textContent =
+        (p.id === lobby.host ? "👑 " : "") +
+        p.name +
+        (p.id === myId ? " (you)" : "");
+      flag.className = "state" + (ready.has(p.id) ? " ready" : "");
+      flag.textContent = ready.has(p.id) ? "READY ✓" : "NOT READY";
+      li.append(name, flag);
+      return li;
+    }),
+  );
+  const minutes = Math.round(lobby.duration / 60);
+  if (!dragging) $("lobby-slider").value = String(minutes);
+  $("lobby-slider").disabled = !iAmHost;
+  $("lobby-minutes").textContent = `${minutes} min`;
+  const mine = ready.has(myId);
+  $("ready").textContent = mine ? "Ready ✓" : "I'm ready";
+  $("ready").setAttribute("aria-pressed", String(mine));
+  $("start").hidden = !iAmHost;
+  $("start").disabled = !allReady;
+  $("lobby-title").textContent = allReady
+    ? "Everyone is ready"
+    : "Waiting for the shoal";
+  $("lobby-hint").textContent = iAmHost
+    ? allReady
+      ? "You are the host. Hit start when you like."
+      : "You are the host: set the match length, then start once everyone is ready."
+    : allReady
+      ? `Waiting for ${state.players.find((p) => p.id === lobby.host)?.name ?? "the host"} to start the game.`
+      : "Mark yourself ready. The host starts the game once everyone is.";
+}
 function updateUI() {
   const me = state.players.find((p) => p.id === myId);
   if (!me) return;
+  updateLobby(me);
+  $("hud").hidden = state.phase === "lobby";
   $("mass").textContent = me.mass.toFixed(1);
   $("score").textContent = me.score;
   $("timer").textContent =
@@ -391,7 +466,9 @@ function updateUI() {
     }),
   );
   $("overlay").hidden =
-    (me.alive && state.phase === "playing") || !!(deathCam && !deathCam.done);
+    state.phase === "lobby" ||
+    (me.alive && state.phase === "playing") ||
+    !!(deathCam && !deathCam.done);
   if (state.phase === "results") {
     $("overlay-tag").textContent = `ROUND ${state.round} COMPLETE`;
     $("overlay-title").textContent = `${ranked[0]?.name || "Nobody"} wins!`;
@@ -632,7 +709,7 @@ engine.runRenderLoop(() => {
     if (f.stunned > 0) sparks.burst(v.root.position, 2, r);
   }
   placeLabels();
-  const mine = me && visuals.get(me.id);
+  const mine = me?.alive && visuals.get(me.id);
   if (deathCam && me && !me.alive) deathCamera(dt, now);
   else if (mine) {
     const r = radius(me.mass),

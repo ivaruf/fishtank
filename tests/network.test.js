@@ -124,11 +124,33 @@ test("HTTP, two clients, input authority, solo isolation and reconnect", async (
     );
     const solo = await join("single");
     assert.equal((await message(solo, "WORLD_STATE")).players.length, 1);
+    // The shared room is a lobby: the first player hosts, everyone readies up.
+    assert.equal(state.phase, "lobby");
+    assert.equal(state.lobby.host, a.playerId);
     b.close();
     await once(b, "close");
     assert.equal((await message(a, "WORLD_STATE")).players.length, 1);
-    await join();
+    const c = await join();
     assert.equal((await message(a, "WORLD_STATE")).players.length, 2);
+    c.send(JSON.stringify({ type: "SETTINGS", duration: 60 }));
+    c.send(JSON.stringify({ type: "START" }));
+    a.send(JSON.stringify({ type: "READY", ready: true }));
+    c.send(JSON.stringify({ type: "READY", ready: true }));
+    a.send(JSON.stringify({ type: "SETTINGS", duration: 180 }));
+    await message(a, "WORLD_STATE");
+    const lobby = await message(a, "WORLD_STATE");
+    assert.equal(lobby.phase, "lobby", "a guest cannot start the match");
+    assert.equal(lobby.lobby.duration, 180, "only the host's length counts");
+    assert.deepEqual(
+      [...lobby.lobby.ready].sort(),
+      [a.playerId, c.playerId].sort(),
+    );
+    a.send(JSON.stringify({ type: "START" }));
+    await message(a, "WORLD_STATE");
+    const playing = await message(a, "WORLD_STATE");
+    assert.equal(playing.phase, "playing");
+    assert.ok(playing.remaining > 175 && playing.remaining <= 180);
+    assert.ok(playing.players.every((p) => p.alive));
   } finally {
     for (const s of clients) s.terminate();
     await new Promise((resolve) => wss.close(resolve));

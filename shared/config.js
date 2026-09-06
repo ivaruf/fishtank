@@ -25,7 +25,7 @@ export const CONFIG = Object.freeze({
 });
 // Bumped whenever snapshots or join messages change shape, so a client can
 // tell when it is talking to a server process started from older code.
-export const PROTOCOL = 3;
+export const PROTOCOL = 4;
 export const radius = (mass) => Math.cbrt(mass) * 0.48;
 export const outweighs = (predator, prey) =>
   predator.mass > prey.mass * CONFIG.eatRatio;
@@ -47,6 +47,9 @@ export const SPECIES = Object.freeze([
   "goldfish",
   "betta",
   "shark",
+  "butterflyfish",
+  "lionfish",
+  "wrasse",
 ]);
 export const speciesLabel = (species = "fish") =>
   String(species).replaceAll("-", " ");

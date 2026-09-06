@@ -3,6 +3,7 @@ Run: blender --background --factory-startup --python tools/blender/create_fish.p
 Without kinds every species is built, each as a standard .glb plus a denser -hd.glb for the Ultra quality
 setting. --thumbnails-only re-renders menu thumbnails from the saved .blend files; --hd-only exports only the
 high-detail models.
+--models-only skips preview and menu-thumbnail generation.
 Authoring coordinates below are X right, Y up, Z forward; convert to Blender Z up.
 """
 import bpy
@@ -17,7 +18,7 @@ THUMBS = ROOT / 'client/assets/thumbs'
 SOURCE = ROOT / 'assets/blender'
 DOCS = ROOT / 'docs'
 for path in [OUT, THUMBS, SOURCE, DOCS]: path.mkdir(parents=True, exist_ok=True)
-KINDS = ['clownfish', 'blue-tang', 'pufferfish', 'angelfish', 'goldfish', 'betta', 'shark']
+KINDS = ['clownfish', 'blue-tang', 'pufferfish', 'angelfish', 'goldfish', 'betta', 'shark', 'butterflyfish', 'lionfish', 'wrasse', 'seahorse', 'manta-ray', 'royal-gramma', 'triggerfish']
 # Tessellation per quality tier: (segments, rings) for spheres, bevel/curve resolution for fins and rays.
 DETAIL = {
     'standard': dict(body=(32, 24), sphere=(20, 12), small=(12, 8), tiny=(10, 6), bevel=2, curve=1, suffix=''),
@@ -81,6 +82,16 @@ def body(parent, scale, materials, kind):
             elif kind=='goldfish' and math.sin(a)<-.6: index=1
             elif kind=='betta' and math.sin(a)>.8: index=1
             elif kind=='shark' and math.sin(a)<-.3: index=1
+            elif kind=='butterflyfish':
+                if abs(z-.49)<.12: index=1
+                elif abs(z+.59)<.055: index=2
+            elif kind=='lionfish':
+                if math.cos(z*19+math.sin(a)*.7)>.3: index=1
+            elif kind=='royal-gramma' and z<-.05: index=1
+            elif kind=='triggerfish' and z>.58: index=1
+            elif kind=='wrasse':
+                if abs(math.sin(a)-.23)<.15 or abs(math.sin(a)+.38)<.10: index=1
+                elif math.sin(a)<-.7: index=2
             indices.append(index)
     obj=mesh('Body',vertices,faces,materials[0],parent)
     for m in materials[1:]:obj.data.materials.append(m)
@@ -139,7 +150,7 @@ def merge_parts(parent,name):
     obj.select_set(False)
     return obj
 
-def build(kind, detail='standard'):
+def build(kind, detail='standard', models_only=False):
     global LEVEL
     LEVEL=DETAIL[detail]
     bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -154,6 +165,7 @@ def build(kind, detail='standard'):
     root=bpy.data.objects.new(kind,None);bpy.context.collection.objects.link(root)
     root['forward']='+Z in glTF';root['style']='Original Fishtank stylized fish'
     tailshapes=None;rays=None;raymat=None;tailthickness=.035
+    tailcurve=None;tailpivot=(0,0,-.85);tailwidth=.035
     if kind=='clownfish':
         body(root,(.43,.59,1.06),[orange,cream,dark],kind)
         eyes(root,.32,.16,.73,cream,dark,gold)
@@ -230,6 +242,149 @@ def build(kind, detail='standard'):
         tailmat=violet;edge=garnet;tailheight=.85
         tailshapes=[[(0,.12,-.83),(0,.85,-1.30),(0,.95,-1.75),(0,0,-1.90),(0,-.95,-1.75),(0,-.85,-1.30),(0,-.12,-.83)]]
         rays=[[(.039,0,-.91),(.039,i*.34,-1.62)] for i in [-2,-1,0,1,2]]
+    elif kind=='butterflyfish':
+        # A deep lemon disc, dark eye band, rear eyespot, and small pointed snout.
+        lemon=mat('Lemon',(1,.77,.035));citron=mat('Citron',(1,.93,.32))
+        body(root,(.25,.66,.89),[lemon,dark,cream],kind)
+        eyes(root,.19,.20,.49,cream,dark,gold)
+        sphere('Pointed snout',(0,-.015,.86),(.13,.14,.19),lemon,root)
+        line('Mouth',[(-.065,-.035,1.025),(0,-.055,1.052),(.065,-.035,1.025)],dark,root)
+        fin('Rounded dorsal',[(0,.43,.57),(0,.76,.27),(0,.82,-.22),(0,.62,-.74),(0,.23,-.78)],citron,orange,root,.025)
+        fin('Rounded anal',[(0,-.43,.45),(0,-.73,.12),(0,-.72,-.36),(0,-.31,-.77)],citron,orange,root,.025)
+        for side in [-1,1]:
+            sphere('Eyespot rim',(side*.202,.28,-.46),(.037,.16,.16),cream,root)
+            sphere('False eyespot',(side*.235,.28,-.46),(.021,.115,.115),dark,root)
+            fin('Pectoral',[(side*.23,-.06,.27),(side*.56,-.19,.01),(side*.41,-.29,-.19)],citron,orange,root,.014)
+            for i in range(3):
+                line('Dorsal ray',[(side*.031,.49,-.03-i*.14),(side*.031,.74-i*.04,-.16-i*.14)],lemon,root,.009)
+        tailmat=lemon;edge=dark;tailheight=.38;raymat=cream
+    elif kind=='lionfish':
+        # Broad striped body, radiating pectoral fans, and a crown of dorsal spines.
+        rust=mat('Rust',( .50,.085,.035));ivory=mat('Ivory',(1,.82,.54))
+        body(root,(.43,.49,.96),[rust,ivory],kind)
+        eyes(root,.33,.18,.64,cream,dark,gold)
+        sphere('Lower lip',(0,-.17,.86),(.23,.10,.13),ivory,root)
+        line('Mouth',[(-.12,-.15,.94),(0,-.18,.98),(.12,-.15,.94)],dark,root,.012)
+        for i in range(7):
+            z=.52-i*.19;h=.95+.22*math.sin(i*.65)
+            fin('Dorsal spine',[(0,.31,z+.055),(0,h,z-.16),(0,.34,z-.13)],ivory,rust,root,.016)
+            if i<6:fin('Dorsal web',[(0,.36,z),(0,h*.77,z-.13),(0,.43,z-.29)],rust,ivory,root,.013)
+        for side in [-1,1]:
+            origin=(side*.34,-.07,.26)
+            tips=[(side*(.76+.38*math.sin(i*math.pi/5)),.16-i*.13,.23-i*.23) for i in range(6)]
+            for i in range(5):
+                fin('Fan membrane',[origin,tips[i],tips[i+1]],rust,ivory,root,.014)
+            for tip in tips:
+                line('Fan spine',[origin,tip,(tip[0]*1.08,tip[1]-.035,tip[2]-.045)],ivory,root,.02)
+            line('Brow tassel',[(side*.30,.34,.72),(side*.37,.69,.63)],ivory,root,.018)
+        tailmat=ivory;edge=rust;tailheight=.43;raymat=rust
+    elif kind=='wrasse':
+        # Streamlined green reef fish with pink ribbons and a continuous low dorsal.
+        jade=mat('Jade',(.015,.62,.43));rose=mat('Coral pink',(.92,.09,.28))
+        body(root,(.30,.36,1.12),[jade,rose,cream],kind)
+        eyes(root,.225,.115,.79,cream,dark,gold)
+        fin('Long dorsal',[(0,.26,.74),(0,.47,.49),(0,.50,-.33),(0,.26,-.97),(0,.17,-.78)],jade,rose,root,.025)
+        fin('Anal',[(0,-.24,.03),(0,-.48,-.35),(0,-.24,-.92)],jade,rose,root,.02)
+        for side in [-1,1]:
+            fin('Pectoral',[(side*.26,-.04,.46),(side*.63,-.20,.12),(side*.45,-.29,-.16)],gold,rose,root,.014)
+            line('Cheek ribbon',[(side*.225,.02,.86),(side*.282,-.08,.62),(side*.29,-.10,.44)],rose,root,.019)
+        line('Smile',[(-.09,-.07,1.09),(0,-.10,1.12),(.09,-.07,1.09)],dark,root,.012)
+        tailmat=jade;edge=rose;tailheight=.38;raymat=gold
+        tailshapes=[[(0,.10,-.92),(0,.39,-1.38),(0,.29,-1.58),(0,0,-1.45),(0,-.29,-1.58),(0,-.39,-1.38),(0,-.10,-.92)]]
+    elif kind=='royal-gramma':
+        # A crisp purple-to-yellow split, low scalloped dorsal, and a dark eyestripe.
+        orchid=mat('Orchid',(.40,.025,.72));sunshine=mat('Sunshine',(1,.72,.025))
+        body(root,(.31,.42,1.02),[orchid,sunshine],kind)
+        eyes(root,.235,.14,.73,cream,dark,gold)
+        fin('Purple dorsal',[(0,.31,.61),(0,.60,.40),(0,.61,.06),(0,.34,-.08)],orchid,violet,root,.023)
+        fin('Golden dorsal',[(0,.35,-.07),(0,.60,-.12),(0,.48,-.61),(0,.18,-.92)],sunshine,orange,root,.023)
+        fin('Anal',[(0,-.32,-.06),(0,-.57,-.36),(0,-.23,-.87)],sunshine,orange,root,.02)
+        for side in [-1,1]:
+            fin('Pectoral',[(side*.28,-.05,.36),(side*.62,-.24,.03),(side*.43,-.32,-.22)],orchid,violet,root,.014)
+            line('Eye stripe',[(side*.26,.22,.78),(side*.29,.12,.52),(side*.29,.03,.37)],dark,root,.015)
+            sphere('Dorsal eyespot',(side*.032,.51,.28),(.018,.066,.077),dark,root,*LEVEL['small'])
+        line('Smile',[(-.08,-.09,.99),(0,-.12,1.026),(.08,-.09,.99)],dark,root,.012)
+        tailmat=sunshine;edge=orange;tailheight=.41;raymat=cream
+    elif kind=='triggerfish':
+        # Clown triggerfish-inspired spots, yellow saddle, stout mouth, and trigger spine.
+        charcoal=mat('Charcoal',(.035,.065,.10));ochre=mat('Saffron',(1,.59,.025))
+        body(root,(.34,.56,.96),[charcoal,ochre],kind)
+        eyes(root,.245,.25,.62,cream,dark,ochre)
+        sphere('Lip',(0,-.07,.928),(.16,.115,.10),ochre,root)
+        line('Mouth',[(-.08,-.08,1.00),(0,-.11,1.03),(.08,-.08,1.00)],dark,root,.014)
+        fin('Trigger spine',[(0,.46,.27),(0,.95,.17),(0,.57,.06)],ochre,dark,root,.023)
+        fin('Rear dorsal',[(0,.41,-.17),(0,.72,-.47),(0,.22,-.89)],cream,ochre,root,.026)
+        fin('Anal',[(0,-.38,-.12),(0,-.66,-.46),(0,-.21,-.86)],cream,ochre,root,.026)
+        for side in [-1,1]:
+            fin('Pectoral',[(side*.30,-.04,.28),(side*.64,-.20,-.02),(side*.43,-.33,-.23)],ochre,dark,root,.015)
+            for row in range(3):
+                for col in range(4):
+                    y=-.33+row*.18;z=-.53+col*.22+(row%2)*.06
+                    x=.343*math.sqrt(max(.01,1-(y/.56)**2-(z/.96)**2))
+                    sphere('Pearl spot',(side*x,y,z),(.037,.060,.066),cream,root,*LEVEL['small'])
+            for i in range(4):
+                line('Saddle fleck',[(side*.19,.43,-.16-i*.10),(side*.22,.40,-.19-i*.10)],ochre,root,.027)
+        tailmat=charcoal;edge=ochre;tailheight=.46;raymat=cream
+    elif kind=='seahorse':
+        # Upright plated trunk, curved neck, tubular snout, coronet and curled prehensile tail.
+        peach=mat('Apricot',(1,.43,.16));ridge=mat('Golden ridges',(1,.74,.30))
+        sphere('Trunk',(0,-.05,-.10),(.25,.52,.31),peach,root)
+        sphere('Belly',(0,-.10,.115),(.20,.39,.16),ridge,root)
+        sphere('Neck',(0,.43,-.045),(.17,.35,.19),peach,root)
+        sphere('Head',(0,.69,.18),(.25,.25,.31),peach,root)
+        sphere('Tube snout',(0,.61,.52),(.115,.115,.29),ridge,root)
+        sphere('Mouth',(0,.61,.80),(.079,.077,.014),dark,root)
+        eyes(root,.19,.77,.29,cream,dark,gold)
+        for i in range(4):
+            z=-.01+i*.095
+            fin('Coronet',[(0,.81,z-.03),(0,1.07+(i%2)*.09,z),(0,.84,z+.06)],ridge,peach,root,.024)
+        for i in range(6):
+            y=-.39+i*.135
+            line('Trunk ridge',[(-.20,y,.10),(0,y,.275),(.20,y,.10)],ridge,root,.018)
+            fin('Back plate',[(0,y,-.32),(0,y+.09,-.47),(0,y+.16,-.31)],ridge,peach,root,.025)
+        for side in [-1,1]:
+            fin('Tiny ear fin',[(side*.13,.48,.02),(side*.39,.36,-.12),(side*.17,.28,-.03)],cream,peach,root,.014)
+        fin('Dorsal fan',[(0,.17,-.30),(0,.17,-.63),(0,-.20,-.65),(0,-.28,-.28)],cream,peach,root,.022)
+        tailmat=peach;edge=ridge;rays=[];tailwidth=.095;tailpivot=(0,-.40,-.10)
+        tailcurve=[(0,-.40,-.10),(0,-.64,-.17),(0,-.84,-.15)]
+        for i in range(1,29):
+            t=i/28;angle=math.pi+t*math.pi*1.75;r=.27*(1-t)+.035*t
+            tailcurve.append((0,-.84+r*math.sin(angle),.12+r*math.cos(angle)))
+    elif kind=='manta-ray':
+        # One closed, softly cambered diamond with a pale underside and long whip tail.
+        ocean=mat('Ocean slate',(.055,.20,.29));belly=mat('Cloud belly',(.80,.89,.84))
+        vertices=[];faces=[];nx=32 if detail=='standard' else 64;nz=16 if detail=='standard' else 32
+        for lower in [False,True]:
+            for i in range(nx+1):
+                u=-1+2*i/nx;a=abs(u);leading=.88*(1-a)-.17*a;trailing=-.78+.53*a
+                for j in range(nz+1):
+                    v=j/nz;z=leading*(1-v)+trailing*v
+                    y=(.17*math.sin(math.pi*v)*(1-a*a)+.07*a) * (-.6 if lower else 1)
+                    vertices.append((u*1.43,y,z))
+        layer=(nx+1)*(nz+1)
+        for side in [0,1]:
+            for i in range(nx):
+                for j in range(nz):
+                    k=side*layer+i*(nz+1)+j
+                    face=(k,k+nz+1,k+nz+2,k+1)
+                    faces.append(face if side==0 else tuple(reversed(face)))
+        for i in range(nx):
+            for j in [0,nz]:
+                k=i*(nz+1)+j;faces.append((k,k+nz+1,k+nz+1+layer,k+layer))
+        for i in [0,nx]:
+            for j in range(nz):
+                k=i*(nz+1)+j;faces.append((k,k+1,k+1+layer,k+layer))
+        wings=mesh('Wing disc',vertices,faces,ocean,root);wings.data.materials.append(belly)
+        for poly in wings.data.polygons:poly.use_smooth=True;poly.material_index=1 if nx*nz<=poly.index<2*nx*nz else 0
+        sphere('Head',(0,.035,.49),(.39,.15,.36),ocean,root)
+        eyes(root,.265,.10,.60,cream,dark,blue)
+        for side in [-1,1]:
+            line('Cephalic lobe',[(side*.30,.015,.68),(side*.34,-.015,.91),(side*.25,.015,1.06)],ocean,root,.070)
+            line('Wing highlight',[(side*.40,.11,.24),(side*.91,.105,-.02),(side*1.27,.08,-.14)],silver,root,.015)
+        line('Smile',[(-.15,-.07,.80),(0,-.11,.84),(.15,-.07,.80)],dark,root,.014)
+        fin('Dorsal',[(0,.10,-.43),(0,.37,-.68),(0,.035,-.77)],ocean,dark,root,.025)
+        tailmat=ocean;edge=dark;rays=[];tailwidth=.043;tailpivot=(0,0,-.67)
+        tailcurve=[(0,0,-.67),(0,.01,-.91),(0,.055,-1.19),(0,.09,-1.45),(0,.055,-1.72)]
     else:
         # Sleek grey shark: swept fins, gill slits, a wide grin and a crescent tail.
         body(root,(.34,.40,1.08),[slate,cream],kind)
@@ -247,13 +402,17 @@ def build(kind, detail='standard'):
         rays=[]
     # Keep tail pivot local to its attachment for exported swim animation.
     tail=bpy.data.objects.new('Tail',None);bpy.context.collection.objects.link(tail);tail.parent=root
-    for shape in tailshapes or [[(0,.12,-.83),(0,tailheight,-1.50),(0,.12,-1.43),(0,-tailheight,-1.50),(0,-.12,-.83)]]:
-        fin('Tail fan',shape,tailmat,edge,tail,tailthickness)
+    if tailcurve:
+        curve=line('Curved tail',tailcurve,tailmat,tail,tailwidth)
+        for i,point in enumerate(curve.data.splines[0].points):point.radius=1-.82*i/(len(tailcurve)-1)
+    else:
+        for shape in tailshapes or [[(0,.12,-.83),(0,tailheight,-1.50),(0,.12,-1.43),(0,-tailheight,-1.50),(0,-.12,-.83)]]:
+            fin('Tail fan',shape,tailmat,edge,tail,tailthickness)
     if rays is None: rays=[[(.039,0,-.91),(.039,i*tailheight*.40,-1.42)] for i in [-2,-1,0,1,2]]
     for points in rays: line('Fin ray',points,raymat or edge,tail,.008)
     static=merge_parts(root,'BodyMesh');tailmesh=merge_parts(tail,'TailMesh')
     # Move pivot without moving its geometry in world space.
-    tail.location=vec((0,0,-.85));tailmesh.location=-tail.location
+    tail.location=vec(tailpivot);tailmesh.location=-tail.location
     for frame,angle in [(1,0),(7,.30),(13,0),(19,-.30),(25,0)]:
         tail.rotation_euler.z=angle;tail.keyframe_insert(data_path='rotation_euler',index=2,frame=frame)
     tail.animation_data.action.name='swim'
@@ -266,6 +425,7 @@ def build(kind, detail='standard'):
     # Source files include studio lighting and a camera for easy inspection.
     studio(scene)
     bpy.ops.wm.save_as_mainfile(filepath=str(SOURCE/f'{kind}.blend'))
+    if models_only: return kind
     scene.render.filepath=str(DOCS/f'{kind}.png');bpy.ops.render.render(write_still=True)
     thumbnail(kind)
     return kind
@@ -305,5 +465,5 @@ elif '--hd-only' in args:
     for kind in kinds:build(kind,'hd')
     print(f'FISHTANK: High-detail models exported for {", ".join(kinds)}.')
 else:
-    for kind in kinds:build(kind);build(kind,'hd')
-    print(f'FISHTANK: Built {", ".join(kinds)} (Blender sources, standard and HD GLBs, previews, thumbnails).')
+    for kind in kinds:build(kind,models_only='--models-only' in args);build(kind,'hd')
+    print(f'FISHTANK: Built {", ".join(kinds)} (Blender sources, standard and HD GLBs).')

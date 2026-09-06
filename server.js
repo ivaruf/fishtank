@@ -21,7 +21,8 @@ const vendors = {
     "node_modules/babylonjs-loaders/babylonjs.loaders.min.js",
 };
 export function createGameServer() {
-  const rooms = new Map([["multiplayer", new World()]]);
+  const shared = () => new World(Math.random, { lobby: true });
+  const rooms = new Map([["multiplayer", shared()]]);
   const server = http.createServer(async (req, res) => {
     try {
       const url = decodeURIComponent(
@@ -75,6 +76,7 @@ export function createGameServer() {
       if (m.type === "JOIN" && !socket.room) {
         const key = m.mode === "single" ? socket.id : "multiplayer";
         if (!rooms.has(key)) rooms.set(key, new World());
+        // (Solo rooms are keyed by socket id and play immediately.)
         const room = rooms.get(key);
         if (room.players.size >= C.maxPlayers) {
           socket.send(
@@ -108,15 +110,21 @@ export function createGameServer() {
       if (m.type === "NEXT_ROUND" && socket.room) {
         rooms.get(socket.room)?.nextRound();
       }
+      if (m.type === "READY" && socket.room)
+        rooms.get(socket.room)?.setReady(socket.id, !!m.ready);
+      if (m.type === "SETTINGS" && socket.room)
+        rooms.get(socket.room)?.setDuration(socket.id, Number(m.duration));
+      if (m.type === "START" && socket.room)
+        rooms.get(socket.room)?.start(socket.id);
     });
     socket.on("close", () => {
       clearTimeout(joinTimeout);
       const room = rooms.get(socket.room);
-      room?.players.delete(socket.id);
+      room?.removePlayer(socket.id);
       if (socket.room && socket.room !== "multiplayer")
         rooms.delete(socket.room);
       if (socket.room === "multiplayer" && !room.players.size)
-        rooms.set("multiplayer", new World());
+        rooms.set("multiplayer", shared());
     });
   });
   let tick = 0;

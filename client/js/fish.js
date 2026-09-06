@@ -40,6 +40,9 @@ const NOSE = {
   goldfish: 0.88,
   betta: 0.98,
   shark: 1.02,
+  butterflyfish: 1.04,
+  lionfish: 0.97,
+  wrasse: 1.11,
 };
 function shared(map, scene, make) {
   if (!map.has(scene)) map.set(scene, make());
