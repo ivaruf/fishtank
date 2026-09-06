@@ -262,6 +262,13 @@ button span {
   letter-spacing: 0.8px;
   pointer-events: none;
 }
+/* Quiet enough to ignore, present enough to check after a deploy. */
+.version {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 1.4px;
+  color: #7f9c94;
+  white-space: nowrap;
+}
 .key {
   display: inline-block;
   border: 1px solid #6e8a80;

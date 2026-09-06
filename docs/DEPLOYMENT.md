@@ -33,6 +33,20 @@ Consequences:
 6. Check `https://<service>.onrender.com/healthz` — it returns the live room
    list, not just a 200.
 
+## Confirming a deploy landed
+
+The menu shows `build <sha>` in the bottom right, fetched from `/healthz` and
+never cached, so it is the build the server is actually running rather than
+anything baked into the page. Hover it for the protocol number and the time
+the process started, which also tells apart two deploys of the same commit.
+
+It comes from `RENDER_GIT_COMMIT`, which Render sets for services built from a
+repo. `APP_VERSION` overrides it on any other host, and locally the server
+reads the checked-out commit from `.git` so the number matches
+`git rev-parse --short HEAD`. If none of those work it says `build dev` rather
+than inventing a version, and `build unknown` if the page cannot reach the
+server at all.
+
 Until step 4 is done the deploy job fails loudly rather than silently skipping,
 so a red build there means "add the secret", not "the code is broken".
 

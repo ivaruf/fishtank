@@ -367,3 +367,33 @@ test("assets are compressed, revalidated by content hash, and Babylon has a work
     await new Promise((resolve) => server.close(resolve));
   }
 });
+
+test("the running build is reported so a deploy can be confirmed", async () => {
+  const { server, wss } = createGameServer();
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const base = `http://127.0.0.1:${server.address().port}`;
+  try {
+    const health = await (await fetch(`${base}/healthz`)).json();
+    // A short commit hash here, or "dev" when there is no repo to read.
+    assert.match(
+      health.version,
+      /^(dev|[0-9a-f]{7})$/,
+      `unexpected version ${health.version}`,
+    );
+    assert.ok(
+      !Number.isNaN(Date.parse(health.started)),
+      "started should be a parseable timestamp",
+    );
+    assert.equal(health.protocol, PROTOCOL);
+    // Never cached, or the whole point of checking it is lost.
+    const res = await fetch(`${base}/healthz`);
+    assert.equal(res.headers.get("cache-control"), "no-store");
+    // The menu has somewhere to put it.
+    const html = await (await fetch(base)).text();
+    assert.match(html, /id="version"/);
+  } finally {
+    await new Promise((resolve) => wss.close(resolve));
+    await new Promise((resolve) => server.close(resolve));
+  }
+});

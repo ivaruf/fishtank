@@ -1,5 +1,6 @@
 import http from "node:http";
 import { readFile, readdir } from "node:fs/promises";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { randomUUID, createHash } from "node:crypto";
@@ -28,6 +29,25 @@ const vendors = {
   "/vendor/loaders.js":
     "node_modules/babylonjs-loaders/babylonjs.loaders.min.js",
 };
+// What build is actually running, so a deploy can be confirmed at a glance
+// rather than by guessing. Render sets RENDER_GIT_COMMIT for services built
+// from a repo; APP_VERSION overrides it on any other host, and locally we read
+// the checked-out commit straight from .git. Resolved once at startup.
+const BUILD = (() => {
+  const given = process.env.APP_VERSION || process.env.RENDER_GIT_COMMIT;
+  if (given) return given.trim().slice(0, 7);
+  try {
+    const head = readFileSync(path.join(root, ".git/HEAD"), "utf8").trim();
+    const ref = head.startsWith("ref: ")
+      ? readFileSync(path.join(root, ".git", head.slice(5)), "utf8")
+      : head;
+    return ref.trim().slice(0, 7);
+  } catch {
+    // Packed refs, or no .git at all: better to say so than to invent one.
+    return "dev";
+  }
+})();
+const STARTED = new Date().toISOString();
 // PNG and M4A are already compressed; measured 0% gain and pure CPU cost.
 const COMPRESSIBLE = new Set([".html", ".js", ".css", ".glb", ".json"]);
 const brotli = promisify(zlib.brotliCompress);
@@ -104,6 +124,8 @@ export function createGameServer() {
         res.end(
           JSON.stringify({
             ok: true,
+            version: BUILD,
+            started: STARTED,
             protocol: PROTOCOL,
             uptime: Math.round(process.uptime()),
             players: games.reduce((n, g) => n + g.players, 0),

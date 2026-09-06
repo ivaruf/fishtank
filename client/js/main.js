@@ -133,6 +133,23 @@ let network = null,
   deathCam = null,
   touchMode = false,
   leaderId = null;
+// Which build is serving us, shown on the menu so a deploy can be confirmed
+// without guessing. Read from the server rather than baked into the page: it
+// is the server that gets replaced, and /healthz is never cached.
+fetch("/healthz", { cache: "no-store" })
+  .then((r) => (r.ok ? r.json() : Promise.reject(new Error(r.status))))
+  .then(({ version, started, protocol }) => {
+    $("version").textContent = `build ${version}`;
+    const when = new Date(started);
+    $("version").title =
+      `Build ${version}, protocol ${protocol}, running since ` +
+      (isNaN(when) ? started : when.toLocaleString());
+  })
+  .catch(() => {
+    // Say it is unknown rather than show a stale or invented version.
+    $("version").textContent = "build unknown";
+    $("version").title = "Could not reach the server to check its build.";
+  });
 // Touch camera: settles in behind the fish's own heading instead of an aim.
 const follow = { yaw: 0, pitch: 0 };
 // Applied here rather than beside the listener above: setMoveStyle reports a
