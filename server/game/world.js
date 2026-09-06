@@ -12,6 +12,18 @@ import {
   onButton,
 } from "../../shared/config.js";
 import { movementVector, parseInput } from "../../shared/movement.js";
+// Wire precision, applied only when encoding a snapshot. The simulation itself
+// keeps full doubles, so this can never feed back into movement or into who
+// outweighs whom. Positions land on 1 cm and angles on ~0.06 degrees, both
+// finer than the client draws, and short decimals compress far better than a
+// 17-digit float: together with permessage-deflate this is ~90% off the wire.
+// Mass stays at 2dp so the client's food-or-danger tint still matches the
+// server's own comparison for fish of nearly equal size.
+const wire = (n, places) => {
+  if (typeof n !== "number" || !Number.isFinite(n)) return n;
+  const scale = 10 ** places;
+  return Math.round(n * scale) / scale;
+};
 export function canEat(a, b) {
   if (
     !a.alive ||
@@ -370,20 +382,20 @@ export class World {
       npc: !!f.npc,
       name: f.name,
       species: f.species,
-      x: f.x,
-      y: f.y,
-      z: f.z,
-      yaw: f.yaw,
-      pitch: f.pitch,
-      mass: f.mass,
+      x: wire(f.x, 2),
+      y: wire(f.y, 2),
+      z: wire(f.z, 2),
+      yaw: wire(f.yaw, 3),
+      pitch: wire(f.pitch, 3),
+      mass: wire(f.mass, 2),
       score: f.score,
       color: f.color,
       alive: f.alive,
-      protection: f.protection,
-      respawn: f.respawn,
+      protection: wire(f.protection, 2),
+      respawn: wire(f.respawn, 2),
       killedBy: f.killedBy,
       hidden: f.npc ? undefined : inCover(f),
-      stunned: f.stunned > 0 ? f.stunned : undefined,
+      stunned: f.stunned > 0 ? wire(f.stunned, 2) : undefined,
     });
     return {
       type: "WORLD_STATE",

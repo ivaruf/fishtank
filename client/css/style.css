@@ -479,15 +479,16 @@ header,
 .game .status.live {
   color: #d1ed9e;
 }
-/* Eight pips, one per seat, so occupancy reads without counting. */
+/* One pip per seat, so occupancy reads without counting. Sized to fit a full
+   sixteen-seat tank between the name and the status. */
 .game .seats {
   display: flex;
-  gap: 3px;
+  gap: 2px;
   flex: none;
 }
 .game .seats i {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   background: #ffffff26;
 }

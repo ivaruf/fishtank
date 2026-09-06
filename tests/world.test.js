@@ -411,3 +411,37 @@ test("a lobby room waits for everyone ready and the host's start, then returns t
   assert.equal(solo.phase, "playing");
   assert.equal(solo.snapshot().lobby, undefined);
 });
+
+// Snapshots are quantised at the wire boundary only: keeping full doubles in
+// the simulation but short decimals on the wire is most of the ~93% bandwidth
+// saving, so guard both halves of that bargain.
+test("snapshots quantise floats for the wire without touching the simulation", () => {
+  const w = new World(Math.random);
+  for (let i = 0; i < C.maxPlayers; i++) w.addPlayer(`p${i}`, `Player ${i}`);
+  for (let i = 0; i < 40; i++) w.tick(1 / C.tickRate);
+  const snap = w.snapshot();
+  const decimals = (n) => (String(n).split(".")[1] ?? "").length;
+  const budget = { x: 2, y: 2, z: 2, yaw: 3, pitch: 3, mass: 2 };
+  for (const f of [...snap.players, ...snap.npcs])
+    for (const [field, places] of Object.entries(budget))
+      assert.ok(
+        decimals(f[field]) <= places,
+        `${field}=${f[field]} exceeds ${places} decimals on the wire`,
+      );
+  // The authoritative state keeps full precision, or rounding would feed back
+  // into movement and into who outweighs whom.
+  const live = [...w.players.values(), ...w.npcs];
+  assert.ok(
+    live.some((f) => decimals(f.x) > 2 || decimals(f.yaw) > 3),
+    "simulation state should not be rounded",
+  );
+  // A regression guard on size, per fish so it survives changes to maxPlayers
+  // or npcCount: un-quantising, or adding a field to every fish, shows up here
+  // before it shows up on someone's uplink.
+  const fish = snap.players.length + snap.npcs.length;
+  const perFish = JSON.stringify(snap).length / fish;
+  assert.ok(
+    perFish < 200,
+    `${perFish.toFixed(0)} bytes per fish on the wire, across ${fish} fish`,
+  );
+});

@@ -21,10 +21,11 @@ export const CONFIG = Object.freeze({
   spawnProtection: 3,
   tickRate: 30,
   broadcastRate: 15,
-  // Eight is where one room's egress (every client gets the whole ~25 KB
-  // snapshot at broadcastRate) reaches ~26 Mbit/s, about all a home upstream
-  // has. Server CPU is nowhere near the limit; bandwidth is.
-  maxPlayers: 8,
+  // Was eight while a snapshot cost 26 KB on the wire and a full room used
+  // ~26 Mbit/s. Quantised floats plus permessage-deflate cut that to ~1.8 KB,
+  // so sixteen players now cost about 3.5 Mbit/s a room: a gameplay choice
+  // rather than a bandwidth ceiling. See docs/NETWORK-WORKLIST.md.
+  maxPlayers: 16,
 });
 // Separate shared games, each its own World. Three of them cap the host at
 // 24 players (~78 Mbit/s worst case) and keep the game list scannable.
@@ -37,7 +38,7 @@ export const TANKS = Object.freeze(
 export const isTank = (id) => TANKS.some((t) => t.id === id);
 // Bumped whenever snapshots or join messages change shape, so a client can
 // tell when it is talking to a server process started from older code.
-export const PROTOCOL = 5;
+export const PROTOCOL = 6;
 export const radius = (mass) => Math.cbrt(mass) * 0.48;
 export const outweighs = (predator, prey) =>
   predator.mass > prey.mass * CONFIG.eatRatio;
