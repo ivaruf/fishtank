@@ -154,9 +154,35 @@
         </div>
         <span class="zone-hint">DIVE · DRAG DOWN OR UP</span>
       </div>
-      <div class="landscape-hint">
-        Rotate your phone for more swimming room ↻
-      </div>
+    </div>
+    <div id="rotate" class="rotate" role="dialog" aria-live="polite">
+      <svg class="rotate-art" viewBox="0 0 240 240" aria-hidden="true">
+        <path
+          class="rotate-arrow"
+          d="M52 168 A90 90 0 0 1 182 66"
+          fill="none"
+          stroke="#d1ed9e"
+          stroke-width="12"
+          stroke-linecap="round"
+        />
+        <path d="M150 42 L196 60 L178 106 Z" fill="#d1ed9e" />
+        <g class="rotate-phone">
+          <rect
+            x="92"
+            y="70"
+            width="56"
+            height="100"
+            rx="12"
+            fill="#0f2b2c"
+            stroke="#8fb3a8"
+            stroke-width="6"
+          />
+          <rect x="102" y="84" width="36" height="66" rx="3" fill="#1f5a52" />
+          <circle cx="120" cy="160" r="4" fill="#8fb3a8" />
+        </g>
+      </svg>
+      <h2>Turn your phone sideways</h2>
+      <p>Fishtank swims in landscape only.</p>
     </div>
     <script src="/vendor/babylon.js"></script>
     <script src="/vendor/loaders.js"></script>

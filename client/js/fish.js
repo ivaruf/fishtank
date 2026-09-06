@@ -43,6 +43,10 @@ const NOSE = {
   butterflyfish: 1.04,
   lionfish: 0.97,
   wrasse: 1.11,
+  seahorse: 0.81,
+  "manta-ray": 0.84,
+  "royal-gramma": 1.02,
+  triggerfish: 1.03,
 };
 function shared(map, scene, make) {
   if (!map.has(scene)) map.set(scene, make());
@@ -57,8 +61,15 @@ const modelsFor = (scene) => {
 // detail "hd" picks the denser exports behind the Ultra quality setting. A
 // reload swaps the whole set at once and disposes the previous models, so the
 // caller must rebuild any fish created from them afterwards.
-export const modelUrl = (species, detail = "standard") =>
-  `/assets/models/${species}${detail === "hd" ? "-hd" : ""}.glb`;
+export const modelUrl = (species, detail = "standard") => {
+  const suffix =
+    detail === "hd"
+      ? "-hd"
+      : species === "clownfish" && ["low", "high"].includes(detail)
+        ? `-${detail}`
+        : "";
+  return `/assets/models/${species}${suffix}.glb`;
+};
 export async function loadFishModels(
   scene,
   load = (species, detail) =>
@@ -78,7 +89,7 @@ export async function loadFishModels(
           console.warn(`No ${detail} model for "${species}"; using standard`);
           container = await load(species, "standard");
         }
-        prepare(container, scene);
+        prepare(container, scene, species, detail);
         next.set(species, container);
       } catch (error) {
         failed.push(species);
@@ -90,7 +101,7 @@ export async function loadFishModels(
   models.set(scene, next);
   return { loaded: SPECIES.filter((s) => next.has(s)), failed, detail };
 }
-function prepare(container, scene) {
+function prepare(container, scene, species, detail) {
   // The glTF loader auto-plays the first clip on the hidden source model.
   for (const group of container.animationGroups) group.stop();
   // The scene has no environment texture, so swap the exported PBR materials
@@ -107,6 +118,14 @@ function prepare(container, scene) {
       const base = (pbr.albedoColor ?? B.Color3.White()).toGammaSpace();
       const m = material(scene, pbr.name, base.scale(0.3));
       m.emissiveColor = base.scale(0.4);
+      if (species === "clownfish" && detail !== "low") {
+        // Preserve authored roughness as a wet highlight without changing the
+        // shared instance-color shader or washing out the painted stripes.
+        const roughness = pbr.roughness ?? 0.4;
+        m.specularPower = 12 + (1 - roughness) * 96;
+        const gloss = detail === "hd" ? 0.36 : detail === "high" ? 0.26 : 0.18;
+        m.specularColor = new B.Color3(gloss, gloss * 0.95, gloss * 0.85);
+      }
       converted.set(pbr, m);
     }
     mesh.material = converted.get(pbr);
@@ -150,7 +169,8 @@ export function createFish(scene, species, npc = false, color = 0) {
     scene,
   );
   mouth.parent = pose;
-  mouth.position.set(0, -0.08, (model ? NOSE[species] : 1.2) - 0.02);
+  const mouthY = model && species === "seahorse" ? 0.61 : -0.08;
+  mouth.position.set(0, mouthY, (model ? (NOSE[species] ?? 1) : 1.2) - 0.02);
   mouth.scaling.set(0.34, 0.02, 0.16);
   mouth.material = shared(maws, scene, () => {
     const m = material(scene, "maw", "#0b1013");
@@ -279,7 +299,7 @@ export function createFish(scene, species, npc = false, color = 0) {
             0.02 + gape * 0.46,
             0.16 + gape * 0.08,
           );
-          mouth.position.y = -0.08 - gape * 0.18;
+          mouth.position.y = mouthY - gape * 0.18;
         }
       }
       return false;

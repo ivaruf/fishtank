@@ -9,7 +9,8 @@ const BABYLON = require("babylonjs");
 globalThis.BABYLON = BABYLON;
 require("babylonjs-loaders");
 globalThis.window = Object.assign(new EventTarget(), { BABYLON });
-const { createFish, loadFishModels } = await import("../client/js/fish.js");
+const { createFish, loadFishModels, modelUrl } =
+  await import("../client/js/fish.js");
 function headless() {
   const engine = new BABYLON.NullEngine(),
     scene = new BABYLON.Scene(engine);
@@ -22,10 +23,7 @@ const fromDisk = (scene) => (species, detail) =>
   BABYLON.LoadAssetContainerAsync(
     new Uint8Array(
       readFileSync(
-        new URL(
-          `../client/assets/models/${species}${detail === "hd" ? "-hd" : ""}.glb`,
-          import.meta.url,
-        ),
+        new URL(`../client${modelUrl(species, detail)}`, import.meta.url),
       ),
     ),
     scene,
@@ -102,8 +100,10 @@ test("Blender fish load, face +Z, share instanced geometry, swim, tint and dispo
         if (m.material)
           assert.equal(m.material.getClassName(), "StandardMaterial");
       const { nose, tail } = worldZ(fish);
-      assert.ok(nose > 5.7, `${species} nose ahead of origin: ${nose}`);
-      assert.ok(tail < 3.6, `${species} tail behind origin: ${tail}`);
+      // Faces +Z: nose ahead of the origin, tail behind it. Loose enough for
+      // upright shapes such as a seahorse, strict enough to catch a flipped export.
+      assert.ok(nose > 5.5, `${species} nose ahead of origin: ${nose}`);
+      assert.ok(tail < 4.5, `${species} tail behind origin: ${tail}`);
       assert.ok(meshes.some((m) => m.name === "player crest"));
       assert.equal(fish.crown.isEnabled(), false, "no crown until leading");
       fish.setCrown(true);
@@ -217,6 +217,28 @@ test("missing models fall back to a procedural fish with the same contract", () 
       scene.materials.map((m) => m.name),
       ["maw"],
     );
+  } finally {
+    engine.dispose();
+  }
+});
+
+test("clownfish quality tiers change geometry and preserve animated instances", async () => {
+  const { engine, scene } = headless();
+  try {
+    let previous = 0;
+    for (const detail of ["low", "standard", "high", "hd"]) {
+      await loadFishModels(scene, fromDisk(scene), detail);
+      const fish = createFish(scene, "clownfish", true);
+      assert.ok(vertices(fish) > previous, `${detail} adds visible geometry`);
+      previous = vertices(fish);
+      assert.ok(
+        fish.swim.targetedAnimations.length >=
+          (detail === "high" || detail === "hd" ? 3 : 1),
+      );
+      fish.dispose();
+    }
+    assert.equal(modelUrl("shark", "low"), modelUrl("shark", "standard"));
+    assert.equal(modelUrl("shark", "high"), modelUrl("shark", "standard"));
   } finally {
     engine.dispose();
   }

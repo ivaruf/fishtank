@@ -50,6 +50,10 @@ export const SPECIES = Object.freeze([
   "butterflyfish",
   "lionfish",
   "wrasse",
+  "seahorse",
+  "manta-ray",
+  "royal-gramma",
+  "triggerfish",
 ]);
 export const speciesLabel = (species = "fish") =>
   String(species).replaceAll("-", " ");

@@ -502,14 +502,64 @@ header,
     font-size: 11px;
   }
 }
-.landscape-hint {
+/* Portrait phones get a full-screen prompt instead of a squeezed game. */
+.rotate {
   display: none;
-  position: absolute;
-  bottom: 175px;
-  width: 100%;
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 24px;
+  background: #052b32;
+  color: #edf8ef;
   text-align: center;
-  font-size: 10px;
-  color: #d1ed9e;
+}
+.rotate h2 {
+  margin: 18px 0 6px;
+  font-size: 28px;
+  letter-spacing: -1px;
+}
+.rotate p {
+  margin: 0;
+  color: #b6d2c6;
+  font-size: 14px;
+}
+.rotate-art {
+  width: min(62vw, 300px);
+  height: auto;
+}
+.rotate-phone {
+  transform-origin: 120px 120px;
+  animation: rotate-phone 2.6s ease-in-out infinite;
+}
+@keyframes rotate-phone {
+  0%,
+  30% {
+    transform: rotate(0deg);
+  }
+  60%,
+  100% {
+    transform: rotate(90deg);
+  }
+}
+.rotate-arrow {
+  stroke-dasharray: 300;
+  animation: rotate-arrow 2.6s ease-in-out infinite;
+}
+@keyframes rotate-arrow {
+  0%,
+  30% {
+    stroke-dashoffset: 300;
+    opacity: 0.25;
+  }
+  60%,
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
 }
 .header-tools {
   display: flex;
@@ -694,8 +744,8 @@ select {
   }
 }
 @media (pointer: coarse) and (orientation: portrait) {
-  .landscape-hint {
-    display: block;
+  .rotate {
+    display: flex;
   }
 }
 @media (max-height: 520px) and (orientation: landscape) {

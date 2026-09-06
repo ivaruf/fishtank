@@ -44,5 +44,7 @@ test("high-DPI screens render above CSS resolution with bounded quality choices"
   assert.equal(hardwareScaling("ultra", 2), 1 / 3);
   assert.equal(hardwareScaling("ultra", 4), 1 / 3);
   assert.equal(modelDetail("ultra"), "hd");
-  assert.equal(modelDetail("sharp"), "standard");
+  assert.equal(modelDetail("sharp"), "high");
+  assert.equal(modelDetail("balanced"), "standard");
+  assert.equal(modelDetail("battery"), "low");
 });

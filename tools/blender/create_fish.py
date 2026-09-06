@@ -21,6 +21,8 @@ for path in [OUT, THUMBS, SOURCE, DOCS]: path.mkdir(parents=True, exist_ok=True)
 KINDS = ['clownfish', 'blue-tang', 'pufferfish', 'angelfish', 'goldfish', 'betta', 'shark', 'butterflyfish', 'lionfish', 'wrasse', 'seahorse', 'manta-ray', 'royal-gramma', 'triggerfish']
 # Tessellation per quality tier: (segments, rings) for spheres, bevel/curve resolution for fins and rays.
 DETAIL = {
+    'low': dict(body=(20,14), sphere=(12,8), small=(10,6), tiny=(8,4), bevel=1, curve=0, suffix='-low'),
+    'high': dict(body=(40,30), sphere=(24,14), small=(12,8), tiny=(10,6), bevel=2, curve=1, suffix='-high'),
     'standard': dict(body=(32, 24), sphere=(20, 12), small=(12, 8), tiny=(10, 6), bevel=2, curve=1, suffix=''),
     'hd': dict(body=(72, 54), sphere=(36, 20), small=(16, 10), tiny=(14, 8), bevel=4, curve=3, suffix='-hd'),
 }
@@ -401,8 +403,15 @@ def build(kind, detail='standard', models_only=False):
         tailshapes=[[(0,.10,-.83),(0,.78,-1.55),(0,.62,-1.62),(0,.05,-1.25),(0,-.45,-1.50),(0,-.55,-1.45),(0,-.10,-.83)]]
         rays=[]
     # Keep tail pivot local to its attachment for exported swim animation.
+    if kind=='clownfish' and detail!='low':
+        sys.path.insert(0,str(Path(__file__).parent))
+        import clownfish_detail
+        fin_highlight=clownfish_detail.enhance(sys.modules[__name__],root,detail,orange,cream,dark,gold)
     tail=bpy.data.objects.new('Tail',None);bpy.context.collection.objects.link(tail);tail.parent=root
-    if tailcurve:
+    if kind=='clownfish' and detail!='low':
+        clownfish_detail.tail(sys.modules[__name__],tail,detail,orange,cream,dark,fin_highlight)
+        rays=[]
+    elif tailcurve:
         curve=line('Curved tail',tailcurve,tailmat,tail,tailwidth)
         for i,point in enumerate(curve.data.splines[0].points):point.radius=1-.82*i/(len(tailcurve)-1)
     else:
@@ -418,16 +427,16 @@ def build(kind, detail='standard', models_only=False):
     tail.animation_data.action.name='swim'
     scene.frame_set(1)
     bpy.ops.object.select_all(action='DESELECT')
-    for o in [root,static,tail,tailmesh]:o.select_set(True)
+    for o in [root,*root.children_recursive]:o.select_set(True)
     bpy.context.view_layer.objects.active=root
     bpy.ops.export_scene.gltf(filepath=str(OUT/f"{kind}{LEVEL['suffix']}.glb"),export_format='GLB',use_selection=True,export_animations=True,export_animation_mode='ACTIVE_ACTIONS',export_frame_range=True,export_yup=True,export_cameras=False,export_lights=False)
-    if detail!='standard': return kind
+    if detail!='standard' and kind!='clownfish': return kind
     # Source files include studio lighting and a camera for easy inspection.
     studio(scene)
-    bpy.ops.wm.save_as_mainfile(filepath=str(SOURCE/f'{kind}.blend'))
+    bpy.ops.wm.save_as_mainfile(filepath=str(SOURCE/f"{kind}{LEVEL['suffix']}.blend"))
     if models_only: return kind
-    scene.render.filepath=str(DOCS/f'{kind}.png');bpy.ops.render.render(write_still=True)
-    thumbnail(kind)
+    scene.render.filepath=str(DOCS/f"{kind}{LEVEL['suffix']}.png");bpy.ops.render.render(write_still=True)
+    if detail=='standard': thumbnail(kind)
     return kind
 
 def thumbnail(kind):
@@ -458,12 +467,15 @@ args=sys.argv[sys.argv.index('--')+1:] if '--' in sys.argv else []
 kinds=[a for a in args if a in KINDS] or KINDS
 if '--thumbnails-only' in args:
     for kind in kinds:
-        bpy.ops.wm.open_mainfile(filepath=str(SOURCE/f'{kind}.blend'))
+        bpy.ops.wm.open_mainfile(filepath=str(SOURCE/f"{kind}{LEVEL['suffix']}.blend"))
         thumbnail(kind)
     print(f'FISHTANK: Thumbnails rendered for {", ".join(kinds)}.')
 elif '--hd-only' in args:
     for kind in kinds:build(kind,'hd')
     print(f'FISHTANK: High-detail models exported for {", ".join(kinds)}.')
 else:
-    for kind in kinds:build(kind,models_only='--models-only' in args);build(kind,'hd')
+    for kind in kinds:
+        if kind=='clownfish':
+            for detail in ['low','standard','high','hd']:build(kind,detail,models_only='--models-only' in args)
+        else:build(kind,models_only='--models-only' in args);build(kind,'hd')
     print(f'FISHTANK: Built {", ".join(kinds)} (Blender sources, standard and HD GLBs).')

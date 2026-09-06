@@ -6,5 +6,8 @@ export function hardwareScaling(mode, devicePixelRatio = 1) {
   const cap = { battery: 1, balanced: 1.5, sharp: 2 }[mode] ?? 1.5;
   return 1 / Math.min(dpr, cap);
 }
-// Only Ultra loads the denser fish exports.
-export const modelDetail = (mode) => (mode === "ultra" ? "hd" : "standard");
+// The clownfish has authored tiers; other fish retain standard/HD models.
+export const modelDetail = (mode) =>
+  ({ battery: "low", balanced: "standard", sharp: "high", ultra: "hd" })[
+    mode
+  ] ?? "standard";

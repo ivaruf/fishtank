@@ -67,7 +67,7 @@ $("mute").addEventListener("click", () => {
 syncMute();
 audio.music("menu");
 // Fish drawn before the Blender models arrive are rebuilt once they are cached.
-// Ultra swaps in the high-detail exports; loads are chained so the last choice
+// Quality swaps in the authored model tiers; loads are chained so the last choice
 // always wins even if the player flips the selector quickly.
 let modelsLoading = Promise.resolve(),
   loadedDetail = null;
@@ -285,7 +285,7 @@ function join(mode) {
         audio.play("respawn");
         deathCam = null;
       }
-      controls.setActive(!!me?.alive && next.phase === "playing");
+      syncControls(me, next.phase);
       state = next;
       updateUI();
       audio.music(next.phase === "lobby" ? "menu" : "game");
@@ -617,7 +617,21 @@ function deathCamera(dt, now) {
     updateUI();
   }
 }
+// Portrait phones only see the rotate prompt: rendering pauses and the fish
+// holds still until the phone is turned.
+const portrait = matchMedia("(pointer: coarse) and (orientation: portrait)");
+function syncControls(me, phase) {
+  controls.setActive(!!me?.alive && phase === "playing" && !portrait.matches);
+}
+portrait.addEventListener("change", () => {
+  syncControls(
+    state?.players.find((p) => p.id === myId),
+    state?.phase,
+  );
+  requestAnimationFrame(() => engine.resize());
+});
 engine.runRenderLoop(() => {
+  if (portrait.matches) return;
   const dt = Math.min(engine.getDeltaTime() / 1000, 0.05);
   time += dt;
   aquarium.animate(dt);
