@@ -228,7 +228,7 @@ button span {
   color: #ffd2a4;
   font-size: 13px;
 }
-footer {
+.menu-instructions {
   position: absolute;
   bottom: 26px;
   left: 42px;
@@ -679,7 +679,7 @@ select {
   h1 {
     letter-spacing: -2px;
   }
-  footer {
+  .menu-instructions {
     left: 22px;
     right: 22px;
     font-size: 8px;
@@ -719,14 +719,14 @@ select {
   }
 }
 @media (pointer: coarse) {
-  footer .key,
-  footer .divider {
+  .menu-instructions .key,
+  .menu-instructions .divider {
     display: none;
   }
-  footer > div {
+  .menu-instructions > div {
     font-size: 0;
   }
-  footer > div:after {
+  .menu-instructions > div:after {
     content: "LEFT: STEER · RIGHT: DIVE OR RISE · YOU ALWAYS SWIM";
     font-size: 9px;
   }
@@ -752,7 +752,7 @@ select {
 }
 
 @media (pointer: coarse) {
-  .playing footer {
+  .playing .menu-instructions {
     display: none;
   }
   .playing .exit {
@@ -1223,5 +1223,69 @@ select:focus-visible {
   }
   #leave-dialog {
     padding: 22px;
+  }
+}
+
+#fish-preview {
+  position: absolute;
+  right: 3%;
+  top: 23%;
+  width: 43%;
+  height: 58%;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+#fish-preview.grabbing {
+  cursor: grabbing;
+}
+#fish-preview span {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  text-align: center;
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: #b9ceca;
+  pointer-events: none;
+}
+@media (max-height: 520px) and (orientation: landscape) {
+  #fish-preview {
+    left: 6%;
+    right: auto;
+    top: 155px;
+    width: 35%;
+    height: calc(100dvh - 180px);
+  }
+  .panel {
+    pointer-events: none;
+  }
+  .panel input,
+  .panel .species-strip,
+  .panel .buttons {
+    pointer-events: auto;
+  }
+}
+
+/* Instructions follow the play actions instead of floating over the preview. */
+.panel .menu-instructions {
+  position: static;
+  margin-top: 14px;
+  color: #b9ceca;
+  font-size: 10px;
+  line-height: 1.9;
+  letter-spacing: 0.2px;
+}
+.menu-instructions .divider {
+  margin: 0 6px;
+}
+@media (max-height: 520px) and (orientation: landscape) {
+  .panel .menu-instructions {
+    grid-column: 2;
+    grid-row: 4;
+    margin-top: 10px;
+  }
+  .panel .error {
+    grid-row: 5;
   }
 }

@@ -204,50 +204,94 @@ function clearFish() {
 }
 // The chosen species swims large beside the menu until the player dives in.
 let hero = null;
+const preview = $("fish-preview");
+const previewLight = new B.HemisphericLight(
+  "preview fill",
+  B.Vector3.Up(),
+  scene,
+);
+previewLight.intensity = 1.5;
+previewLight.diffuse = new B.Color3(1, 0.96, 0.88);
+previewLight.groundColor = new B.Color3(0.48, 0.65, 0.7);
+previewLight.specular = new B.Color3(0.25, 0.25, 0.25);
+previewLight.renderPriority = 100;
+previewLight.setEnabled(false);
+const spin = { pointer: null, x: 0, y: 0, yaw: 0, pitch: 0, touched: false };
+function releasePreview() {
+  if (spin.pointer !== null && preview.hasPointerCapture(spin.pointer))
+    preview.releasePointerCapture(spin.pointer);
+  spin.pointer = null;
+  preview.classList.remove("grabbing");
+}
+preview.addEventListener("pointerdown", (event) => {
+  if (event.button !== 0 || spin.pointer !== null) return;
+  spin.pointer = event.pointerId;
+  spin.x = event.clientX;
+  spin.y = event.clientY;
+  if (!spin.touched) spin.yaw = Math.sin(time * 0.45) * 0.55;
+  spin.touched = true;
+  preview.setPointerCapture(event.pointerId);
+  preview.classList.add("grabbing");
+  event.preventDefault();
+});
+preview.addEventListener("pointermove", (event) => {
+  if (event.pointerId !== spin.pointer) return;
+  spin.yaw += (event.clientX - spin.x) * 0.012;
+  spin.pitch = clamp(spin.pitch + (event.clientY - spin.y) * 0.01, -1.3, 1.3);
+  spin.x = event.clientX;
+  spin.y = event.clientY;
+});
+for (const type of ["pointerup", "pointercancel", "lostpointercapture"])
+  preview.addEventListener(type, (event) => {
+    if (event.pointerId === spin.pointer) releasePreview();
+  });
+window.addEventListener("blur", releasePreview);
 function hideHero() {
+  releasePreview();
+  preview.hidden = true;
+  previewLight.setEnabled(false);
+  previewLight.includedOnlyMeshes = [];
   hero?.dispose();
   hero = null;
 }
 function showHero(dt) {
   if (hero && hero.species !== chosenSpecies) hideHero();
   if (!hero) {
-    hero = createFish(scene, chosenSpecies, false);
+    hero = createFish(scene, chosenSpecies, false, 0, true);
+    previewLight.includedOnlyMeshes = hero.root.getChildMeshes();
+    previewLight.setEnabled(true);
     hero.species = chosenSpecies;
     hero.swim.speedRatio = 0.9;
   }
+  preview.hidden = false;
   const canvas = $("game"),
-    wide = canvas.clientWidth > canvas.clientHeight,
-    // Short landscape phones: the form fills the screen, so keep the hero small
-    // and tucked into the top-right corner.
-    short = canvas.clientHeight < 520,
-    forward = camera.getDirection(B.Vector3.Forward());
-  if (wide && short) return hideHero();
+    bounds = preview.getBoundingClientRect(),
+    screen = canvas.getBoundingClientRect(),
+    forward = camera.getDirection(B.Vector3.Forward()),
+    halfHeight = Math.tan(camera.fov / 2) * 10,
+    halfWidth = (halfHeight * screen.width) / screen.height,
+    x = ((bounds.left + bounds.width / 2 - screen.left) / screen.width) * 2 - 1,
+    y = 1 - ((bounds.top + bounds.height / 2 - screen.top) / screen.height) * 2;
+  previewLight.direction.copyFrom(
+    forward.scale(-1).add(camera.getDirection(B.Vector3.Up())),
+  );
   hero.root.position.copyFrom(
     camera.position
       .add(forward.scale(10))
-      .add(
-        camera
-          .getDirection(B.Vector3.Right())
-          .scale(wide ? (short ? 6.2 : 4.3) : 0.9),
-      )
-      .add(
-        camera
-          .getDirection(B.Vector3.Up())
-          .scale(
-            (wide ? (short ? 2.6 : 2.2) : 3.5) + Math.sin(time * 1.1) * 0.15,
-          ),
-      ),
+      .add(camera.getDirection(B.Vector3.Right()).scale(x * halfWidth))
+      .add(camera.getDirection(B.Vector3.Up()).scale(y * halfHeight)),
   );
-  // Three-quarter view that slowly swings between profile and face-on.
   hero.root.rotation.set(
-    Math.sin(time * 0.8) * 0.06,
+    spin.touched ? spin.pitch : Math.sin(time * 0.8) * 0.06,
     Math.atan2(forward.x, forward.z) +
       Math.PI / 2 +
       0.55 +
-      Math.sin(time * 0.45) * 0.55,
+      (spin.touched ? spin.yaw : Math.sin(time * 0.45) * 0.55),
     0,
   );
-  hero.root.scaling.setAll(wide ? (short ? 1.1 : 2) : 1.15);
+  hero.root.scaling.setAll(
+    (Math.min(bounds.width, bounds.height) / screen.height) * halfHeight * 0.65,
+  );
   hero.update(dt);
 }
 let leavePromptOpen = false;

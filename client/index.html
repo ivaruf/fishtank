@@ -71,6 +71,13 @@
         <div id="fullscreen-status" role="status" hidden></div>
       </div>
     </header>
+    <div
+      id="fish-preview"
+      role="img"
+      aria-label="Selected fish preview. Drag to rotate."
+    >
+      <span>Your fish · Drag to explore</span>
+    </div>
     <main id="menu" class="panel">
       <h1>Welcome to the<br /><em>foodchain.</em></h1>
       <label class="sr-only" for="name">Your name</label
@@ -110,6 +117,14 @@
         ><button id="multi" class="secondary">
           Play with friends <span>→</span>
         </button>
+      </div>
+      <div class="menu-instructions">
+        <div>
+          <span class="key">W</span><span class="key">S</span> forward / back
+          <span class="key">A</span><span class="key">D</span> strafe
+          <span class="divider">/</span> Mouse to aim · Click to capture · Esc
+          for menu
+        </div>
       </div>
       <p class="error" id="error" role="alert"></p>
     </main>
@@ -189,14 +204,7 @@
         </button>
       </div>
     </dialog>
-    <footer>
-      <div>
-        <span class="key">W</span><span class="key">S</span> forward / back
-        <span class="key">A</span><span class="key">D</span> strafe
-        <span class="divider">/</span> Mouse to aim · Click to capture · Esc for
-        menu
-      </div>
-    </footer>
+
     <div id="touch" hidden>
       <div id="move-zone" class="touch-zone steer-zone" aria-label="Steer">
         <div id="move-stick" class="joystick floating" hidden>

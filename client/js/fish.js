@@ -159,14 +159,20 @@ function prepare(container, scene, species, detail) {
   }
 }
 // species picks the model; color only feeds the procedural fallback palette.
-export function createFish(scene, species, npc = false, color = 0) {
+export function createFish(
+  scene,
+  species,
+  npc = false,
+  color = 0,
+  preview = false,
+) {
   // Server state drives root; bite and death animations play on pose.
   const root = new B.TransformNode("fish", scene),
     pose = new B.TransformNode("pose", scene);
   pose.parent = root;
   const model = modelsFor(scene).get(species);
   const body = model
-    ? instantiate(model, pose)
+    ? instantiate(model, pose, preview)
     : procedural(scene, pose, color);
   if (!npc) {
     if (!crests.has(scene))
@@ -344,9 +350,10 @@ export function createFish(scene, species, npc = false, color = 0) {
   };
   return fish;
 }
-function instantiate(container, parent) {
+function instantiate(container, parent, preview = false) {
   const entries = container.instantiateModelsToScene((name) => name, false, {
-    doNotInstantiate: false,
+    // The menu preview needs its own meshes for isolated studio lighting.
+    doNotInstantiate: preview,
   });
   for (const node of entries.rootNodes) node.parent = parent;
   const instances = parent
