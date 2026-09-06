@@ -71,7 +71,7 @@ Do these in order; each was measured on top of the ones before it.
   neutral" band to ±0.05 mass, so a fish could appear neutral in the threat
   tint and still eat you. 2dp costs about 0.4% of the snapshot and keeps the
   client's food-or-danger cue faithful to the server's own comparison.
-- **Quantisation lives only in `encode`.** `wire()` in `server/game/world.js`
+- **Quantisation lives only in `encode`.** `wire()` in `shared/world.js`
   rounds on the way out; `f.x`, `f.mass` and friends keep full doubles, so
   rounding can never feed back into movement or into `outweighs`.
   `tests/world.test.js` asserts both halves: wire values respect their decimal

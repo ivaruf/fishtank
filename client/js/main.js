@@ -7,6 +7,7 @@ import { createFilter } from "./filter.js";
 import { createAudio } from "./audio.js";
 import { createControls } from "./controls.js";
 import { connect, AWAY } from "./networking.js";
+import { playLocally } from "./local.js";
 import {
   CONFIG as C,
   SPECIES,
@@ -427,8 +428,12 @@ function leave(message = "") {
 function join(mode, room) {
   if (joining || network) return;
   joining = true;
-  $("error").textContent = "Connecting…";
-  const connection = connect({
+  // Solo runs the same World in this tab: no socket, no traffic, no latency,
+  // and it keeps working with the network gone. Only shared tanks need a host.
+  const solo = mode === "single";
+  const open = solo ? playLocally : connect;
+  $("error").textContent = solo ? "" : "Connecting…";
+  const connection = open({
     join: { name: $("name").value, mode, species: chosenSpecies, room },
     onWelcome(id, protocol, roomName) {
       myId = id;
@@ -444,10 +449,9 @@ function join(mode, room) {
       $("touch").hidden = !touchMode;
       controls.setTouchMode(touchMode);
       audio.music("game");
-      $("connection").textContent =
-        mode === "single"
-          ? "● SOLO AQUARIUM"
-          : `● ${(roomName ?? "shared tank").toUpperCase()}`;
+      $("connection").textContent = solo
+        ? "● SOLO AQUARIUM · OFFLINE"
+        : `● ${(roomName ?? "shared tank").toUpperCase()}`;
       if (protocol !== PROTOCOL) {
         console.warn(
           `Server speaks protocol ${protocol}, this client expects ${PROTOCOL}. Restart the server (npm start).`,

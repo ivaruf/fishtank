@@ -7,7 +7,7 @@ import { randomUUID, createHash } from "node:crypto";
 import zlib from "node:zlib";
 import { promisify } from "node:util";
 import { WebSocketServer, WebSocket } from "ws";
-import { World } from "./server/game/world.js";
+import { World } from "./shared/world.js";
 import {
   CONFIG as C,
   SPECIES,

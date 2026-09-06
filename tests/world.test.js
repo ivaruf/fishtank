@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { World, canEat } from "../server/game/world.js";
+import { World, canEat } from "../shared/world.js";
 import {
   CONFIG as C,
   FILTER,

@@ -2,7 +2,7 @@
 // optimisation would actually save. Run: node tools/measure-traffic.mjs
 // Numbers here are the baseline recorded in docs/NETWORK-WORKLIST.md; re-run
 // after each optimisation and update that table.
-import { World } from "../server/game/world.js";
+import { World } from "../shared/world.js";
 import { CONFIG as C } from "../shared/config.js";
 import zlib from "node:zlib";
 

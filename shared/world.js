@@ -10,8 +10,8 @@ import {
   outweighs,
   FILTER,
   onButton,
-} from "../../shared/config.js";
-import { movementVector, parseInput } from "../../shared/movement.js";
+} from "./config.js";
+import { movementVector, parseInput } from "./movement.js";
 // Wire precision, applied only when encoding a snapshot. The simulation itself
 // keeps full doubles, so this can never feed back into movement or into who
 // outweighs whom. Positions land on 1 cm and angles on ~0.06 degrees, both
