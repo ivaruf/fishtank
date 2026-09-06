@@ -6,7 +6,7 @@ import { createPuffs, createSparks, createStream } from "./effects.js";
 import { createFilter } from "./filter.js";
 import { createAudio } from "./audio.js";
 import { createControls } from "./controls.js";
-import { connect } from "./networking.js";
+import { connect, AWAY } from "./networking.js";
 import {
   CONFIG as C,
   SPECIES,
@@ -533,9 +533,16 @@ function join(mode, room) {
     onError(message) {
       $("error").textContent = message;
     },
-    onClose() {
-      if (network === connection)
-        leave("Connection closed. Dive in again to reconnect.");
+    onClose(event) {
+      if (network !== connection) return;
+      // Being dropped for going away is normal, not a fault: say which it was.
+      leave(
+        event?.code === AWAY
+          ? "Paused while the tab was in the background. Dive in again."
+          : event?.reason === "Idle"
+            ? "Left the tank after a while away. Dive in again."
+            : "Connection closed. Dive in again to reconnect.",
+      );
     },
   });
   network = connection;

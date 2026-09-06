@@ -1,3 +1,10 @@
+import { CONFIG as C } from "../../shared/config.js";
+// How long a hidden tab holds its socket before letting go. A full snapshot
+// stream costs about 95 MB an hour whether or not anyone is watching, so a
+// pocketed phone should not keep paying for one.
+const HIDDEN_LIMIT = 60_000;
+// Our own close code, so the menu can say why rather than blaming the network.
+export const AWAY = 4000;
 // The socket opens before the player has picked a game: the server greets it
 // with a GAMES list and keeps it refreshed until a JOIN arrives.
 export function connect({
@@ -18,6 +25,26 @@ export function connect({
     else return false;
     return true;
   };
+  // While the page is visible we say so; the server reaps sockets that go
+  // quiet. Input already speaks for a player mid-round, but someone waiting in
+  // a lobby sends nothing at all and must not be mistaken for an empty tab.
+  let hiddenAt = 0;
+  const visible = () => document.visibilityState === "visible";
+  const keepAlive = setInterval(() => {
+    if (visible()) post({ type: "AWAKE" });
+    else if (hiddenAt && Date.now() - hiddenAt > HIDDEN_LIMIT)
+      socket.close(AWAY, "Away");
+  }, C.keepAlive * 1000);
+  const onVisibility = () => {
+    hiddenAt = visible() ? 0 : Date.now();
+    if (visible()) post({ type: "AWAKE" });
+  };
+  document.addEventListener("visibilitychange", onVisibility);
+  const stopKeepAlive = () => {
+    clearInterval(keepAlive);
+    document.removeEventListener("visibilitychange", onVisibility);
+  };
+  socket.addEventListener("close", stopKeepAlive);
   socket.addEventListener("open", () => {
     if (queued) {
       post({ type: "JOIN", ...queued });
@@ -48,6 +75,7 @@ export function connect({
       post({ type, ...payload });
     },
     close() {
+      stopKeepAlive();
       socket.close();
     },
   };

@@ -397,3 +397,84 @@ test("the running build is reported so a deploy can be confirmed", async () => {
     await new Promise((resolve) => server.close(resolve));
   }
 });
+
+// A connected socket used to cost a full snapshot stream whether or not
+// anyone was playing, which is how twenty minutes of play became 2 GB.
+test("idle sockets are reaped and quiet rooms broadcast slowly", async () => {
+  const { server, wss } = createGameServer({ idleTimeout: 1 });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const url = `ws://127.0.0.1:${server.address().port}/ws`;
+  const clients = [];
+  const open = async () => {
+    const s = new WebSocket(url);
+    clients.push(s);
+    await once(s, "open");
+    return s;
+  };
+  try {
+    // A socket that says nothing is a locked tablet, not a player.
+    const quiet = await open();
+    quiet.send(
+      JSON.stringify({
+        type: "JOIN",
+        name: "Gone",
+        mode: "multiplayer",
+        room: TANKS[0].id,
+      }),
+    );
+    await message(quiet, "WELCOME");
+    const [code, reason] = await once(quiet, "close");
+    assert.equal(code, 1001);
+    assert.equal(String(reason), "Idle");
+
+    // A visible page keeps saying so, and must never be reaped for waiting.
+    const waiting = await open();
+    waiting.send(
+      JSON.stringify({
+        type: "JOIN",
+        name: "Here",
+        mode: "multiplayer",
+        room: TANKS[1].id,
+      }),
+    );
+    await message(waiting, "WELCOME");
+    const beat = setInterval(
+      () => waiting.send(JSON.stringify({ type: "AWAKE" })),
+      200,
+    );
+    // Count snapshots while it sits in a lobby, then again mid-round.
+    const count = async (ms) => {
+      let n = 0;
+      const tally = (raw) => {
+        if (JSON.parse(raw).type === "WORLD_STATE") n++;
+      };
+      waiting.on("message", tally);
+      await new Promise((r) => setTimeout(r, ms));
+      waiting.off("message", tally);
+      return n;
+    };
+    const lobby = await count(2000);
+    waiting.send(JSON.stringify({ type: "READY", ready: true }));
+    waiting.send(JSON.stringify({ type: "START" }));
+    await new Promise((r) => setTimeout(r, 300));
+    const playing = await count(2000);
+    clearInterval(beat);
+    assert.equal(
+      waiting.readyState,
+      WebSocket.OPEN,
+      "a live tab is not reaped",
+    );
+    // Roughly 3 Hz against 15 Hz; loose bounds so timing jitter cannot flake.
+    assert.ok(lobby >= 3 && lobby <= 10, `lobby sent ${lobby} snapshots in 2s`);
+    assert.ok(playing >= 20, `a round sent ${playing} snapshots in 2s`);
+    assert.ok(
+      playing > lobby * 2,
+      `a quiet room must cost less: ${lobby} vs ${playing}`,
+    );
+  } finally {
+    for (const s of clients) s.terminate();
+    await new Promise((resolve) => wss.close(resolve));
+    await new Promise((resolve) => server.close(resolve));
+  }
+});

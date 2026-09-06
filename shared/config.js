@@ -21,6 +21,16 @@ export const CONFIG = Object.freeze({
   spawnProtection: 3,
   tickRate: 30,
   broadcastRate: 15,
+  // Nobody is steering in a lobby or on the results screen; only wild fish
+  // drift, and the client interpolates between snapshots. A connected socket
+  // used to cost the same 95 MB an hour whether or not anyone was playing.
+  idleBroadcastRate: 3,
+  // A socket that has sent nothing for this long is a locked tablet or a
+  // background tab, not a player: the client keeps a visible page alive with a
+  // keepalive, so silence means nobody is looking rather than nobody is moving.
+  idleTimeout: 90,
+  // How often a visible client says so. Comfortably inside idleTimeout.
+  keepAlive: 20,
   // Was eight while a snapshot cost 26 KB on the wire and a full room used
   // ~26 Mbit/s. Quantised floats plus permessage-deflate cut that to ~1.8 KB,
   // so sixteen players now cost about 3.5 Mbit/s a room: a gameplay choice
@@ -38,7 +48,7 @@ export const TANKS = Object.freeze(
 export const isTank = (id) => TANKS.some((t) => t.id === id);
 // Bumped whenever snapshots or join messages change shape, so a client can
 // tell when it is talking to a server process started from older code.
-export const PROTOCOL = 6;
+export const PROTOCOL = 7;
 export const radius = (mass) => Math.cbrt(mass) * 0.48;
 export const outweighs = (predator, prey) =>
   predator.mass > prey.mass * CONFIG.eatRatio;

@@ -87,7 +87,9 @@ function pick(entry, accept = "") {
   if (entry.gzip && /\bgzip\b/.test(accept)) return ["gzip", entry.gzip];
   return [null, entry.raw];
 }
-export function createGameServer() {
+// idleTimeout is injectable so the reaper can be tested in a second rather
+// than in a minute and a half.
+export function createGameServer({ idleTimeout = C.idleTimeout } = {}) {
   const shared = () => new World(Math.random, { lobby: true });
   // The shared games are persistent, so the picker always has something to
   // show; solo rooms are keyed by socket id and created on demand.
@@ -198,6 +200,9 @@ export function createGameServer() {
   wss.on("connection", (socket) => {
     socket.id = randomUUID();
     socket.isAlive = true;
+    // Any inbound frame counts as "someone is there"; pongs deliberately do
+    // not, since the browser answers those with the tab closed and asleep.
+    socket.seen = Date.now();
     socket.on("pong", () => (socket.isAlive = true));
     socket.on("error", () => {});
     // Long enough to browse the game list and pick one; still reaps sockets
@@ -207,6 +212,7 @@ export function createGameServer() {
     }, 120000);
     socket.send(JSON.stringify({ type: "GAMES", games: gameList() }));
     socket.on("message", (raw) => {
+      socket.seen = Date.now();
       let m;
       try {
         m = JSON.parse(raw);
@@ -214,6 +220,8 @@ export function createGameServer() {
         return;
       }
       if (!m || typeof m !== "object") return;
+      // AWAKE carries nothing: having arrived is the whole message.
+      if (m.type === "AWAKE") return;
       if (m.type === "JOIN" && !socket.room) {
         const solo = m.mode === "single";
         // Only the listed tanks are joinable by name, so a client can never
@@ -299,8 +307,13 @@ export function createGameServer() {
       for (const s of wss.clients)
         if (!s.room && s.readyState === WebSocket.OPEN) s.send(games);
     }
-    if (++tick % (C.tickRate / C.broadcastRate)) return;
+    tick++;
+    // Per room, because a lobby or a results screen needs far fewer updates
+    // than a round in progress and used to cost exactly the same.
     for (const [key, room] of rooms) {
+      const hz =
+        room.phase === "playing" ? C.broadcastRate : C.idleBroadcastRate;
+      if (tick % Math.max(1, Math.round(C.tickRate / hz))) continue;
       const state = JSON.stringify({
         ...room.snapshot(),
         events: room.events.splice(0),
@@ -314,8 +327,19 @@ export function createGameServer() {
           s.send(state);
     }
   }, 1000 / C.tickRate);
+  // Sweep often enough to catch an idle socket promptly, which at the default
+  // ninety seconds is the same fifteen-second beat as before.
+  const sweep = Math.min(15000, Math.max(250, (idleTimeout * 1000) / 3));
   const heartbeat = setInterval(() => {
+    const now = Date.now();
     for (const s of wss.clients) {
+      // A tab that stopped talking is a closed laptop or a backgrounded page.
+      // It still costs a full snapshot stream, so let it go and let the player
+      // dive back in when they return.
+      if (now - s.seen > idleTimeout * 1000) {
+        s.close(1001, "Idle");
+        continue;
+      }
       if (!s.isAlive) {
         s.terminate();
         continue;
@@ -323,7 +347,7 @@ export function createGameServer() {
       s.isAlive = false;
       s.ping();
     }
-  }, 15000);
+  }, sweep);
   server.on("close", () => {
     clearInterval(timer);
     clearInterval(heartbeat);
@@ -364,7 +388,9 @@ if (
   process.argv[1] &&
   path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
-  const { server } = createGameServer();
+  const { server } = createGameServer({
+    idleTimeout: Number(process.env.IDLE_TIMEOUT) || C.idleTimeout,
+  });
   const port = Number(process.env.PORT) || 3000;
   server.listen(port, "0.0.0.0", async () => {
     console.log(
