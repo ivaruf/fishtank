@@ -86,12 +86,17 @@ async function cacheFirst(request, cache) {
   const hit = await cache.match(request);
   const update = fetch(request)
     .then((response) => {
-      if (response.ok) cache.put(request, response.clone());
+      // Only same-origin, non-opaque responses can be stored or trusted.
+      if (response.ok && response.type !== "opaque")
+        cache.put(request, response.clone());
       return response;
     })
     .catch(() => hit);
-  // Serve what we have at once and let the refresh land for next time.
-  return hit || update;
+  // Serve what we have at once and let the refresh land for next time. If
+  // there is no hit we must await the network: returning the bare promise
+  // would hand respondWith an undefined when it rejects, which fails the
+  // request outright instead of merely missing the cache.
+  return hit || (await update) || fetch(request);
 }
 
 self.addEventListener("fetch", (event) => {
@@ -111,6 +116,10 @@ self.addEventListener("fetch", (event) => {
         isAsset(url)
           ? cacheFirst(request, cache)
           : networkFirst(request, cache),
-      ),
+      )
+      // A worker must never be the reason the game fails to load. Anything
+      // unexpected in here falls back to the plain request, which is exactly
+      // what would have happened with no worker installed at all.
+      .catch(() => fetch(request)),
   );
 });
