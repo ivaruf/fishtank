@@ -5,7 +5,11 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
-    "test": "node --test"
+    "test": "node --test",
+    "format:check": "prettier --check client shared server.js tools tests README.md docs"
+  },
+  "engines": {
+    "node": ">=22"
   },
   "dependencies": {
     "babylonjs": "^8.0.0",

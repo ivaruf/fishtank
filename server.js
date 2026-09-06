@@ -92,6 +92,26 @@ export function createGameServer() {
       const url = decodeURIComponent(
         new URL(req.url, "http://localhost").pathname,
       );
+      // A cheap liveness probe for whatever platform this runs on: it reports
+      // the live room count rather than just 200, so a wedged tick loop is
+      // visible. Not cached, and it never touches the disk.
+      if (url === "/healthz") {
+        const games = gameList();
+        res.writeHead(200, {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store",
+        });
+        res.end(
+          JSON.stringify({
+            ok: true,
+            protocol: PROTOCOL,
+            uptime: Math.round(process.uptime()),
+            players: games.reduce((n, g) => n + g.players, 0),
+            games,
+          }),
+        );
+        return;
+      }
       const rel =
         vendors[url] ||
         (url.startsWith("/shared/")
