@@ -258,8 +258,33 @@
       <h2>Turn your phone sideways</h2>
       <p>Fishtank swims in landscape only.</p>
     </div>
-    <script src="/vendor/babylon.js"></script>
-    <script src="/vendor/loaders.js"></script>
+    <!--
+      Babylon comes from jsDelivr, pinned to the exact version in package.json
+      and locked with an integrity hash: 7.9 MB the host no longer serves, and
+      a file many visitors already have cached. The bytes on the CDN are
+      byte-identical to node_modules, so the /vendor/ copy right below is an
+      exact fallback. Each guard runs before the next tag, so a CDN outage,
+      a blocked request, an SRI mismatch or plain LAN play with no internet
+      all fall back to the local copy without changing load order.
+    -->
+    <script
+      src="https://cdn.jsdelivr.net/npm/babylonjs@8.56.2/babylon.js"
+      integrity="sha384-bJ7uvrJB0MXh1qhQouRHX/NbjOQywkt/ZxeFnrMiiFYG8InDFZlQdzVpAGaMhfwZ"
+      crossorigin="anonymous"
+    ></script>
+    <script>
+      window.BABYLON ||
+        document.write('<script src="/vendor/babylon.js"><\/script>');
+    </script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/babylonjs-loaders@8.56.2/babylonjs.loaders.min.js"
+      integrity="sha384-u+jmBF3Ig/827G8UT4kF+dDbuY0uXakBSGip6BUjiZ7IHqxA44vGxcpx76wGLI3f"
+      crossorigin="anonymous"
+    ></script>
+    <script>
+      window.BABYLON?.GLTFFileLoader ||
+        document.write('<script src="/vendor/loaders.js"><\/script>');
+    </script>
     <script type="module" src="/js/main.js"></script>
   </body>
 </html>

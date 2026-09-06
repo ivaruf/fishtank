@@ -1,31 +1,38 @@
 # Network and caching worklist
 
-Created 2026-09-06, updated 2026-09-06 after shipping A1 and A2. Two separate
-problems: the live WebSocket stream during a round, and asset delivery on load.
-Every number below was measured on this repo, not estimated. Work in small
-batches; each item is independently shippable and independently verifiable.
+Created 2026-09-06, updated the same day after shipping A1, A2, B0, B1, B2 and
+B4. Two separate problems: the live WebSocket stream during a round, and asset
+delivery on load. Every number below was measured on this repo, not estimated.
+Work in small batches; each item is independently shippable and independently
+verifiable.
 
 ## Status
 
-**Part A: A1 and A2 are done.** A full 8-player tank went from 25.8 Mbit/s to
-**1.7 Mbit/s** — 93% off the wire, measured end-to-end by counting bytes read
-off a real TCP socket, not simulated. **Part B is untouched.**
+**Live stream: done.** A snapshot went from 26.2 KB to **1.8 KB on the wire**,
+measured end-to-end by counting bytes read off a real TCP socket. That paid for
+raising `maxPlayers` from 8 to 16. A3–A5 are downgraded; see below.
+
+**Asset delivery: done bar one item.** Babylon's 7.9 MB moved to a pinned,
+SRI-locked CDN with the local copy kept as a working fallback, and everything
+the host still serves is brotli-compressed from an in-memory cache and
+revalidated by content hash. **B3 (hashed immutable URLs) is all that remains**,
+and it is an optimisation rather than a fix.
 
 ## Baseline
 
 Snapshot of a full 8-player tank with 100 wild fish, `broadcastRate` 15 Hz:
 
-| What                          | Before A1/A2                                                | Now                               |
-| ----------------------------- | ----------------------------------------------------------- | --------------------------------- |
-| One snapshot, uncompressed    | 26.2 KB                                                     | 18.6 KB                           |
-| One snapshot, **on the wire** | 26.2 KB                                                     | **1.8 KB**                        |
-| Egress, one full tank (8)     | 25.8 Mbit/s                                                 | **1.7 Mbit/s**                    |
-| Egress, three full tanks (24) | 77.3 Mbit/s                                                 | **5.3 Mbit/s**                    |
-| Server CPU, 24 players        | 6% of one core                                              | 25% of one core                   |
-| WebSocket compression         | **off** (`ws` default)                                      | on, context kept between messages |
-| Cold page load                | ~14 MB                                                      | ~14 MB (Part B)                   |
-| HTTP compression              | **none**                                                    | **none** (Part B)                 |
-| HTTP revalidation             | `no-cache`, **no ETag** — every reload refetches every byte | unchanged (Part B)                |
+| What                          | Before A1/A2                                                | Now                                  |
+| ----------------------------- | ----------------------------------------------------------- | ------------------------------------ |
+| One snapshot, uncompressed    | 26.2 KB                                                     | 18.6 KB                              |
+| One snapshot, **on the wire** | 26.2 KB                                                     | **1.8 KB**                           |
+| Egress, one full tank (8)     | 25.8 Mbit/s                                                 | **1.7 Mbit/s**                       |
+| Egress, three full tanks (24) | 77.3 Mbit/s                                                 | **5.3 Mbit/s**                       |
+| Server CPU, 24 players        | 6% of one core                                              | 25% of one core                      |
+| WebSocket compression         | **off** (`ws` default)                                      | on, context kept between messages    |
+| Cold page load, host traffic  | ~14 MB                                                      | **under 1 MB** (7.9 MB on the CDN)   |
+| HTTP compression              | **none**                                                    | brotli, gzip fallback, 65–77%        |
+| HTTP revalidation             | `no-cache`, **no ETag** — every reload refetches every byte | `no-cache` + sha256 ETag, empty 304s |
 
 `node tools/measure-traffic.mjs` reproduces the field breakdown, but note it now
 measures the **post-A2** code, so its raw figure is ~18 KB rather than the 26.2
@@ -98,21 +105,26 @@ the back of these numbers. Re-measured at the new cap, a snapshot still costs
 players is 36% of one core against 11% uncompressed — sub-linear, since 24
 players cost 25%.
 
-**Part B is where the real remaining traffic is** — a cold load is still ~14 MB,
-uncompressed, refetched on every reload. That is now the largest single number
-in this document.
+**Part B is largely done too.** B0, B1, B2 and B4 shipped: Babylon's 7.9 MB
+moved to a pinned, SRI-locked CDN with the local copy kept as a working
+fallback, and everything the host still serves is brotli-compressed from an
+in-memory cache and revalidated by content hash. A cold load went from ~14 MB
+to well under 1 MB of host traffic, and a reload costs a handful of empty
+`304`s. **B3 is the only item left**, and it is an optimisation rather than a
+fix.
 
 ## Part B — asset delivery and caching
 
 The requirement is "cache hard, but always check, and invalidate on update".
 Two mechanisms, used for different files:
 
-| Done | Item                                                                                                                                                                                               | Effect                                        |
-| ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
-| [ ]  | **B1. Compress HTTP responses** (brotli, gzip fallback, honouring `Accept-Encoding`). Skip `.png` and `.m4a` — already compressed, 0% gain.                                                        | vendor 7.7 MB → 1.3 MB (**83%**); GLBs 63–76% |
-| [ ]  | **B2. Strong `ETag` from a content hash, keeping `Cache-Control: no-cache`.** This is the "always check" path: the browser revalidates every time and gets a ~200-byte `304` when nothing changed. | reload ~14 MB → a few KB                      |
-| [ ]  | **B3. Content-hashed URLs + `immutable` for the big, rarely-changing assets** (models, vendor bundles), via a manifest generated at server start.                                                  | removes the revalidation round trip entirely  |
-| [ ]  | **B4. Precompute compressed artifacts** instead of compressing per request; cache them in memory at startup, keyed by the same content hash.                                                       | avoids brotli CPU on every request            |
+| Done | Item                                                                                                                                                                                              | Effect                                    |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| [x]  | **B0. Load Babylon from a pinned CDN with a local fallback.** jsDelivr at the exact installed version, SRI-locked, with the `/vendor/` copy still wired as fallback.                              | **7.9 MB off the host entirely**          |
+| [x]  | **B1. Compress HTTP responses** (brotli quality 5, gzip fallback, honouring `Accept-Encoding`, `Vary: Accept-Encoding`). Skips `.png`/`.m4a` and anything under 1 KB.                             | HTML/CSS/JS 65–77%, GLBs 76%              |
+| [x]  | **B2. Strong `ETag` from a sha256 content hash, keeping `Cache-Control: no-cache`.** The "always check" path: the browser revalidates every time and gets an empty `304` when nothing changed.    | reload → 0-byte bodies                    |
+| [x]  | **B4. Precompressed in-memory cache**, one entry per file per process, holding the hash plus the brotli and gzip bodies. Built lazily on first request, with the entry surface warmed at startup. | brotli CPU paid once, not per request     |
+| [ ]  | **B3. Content-hashed URLs + `immutable` for the fish models**, via a manifest the client resolves through. The only remaining item: it would drop even the revalidation round trip.               | removes ~50 conditional requests per load |
 
 ### How the two cache modes divide
 

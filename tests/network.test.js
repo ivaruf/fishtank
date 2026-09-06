@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { once } from "node:events";
 import { WebSocket } from "ws";
+import { createHash } from "node:crypto";
+import { createRequire } from "node:module";
 import { createGameServer } from "../server.js";
 import { SPECIES, PROTOCOL, CONFIG as C, TANKS } from "../shared/config.js";
 function message(socket, type) {
@@ -285,6 +287,81 @@ test("snapshots are compressed on the wire", async () => {
     assert.equal(state.type, "WORLD_STATE");
     assert.ok(state.npcs.length > 0);
     s.terminate();
+  } finally {
+    await new Promise((resolve) => wss.close(resolve));
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test("assets are compressed, revalidated by content hash, and Babylon has a working fallback", async () => {
+  const { server, wss } = createGameServer();
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const base = `http://127.0.0.1:${server.address().port}`;
+  try {
+    // Brotli and gzip are both offered, and Vary keeps proxies from mixing
+    // encodings up. PNGs are already compressed, so they are served as-is.
+    const raw = await fetch(`${base}/css/style.css`, {
+      headers: { "Accept-Encoding": "identity" },
+    });
+    const br = await fetch(`${base}/css/style.css`, {
+      headers: { "Accept-Encoding": "br" },
+    });
+    assert.equal(br.headers.get("content-encoding"), "br");
+    assert.equal(br.headers.get("vary"), "Accept-Encoding");
+    assert.ok(
+      Number(br.headers.get("content-length")) <
+        Number(raw.headers.get("content-length")) / 2,
+      "brotli should at least halve the stylesheet",
+    );
+    const gz = await fetch(`${base}/js/main.js`, {
+      headers: { "Accept-Encoding": "gzip" },
+    });
+    assert.equal(gz.headers.get("content-encoding"), "gzip");
+    const png = await fetch(`${base}/assets/thumbs/clownfish.png`, {
+      headers: { "Accept-Encoding": "br" },
+    });
+    assert.equal(png.headers.get("content-encoding"), null);
+
+    // The client always revalidates, and unchanged bytes cost no body.
+    const first = await fetch(base);
+    assert.equal(first.headers.get("cache-control"), "no-cache");
+    const etag = first.headers.get("etag");
+    assert.ok(etag, "index.html should carry an ETag");
+    const again = await fetch(base, { headers: { "If-None-Match": etag } });
+    assert.equal(again.status, 304);
+    assert.equal((await again.arrayBuffer()).byteLength, 0);
+
+    // Babylon loads from a pinned CDN, but the local copy must stay wired up
+    // as a fallback for LAN play, an outage, or a blocked request.
+    const html = await first.text();
+    const version = createRequire(import.meta.url)(
+      "babylonjs/package.json",
+    ).version;
+    assert.match(
+      html,
+      new RegExp(`babylonjs@${version.replace(/\./g, "\\.")}/`),
+    );
+    assert.match(html, /\/vendor\/babylon\.js/);
+    assert.match(html, /\/vendor\/loaders\.js/);
+    assert.equal((await fetch(`${base}/vendor/babylon.js`)).status, 200);
+    assert.equal((await fetch(`${base}/vendor/loaders.js`)).status, 200);
+
+    // The integrity hash must match the bytes we would fall back to, or a
+    // Babylon upgrade could leave the CDN and the local copy out of step.
+    for (const [file, url] of [
+      ["babylonjs/babylon.js", "/vendor/babylon.js"],
+      ["babylonjs-loaders/babylonjs.loaders.min.js", "/vendor/loaders.js"],
+    ]) {
+      const bytes = new Uint8Array(
+        await (await fetch(`${base}${url}`)).arrayBuffer(),
+      );
+      const digest = createHash("sha384").update(bytes).digest("base64");
+      assert.ok(
+        html.includes(`sha384-${digest}`),
+        `${file} integrity hash in index.html does not match the served bytes`,
+      );
+    }
   } finally {
     await new Promise((resolve) => wss.close(resolve));
     await new Promise((resolve) => server.close(resolve));

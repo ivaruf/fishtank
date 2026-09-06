@@ -1,8 +1,10 @@
 import http from "node:http";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { randomUUID } from "node:crypto";
+import { randomUUID, createHash } from "node:crypto";
+import zlib from "node:zlib";
+import { promisify } from "node:util";
 import { WebSocketServer, WebSocket } from "ws";
 import { World } from "./server/game/world.js";
 import {
@@ -26,6 +28,45 @@ const vendors = {
   "/vendor/loaders.js":
     "node_modules/babylonjs-loaders/babylonjs.loaders.min.js",
 };
+// PNG and M4A are already compressed; measured 0% gain and pure CPU cost.
+const COMPRESSIBLE = new Set([".html", ".js", ".css", ".glb", ".json"]);
+const brotli = promisify(zlib.brotliCompress);
+const gzip = promisify(zlib.gzip);
+// One entry per file per process: its content hash, and the pre-compressed
+// bodies. Built on first request rather than at startup so `npm start` and the
+// tests stay instant, and so the 36 MB of fish models only cost what is asked
+// for. Brotli at quality 5 measured 83% off the vendor bundle and 63-76% off
+// the GLBs for a fraction of the CPU of the maximum setting.
+const bundle = new Map();
+async function serveFile(file) {
+  let entry = bundle.get(file);
+  if (!entry) {
+    const raw = await readFile(file);
+    const extension = path.extname(file);
+    const compress = COMPRESSIBLE.has(extension) && raw.length > 1024;
+    entry = {
+      type: mime[extension] || "application/octet-stream",
+      hash: `"${createHash("sha256").update(raw).digest("base64url").slice(0, 22)}"`,
+      raw,
+      br: compress
+        ? await brotli(raw, {
+            params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 5 },
+          })
+        : null,
+      gzip: compress ? await gzip(raw, { level: 6 }) : null,
+    };
+    bundle.set(file, entry);
+  }
+  return entry;
+}
+// The client always revalidates, and gets an empty 304 unless the bytes
+// changed. That keeps a rebuilt fish or an edited script live immediately
+// while costing a few hundred bytes instead of megabytes on a reload.
+function pick(entry, accept = "") {
+  if (entry.br && /\bbr\b/.test(accept)) return ["br", entry.br];
+  if (entry.gzip && /\bgzip\b/.test(accept)) return ["gzip", entry.gzip];
+  return [null, entry.raw];
+}
 export function createGameServer() {
   const shared = () => new World(Math.random, { lobby: true });
   // The shared games are persistent, so the picker always has something to
@@ -68,13 +109,26 @@ export function createGameServer() {
         res.writeHead(403).end();
         return;
       }
-      const data = await readFile(file);
-      res.writeHead(200, {
-        "Content-Type": mime[path.extname(file)] || "application/octet-stream",
+      const entry = await serveFile(file);
+      const headers = {
+        "Content-Type": entry.type,
         "X-Content-Type-Options": "nosniff",
+        // Always revalidate, so a rebuilt asset is picked up at once; the
+        // ETag is a content hash, so unchanged bytes cost a 304 and no body.
         "Cache-Control": "no-cache",
-      });
-      res.end(data);
+        ETag: entry.hash,
+        // Different bytes per Accept-Encoding: proxies must not mix them up.
+        Vary: "Accept-Encoding",
+      };
+      if (req.headers["if-none-match"] === entry.hash) {
+        res.writeHead(304, headers).end();
+        return;
+      }
+      const [encoding, body] = pick(entry, req.headers["accept-encoding"]);
+      if (encoding) headers["Content-Encoding"] = encoding;
+      headers["Content-Length"] = body.length;
+      res.writeHead(200, headers);
+      res.end(req.method === "HEAD" ? undefined : body);
     } catch {
       res.writeHead(404).end("Not found");
     }
@@ -234,15 +288,49 @@ export function createGameServer() {
   });
   return { server, wss, rooms };
 }
+// Compress and hash the entry surface up front so the first visitor does not
+// pay for it. Deliberately not the fish models: those are per-quality-tier and
+// 36 MB in total, so they stay lazy and only the tier someone asks for is ever
+// built. Called from the CLI path only, to keep createGameServer() instant for
+// the tests.
+export async function warmBundle() {
+  const entry = [
+    "client/index.html",
+    "client/css/style.css",
+    "shared/config.js",
+    "shared/movement.js",
+    ...(await readdir(path.join(root, "client/js"))).map(
+      (f) => `client/js/${f}`,
+    ),
+  ];
+  const warmed = await Promise.all(
+    entry.map(async (rel) => {
+      try {
+        const e = await serveFile(path.resolve(root, rel));
+        return (e.br ?? e.raw).length;
+      } catch {
+        return 0; // A file that no longer exists simply stays uncached.
+      }
+    }),
+  );
+  return {
+    files: warmed.filter(Boolean).length,
+    bytes: warmed.reduce((a, b) => a + b, 0),
+  };
+}
 if (
   process.argv[1] &&
   path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
   const { server } = createGameServer();
   const port = Number(process.env.PORT) || 3000;
-  server.listen(port, "0.0.0.0", () =>
+  server.listen(port, "0.0.0.0", async () => {
     console.log(
       `Fishtank swimming at http://localhost:${port} — LAN: http://<your-local-ip>:${port}`,
-    ),
-  );
+    );
+    const { files, bytes } = await warmBundle();
+    console.log(
+      `Cached ${files} client files, ${(bytes / 1024).toFixed(0)} KB compressed. Babylon loads from jsDelivr with a /vendor/ fallback.`,
+    );
+  });
 }
