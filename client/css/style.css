@@ -418,6 +418,88 @@ header,
 #next-round {
   margin-top: 18px;
 }
+.games {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 430px;
+  max-width: 92vw;
+  max-height: 90dvh;
+  overflow-y: auto;
+  padding: 26px 30px;
+  z-index: 2;
+}
+.games h2 {
+  font-size: 28px;
+  letter-spacing: -1px;
+  margin: 10px 0 18px;
+}
+.games ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+/* Each game is one button: the whole row is the target. */
+.game {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 13px 15px;
+  text-align: left;
+  background: #153e40a8;
+  border: 1px solid #5b827a;
+  color: #edf8ef;
+  font-size: 13px;
+  font-weight: 500;
+}
+.game:not(:disabled):hover {
+  border-color: #d1ed9e;
+  filter: none;
+}
+.game:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.game .name {
+  flex: 1;
+  white-space: nowrap;
+}
+.game .status {
+  flex: none;
+  font-size: 9px;
+  letter-spacing: 1.6px;
+  color: #9bb5ae;
+  white-space: nowrap;
+}
+.game .status.live {
+  color: #d1ed9e;
+}
+/* Eight pips, one per seat, so occupancy reads without counting. */
+.game .seats {
+  display: flex;
+  gap: 3px;
+  flex: none;
+}
+.game .seats i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ffffff26;
+}
+.game .seats i.taken {
+  background: #d1ed9e;
+}
+.games-hint {
+  font-size: 11px;
+  line-height: 1.6;
+  margin: 16px 0 0;
+  color: #9bb5ae;
+}
 .lobby {
   position: absolute;
   top: 50%;
@@ -1287,5 +1369,15 @@ select:focus-visible {
   }
   .panel .error {
     grid-row: 5;
+  }
+}
+
+/* Mobile puts the preview on the left, where the desktop text scrim was
+   darkening it. Keep a lighter scrim here so the fish's colors read clearly. */
+@media (pointer: coarse) {
+  body:not(.playing) .vignette {
+    background:
+      linear-gradient(90deg, rgba(1, 25, 30, 0.18), transparent 75%),
+      linear-gradient(0deg, rgba(1, 25, 30, 0.3), transparent 25%);
   }
 }

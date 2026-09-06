@@ -21,11 +21,23 @@ export const CONFIG = Object.freeze({
   spawnProtection: 3,
   tickRate: 30,
   broadcastRate: 15,
+  // Eight is where one room's egress (every client gets the whole ~25 KB
+  // snapshot at broadcastRate) reaches ~26 Mbit/s, about all a home upstream
+  // has. Server CPU is nowhere near the limit; bandwidth is.
   maxPlayers: 8,
 });
+// Separate shared games, each its own World. Three of them cap the host at
+// 24 players (~78 Mbit/s worst case) and keep the game list scannable.
+export const TANKS = Object.freeze(
+  Array.from({ length: 3 }, (_, i) => {
+    const number = String(i + 1).padStart(3, "0");
+    return Object.freeze({ id: `tank-${i + 1}`, name: `Aquarium ${number}` });
+  }),
+);
+export const isTank = (id) => TANKS.some((t) => t.id === id);
 // Bumped whenever snapshots or join messages change shape, so a client can
 // tell when it is talking to a server process started from older code.
-export const PROTOCOL = 4;
+export const PROTOCOL = 5;
 export const radius = (mass) => Math.cbrt(mass) * 0.48;
 export const outweighs = (predator, prey) =>
   predator.mass > prey.mass * CONFIG.eatRatio;

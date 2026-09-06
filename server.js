@@ -5,7 +5,13 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { WebSocketServer, WebSocket } from "ws";
 import { World } from "./server/game/world.js";
-import { CONFIG as C, SPECIES, PROTOCOL } from "./shared/config.js";
+import {
+  CONFIG as C,
+  SPECIES,
+  PROTOCOL,
+  TANKS,
+  isTank,
+} from "./shared/config.js";
 const root = path.dirname(fileURLToPath(import.meta.url));
 const mime = {
   ".html": "text/html",
@@ -22,7 +28,24 @@ const vendors = {
 };
 export function createGameServer() {
   const shared = () => new World(Math.random, { lobby: true });
-  const rooms = new Map([["multiplayer", shared()]]);
+  // The shared games are persistent, so the picker always has something to
+  // show; solo rooms are keyed by socket id and created on demand.
+  const rooms = new Map(TANKS.map((t) => [t.id, shared()]));
+  const gameList = () =>
+    TANKS.map((t) => {
+      const room = rooms.get(t.id);
+      return {
+        id: t.id,
+        name: t.name,
+        players: room.players.size,
+        capacity: C.maxPlayers,
+        phase: room.phase,
+        round: room.round,
+        remaining: room.phase === "playing" ? Math.ceil(room.remaining) : 0,
+      };
+    });
+  const openTank = () =>
+    TANKS.find((t) => rooms.get(t.id).players.size < C.maxPlayers)?.id;
   const server = http.createServer(async (req, res) => {
     try {
       const url = decodeURIComponent(
@@ -62,9 +85,12 @@ export function createGameServer() {
     socket.isAlive = true;
     socket.on("pong", () => (socket.isAlive = true));
     socket.on("error", () => {});
+    // Long enough to browse the game list and pick one; still reaps sockets
+    // that connect and never join.
     const joinTimeout = setTimeout(() => {
       if (!socket.room) socket.close(1008, "Join required");
-    }, 10000);
+    }, 120000);
+    socket.send(JSON.stringify({ type: "GAMES", games: gameList() }));
     socket.on("message", (raw) => {
       let m;
       try {
@@ -74,15 +100,31 @@ export function createGameServer() {
       }
       if (!m || typeof m !== "object") return;
       if (m.type === "JOIN" && !socket.room) {
-        const key = m.mode === "single" ? socket.id : "multiplayer";
-        if (!rooms.has(key)) rooms.set(key, new World());
+        const solo = m.mode === "single";
+        // Only the listed tanks are joinable by name, so a client can never
+        // address someone else's solo room by guessing its socket id.
+        const key = solo
+          ? socket.id
+          : typeof m.room === "string" && m.room
+            ? m.room
+            : openTank();
+        if (!solo && !isTank(key)) {
+          socket.send(
+            JSON.stringify({
+              type: "ERROR",
+              message: "That game is no longer available. Pick another tank.",
+            }),
+          );
+          return;
+        }
+        if (solo && !rooms.has(key)) rooms.set(key, new World());
         // (Solo rooms are keyed by socket id and play immediately.)
         const room = rooms.get(key);
         if (room.players.size >= C.maxPlayers) {
           socket.send(
             JSON.stringify({
               type: "ERROR",
-              message: "This tank is full. Try again shortly.",
+              message: "That tank is full. Pick another game.",
             }),
           );
           return;
@@ -101,6 +143,10 @@ export function createGameServer() {
             type: "WELCOME",
             id: socket.id,
             protocol: PROTOCOL,
+            room: solo ? null : key,
+            roomName: solo
+              ? null
+              : (TANKS.find((t) => t.id === key)?.name ?? key),
           }),
         );
       }
@@ -121,15 +167,23 @@ export function createGameServer() {
       clearTimeout(joinTimeout);
       const room = rooms.get(socket.room);
       room?.removePlayer(socket.id);
-      if (socket.room && socket.room !== "multiplayer")
-        rooms.delete(socket.room);
-      if (socket.room === "multiplayer" && !room.players.size)
-        rooms.set("multiplayer", shared());
+      if (!socket.room) return;
+      // Solo rooms go away with their player; a shared tank that empties out
+      // resets to a fresh lobby so the next group starts clean.
+      if (!isTank(socket.room)) rooms.delete(socket.room);
+      else if (room && !room.players.size) rooms.set(socket.room, shared());
     });
   });
   let tick = 0;
   const timer = setInterval(() => {
     for (const room of rooms.values()) room.tick(1 / C.tickRate);
+    // Twice a second, refresh anyone still choosing a game. The list is a few
+    // hundred bytes, so this costs far less than a single world snapshot.
+    if (tick % (C.tickRate / 2) === 0) {
+      const games = JSON.stringify({ type: "GAMES", games: gameList() });
+      for (const s of wss.clients)
+        if (!s.room && s.readyState === WebSocket.OPEN) s.send(games);
+    }
     if (++tick % (C.tickRate / C.broadcastRate)) return;
     for (const [key, room] of rooms) {
       const state = JSON.stringify({

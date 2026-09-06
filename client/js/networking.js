@@ -1,21 +1,33 @@
+// The socket opens before the player has picked a game: the server greets it
+// with a GAMES list and keeps it refreshed until a JOIN arrives.
 export function connect({
-  name,
-  mode,
-  species,
+  onGames,
   onWelcome,
   onState,
   onError,
   onClose,
+  join,
 }) {
   const socket = new WebSocket(
     `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`,
   );
-  socket.addEventListener("open", () =>
-    socket.send(JSON.stringify({ type: "JOIN", name, mode, species })),
-  );
+  let queued = join ?? null;
+  const post = (message) => {
+    if (socket.readyState === WebSocket.OPEN)
+      socket.send(JSON.stringify(message));
+    else return false;
+    return true;
+  };
+  socket.addEventListener("open", () => {
+    if (queued) {
+      post({ type: "JOIN", ...queued });
+      queued = null;
+    }
+  });
   socket.addEventListener("message", (e) => {
     const m = JSON.parse(e.data);
-    if (m.type === "WELCOME") onWelcome(m.id, m.protocol);
+    if (m.type === "GAMES") onGames?.(m.games);
+    if (m.type === "WELCOME") onWelcome(m.id, m.protocol, m.roomName);
     if (m.type === "WORLD_STATE") onState(m);
     if (m.type === "ERROR") onError(m.message);
   });
@@ -24,14 +36,16 @@ export function connect({
     onError("Could not reach the aquarium. Check that the server is running."),
   );
   return {
+    // Send JOIN now, or as soon as the socket finishes opening.
+    join(payload) {
+      if (!post({ type: "JOIN", ...payload })) queued = payload;
+    },
     send(input) {
-      if (socket.readyState === WebSocket.OPEN)
-        socket.send(JSON.stringify({ type: "INPUT", ...input }));
+      post({ type: "INPUT", ...input });
     },
     // Small requests such as NEXT_ROUND, READY {ready}, SETTINGS {duration}, START.
     request(type, payload = {}) {
-      if (socket.readyState === WebSocket.OPEN)
-        socket.send(JSON.stringify({ type, ...payload }));
+      post({ type, ...payload });
     },
     close() {
       socket.close();

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { once } from "node:events";
 import { WebSocket } from "ws";
 import { createGameServer } from "../server.js";
-import { SPECIES, PROTOCOL } from "../shared/config.js";
+import { SPECIES, PROTOCOL, CONFIG as C, TANKS } from "../shared/config.js";
 function message(socket, type) {
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
@@ -151,6 +151,105 @@ test("HTTP, two clients, input authority, solo isolation and reconnect", async (
     assert.equal(playing.phase, "playing");
     assert.ok(playing.remaining > 175 && playing.remaining <= 180);
     assert.ok(playing.players.every((p) => p.alive));
+  } finally {
+    for (const s of clients) s.terminate();
+    await new Promise((resolve) => wss.close(resolve));
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test("several games run at once, each chosen by name and capped at maxPlayers", async () => {
+  const { server, wss } = createGameServer();
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const base = `ws://127.0.0.1:${server.address().port}/ws`,
+    clients = [];
+  // Opens a socket and returns it once the server has offered the game list.
+  async function browse() {
+    const s = new WebSocket(base);
+    clients.push(s);
+    await once(s, "open");
+    const games = message(s, "GAMES");
+    return { socket: s, games: (await games).games };
+  }
+  async function join(socket, room, name = "Test fish") {
+    const welcome = message(socket, "WELCOME");
+    socket.send(
+      JSON.stringify({ type: "JOIN", name, mode: "multiplayer", room }),
+    );
+    const greeting = await welcome;
+    socket.playerId = greeting.id;
+    return greeting;
+  }
+  try {
+    // Every tank is advertised before joining, so a player can choose.
+    const first = await browse();
+    assert.deepEqual(
+      first.games.map((g) => g.id),
+      TANKS.map((t) => t.id),
+    );
+    assert.ok(first.games.every((g) => g.capacity === C.maxPlayers));
+    assert.ok(first.games.every((g) => g.players === 0));
+    assert.ok(first.games.every((g) => g.phase === "lobby"));
+
+    // Two players who pick different tanks play separate games.
+    const one = await browse();
+    const greeting = await join(one.socket, TANKS[0].id);
+    assert.equal(greeting.roomName, TANKS[0].name);
+    assert.equal(greeting.protocol, PROTOCOL);
+    const two = await browse();
+    await join(two.socket, TANKS[1].id);
+    assert.equal((await message(one.socket, "WORLD_STATE")).players.length, 1);
+    assert.equal((await message(two.socket, "WORLD_STATE")).players.length, 1);
+
+    // A browsing socket sees the occupancy change without rejoining.
+    const watcher = await browse();
+    const live = await message(watcher.socket, "GAMES");
+    assert.equal(live.games.find((g) => g.id === TANKS[0].id).players, 1);
+    assert.equal(live.games.find((g) => g.id === TANKS[2].id).players, 0);
+
+    // Omitting the room quick-joins the first tank with space.
+    const quick = await browse();
+    assert.equal((await join(quick.socket, undefined)).room, TANKS[0].id);
+
+    // A tank refuses a ninth fish and says so instead of silently seating it.
+    const full = TANKS[2].id;
+    for (let i = 0; i < C.maxPlayers; i++) {
+      const s = await browse();
+      await join(s.socket, full, `Fish ${i}`);
+    }
+    const rejected = await browse();
+    const error = message(rejected.socket, "ERROR");
+    rejected.socket.send(
+      JSON.stringify({
+        type: "JOIN",
+        name: "Ninth",
+        mode: "multiplayer",
+        room: full,
+      }),
+    );
+    assert.match((await error).message, /full/i);
+
+    // Unknown rooms are refused, so a solo room can never be joined by id.
+    const soloSocket = await browse();
+    const soloWelcome = message(soloSocket.socket, "WELCOME");
+    soloSocket.socket.send(JSON.stringify({ type: "JOIN", mode: "single" }));
+    const soloId = (await soloWelcome).id;
+    const intruder = await browse();
+    const denied = message(intruder.socket, "ERROR");
+    intruder.socket.send(
+      JSON.stringify({
+        type: "JOIN",
+        name: "Sneak",
+        mode: "multiplayer",
+        room: soloId,
+      }),
+    );
+    assert.match((await denied).message, /no longer available/i);
+    assert.equal(
+      (await message(soloSocket.socket, "WORLD_STATE")).players.length,
+      1,
+    );
   } finally {
     for (const s of clients) s.terminate();
     await new Promise((resolve) => wss.close(resolve));

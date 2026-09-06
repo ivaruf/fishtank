@@ -210,7 +210,12 @@ const previewLight = new B.HemisphericLight(
   B.Vector3.Up(),
   scene,
 );
-previewLight.intensity = 1.5;
+const mobilePreview = matchMedia("(pointer: coarse)");
+const syncPreviewLight = () => {
+  previewLight.intensity = mobilePreview.matches ? 2.1 : 1.5;
+};
+mobilePreview.addEventListener("change", syncPreviewLight);
+syncPreviewLight();
 previewLight.diffuse = new B.Color3(1, 0.96, 0.88);
 previewLight.groundColor = new B.Color3(0.48, 0.65, 0.7);
 previewLight.specular = new B.Color3(0.25, 0.25, 0.25);
@@ -358,6 +363,7 @@ function leave(message = "") {
   clearFish();
   $("menu").hidden = false;
   $("hud").hidden = true;
+  $("games").hidden = true;
   $("lobby").hidden = true;
   $("overlay").hidden = true;
   $("touch").hidden = true;
@@ -365,21 +371,22 @@ function leave(message = "") {
   $("connection").textContent = "";
   audio.music("menu");
 }
-function join(mode) {
+// mode "single" plays immediately; "multiplayer" needs a tank, either the one
+// the player picked or, with room omitted, whichever the server has space in.
+function join(mode, room) {
   if (joining || network) return;
   joining = true;
   $("error").textContent = "Connecting…";
   const connection = connect({
-    name: $("name").value,
-    mode,
-    species: chosenSpecies,
-    onWelcome(id, protocol) {
+    join: { name: $("name").value, mode, species: chosenSpecies, room },
+    onWelcome(id, protocol, roomName) {
       myId = id;
       joining = false;
       document.body.classList.add("playing");
       $("game").focus();
       clearFish();
       $("menu").hidden = true;
+      $("games").hidden = true;
       $("hud").hidden = false;
       $("error").textContent = "";
       touchMode = matchMedia("(pointer:coarse)").matches;
@@ -387,7 +394,9 @@ function join(mode) {
       controls.setTouchMode(touchMode);
       audio.music("game");
       $("connection").textContent =
-        mode === "single" ? "● SOLO AQUARIUM" : "● LAN MULTIPLAYER";
+        mode === "single"
+          ? "● SOLO AQUARIUM"
+          : `● ${(roomName ?? "shared tank").toUpperCase()}`;
       if (protocol !== PROTOCOL) {
         console.warn(
           `Server speaks protocol ${protocol}, this client expects ${PROTOCOL}. Restart the server (npm start).`,
@@ -480,12 +489,99 @@ function join(mode) {
   });
   network = connection;
 }
+// Browsing keeps its own connection open purely to receive the GAMES list; it
+// is dropped the moment the player picks a tank, backs out, or dives in.
+let browser = null;
+function closeBrowser() {
+  browser?.close();
+  browser = null;
+  $("games").hidden = true;
+}
+function renderGames(games) {
+  $("games-hint").textContent = games.some((g) => g.players < g.capacity)
+    ? "Games in progress accept new fish mid-round."
+    : "Every tank is full right now. One will free up when a round ends.";
+  $("games-list").replaceChildren(
+    ...games.map((g) => {
+      const full = g.players >= g.capacity,
+        item = document.createElement("li"),
+        button = document.createElement("button");
+      button.type = "button";
+      button.className = "game secondary";
+      button.disabled = full;
+      const name = document.createElement("span");
+      name.className = "name";
+      name.textContent = g.name;
+      const seats = document.createElement("span");
+      seats.className = "seats";
+      seats.append(
+        ...Array.from({ length: g.capacity }, (_, i) => {
+          const pip = document.createElement("i");
+          if (i < g.players) pip.className = "taken";
+          return pip;
+        }),
+      );
+      const status = document.createElement("span");
+      status.className = "status";
+      if (full) status.textContent = "FULL";
+      else if (g.phase === "playing") {
+        status.classList.add("live");
+        const m = Math.floor(g.remaining / 60),
+          s = String(g.remaining % 60).padStart(2, "0");
+        status.textContent = `ROUND ${g.round} · ${m}:${s}`;
+      } else if (g.phase === "results") status.textContent = "RESULTS";
+      else
+        status.textContent = g.players
+          ? `IN LOBBY · ${g.players}/${g.capacity}`
+          : "EMPTY";
+      button.append(name, seats, status);
+      button.onclick = () => {
+        audio.play("click");
+        closeBrowser();
+        join("multiplayer", g.id);
+      };
+      item.append(button);
+      return item;
+    }),
+  );
+}
+function browseGames() {
+  if (browser || network) return;
+  $("games").hidden = false;
+  $("games-list").replaceChildren();
+  $("games-hint").textContent = "Looking for games…";
+  browser = connect({
+    onGames: renderGames,
+    onWelcome() {},
+    onState() {},
+    onError(message) {
+      $("error").textContent = message;
+    },
+    onClose() {
+      // Only surface a dropped browse; a deliberate close already cleaned up.
+      if (browser) {
+        closeBrowser();
+        $("error").textContent = "Lost the game list. Try again.";
+      }
+    },
+  });
+}
 $("solo").onclick = () => {
   audio.play("click");
+  closeBrowser();
   join("single");
 };
 $("multi").onclick = () => {
   audio.play("click");
+  browseGames();
+};
+$("games-back").onclick = () => {
+  audio.play("click");
+  closeBrowser();
+};
+$("quick-join").onclick = () => {
+  audio.play("click");
+  closeBrowser();
   join("multiplayer");
 };
 $("leave").onclick = openGameMenu;
