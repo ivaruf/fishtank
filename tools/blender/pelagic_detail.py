@@ -421,15 +421,14 @@ def shark(b, root, tier, palette):
     rays = b.mat('Shark fin sheen', (.44, .53, .61), .32)
     pale = b.mat('Shark underside', (.80, .85, .87), .44)
     steel = b.mat('Shark steel', (.16, .22, .29), .42)
-    # Blunt snout with an underslung jaw, so the grin reads as a mouth rather than a scratch.
-    b.sphere('Snout', (0, .035, .80), (.245, .20, .255), slate, root)
-    b.sphere('Nose tip', (0, -.02, .92), (.135, .105, .14), slate, root)
-    b.sphere('Jaw', (0, -.195, .85), (.185, .055, .16), cream, root)
-    # The grin wraps the flank corners up toward the eyes, so it still reads from above.
+    # One upper snout; the body's existing underside is the lower jaw.
+    # A separate pale jaw sphere reads as an underbite at three-quarter angles.
+    b.sphere('Snout', (0, .025, .79), (.235, .17, .31), slate, root)
+    # Recess the mouth behind the nose and project it onto the body surface.
     def grin(t, d=0.):
-        z = .74 + .21 * (1 - t * t); a = -math.pi / 2 + t * 1.15
+        z = .67 + .20 * (1 - t * t); a = -math.pi / 2 + t * 1.05
         r = math.sqrt(max(.004, 1 - (z / 1.08) ** 2))
-        return ((.34 * r + .009) * math.cos(a), (.40 * r + .009) * math.sin(a) - d, z)
+        return ((.34 * r + .005) * math.cos(a), (.40 * r + .005) * math.sin(a) - d, z)
     b.line('Grin', [grin(-1 + k / 5) for k in range(11)], dark, root, .015)
     for side in (-1, 1):
         for i in range(5):
@@ -446,7 +445,7 @@ def shark(b, root, tier, palette):
                     p = shark_shell(side, .23 - row * .115, .38 - c * .185 + (row % 2) * .09, .004)
                     b.line('Denticle', [p, (p[0], p[1] - .010, p[2] - .05)], steel, root, .0035)
     if tier == 3:
-        for i in range(11): b.sphere('Tooth', grin(-.90 + i * .18, .034), (.015, .021, .013), cream, root, *b.LEVEL['tiny'])
+        for i in range(11): b.sphere('Tooth', grin(-.80 + i * .16, .006), (.010, .008, .008), cream, root, *b.LEVEL['tiny'])
     sheet(b, 'Dorsal', [(0, .34, .30), (.02, .60, .14), (.035, .90, -.20), (.03, 1.00, -.36), (0, .84, -.40), (-.01, .54, -.30), (0, .34, -.22)], slate, dark, root, .026)
     sheet(b, 'Second dorsal', [(0, .19, -.68), (.015, .34, -.82), (.02, .42, -.94), (0, .30, -.96), (0, .16, -.90)], slate, dark, root, .018)
     sheet(b, 'Anal', [(0, -.20, -.72), (0, -.34, -.86), (0, -.40, -.98), (0, -.26, -.98), (0, -.16, -.90)], slate, dark, root, .016)

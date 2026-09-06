@@ -39,7 +39,7 @@ const NOSE = {
   angelfish: 0.8,
   goldfish: 0.88,
   betta: 0.98,
-  shark: 1.02,
+  shark: 0.89,
   butterflyfish: 1.04,
   lionfish: 0.97,
   wrasse: 1.11,
@@ -187,7 +187,12 @@ export function createFish(scene, species, npc = false, color = 0) {
     scene,
   );
   mouth.parent = pose;
-  const mouthY = model && species === "seahorse" ? 0.61 : -0.08;
+  const mouthY =
+    model && species === "seahorse"
+      ? 0.61
+      : model && species === "shark"
+        ? -0.24
+        : -0.08;
   mouth.position.set(0, mouthY, (model ? (NOSE[species] ?? 1) : 1.2) - 0.02);
   mouth.scaling.set(0.34, 0.02, 0.16);
   mouth.material = shared(maws, scene, () => {

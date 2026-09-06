@@ -6,18 +6,29 @@
       name="viewport"
       content="width=device-width,initial-scale=1,viewport-fit=cover"
     />
-    <title>Fishtank — A little fish. A big adventure.</title>
+    <title>Fishtank — Welcome to the foodchain</title>
     <link rel="stylesheet" href="/css/style.css" />
   </head>
   <body>
     <canvas id="game" tabindex="0" aria-label="3D aquarium"></canvas>
     <div class="vignette"></div>
     <header>
-      <a class="brand" href="/"
-        >◈ fishtank<span>A SMALL WORLD, BELOW THE SURFACE</span></a
-      >
+      <a class="brand" href="/">
+        <!-- The mark is the game: a big fish closing on a smaller one. -->
+        <svg class="mark" viewBox="-2 0 58 34" aria-hidden="true">
+          <g class="prey" transform="translate(36.4 9.18) scale(.46)">
+            <path d="M6 17 0 9 2.5 17 0 25Z" />
+            <path d="M4 17Q19 4 34 17 19 30 4 17Z" />
+            <circle class="pupil" cx="27" cy="14.5" r="2" />
+          </g>
+          <path d="M6 17 0 9 2.5 17 0 25Z" />
+          <path d="M4 17Q19 4 34 17 19 30 4 17Z" />
+          <circle class="pupil" cx="27" cy="14.5" r="2" />
+        </svg>
+        <span class="wordmark">fishtank</span>
+      </a>
       <div class="header-tools">
-        <div class="connection" id="connection">● YOUR NEXT ADVENTURE</div>
+        <div class="connection" id="connection"></div>
         <div class="display-controls">
           <label class="resolution-label"
             ><span>Quality</span>
@@ -54,20 +65,15 @@
       </div>
     </header>
     <main id="menu" class="panel">
-      <div class="eyebrow">WELCOME TO THE FOOD CHAIN</div>
-      <h1>Small fish.<br />Big <em>possibilities.</em></h1>
-      <p>
-        Find your fins in a living little ocean.<br />Eat, grow, and try not to
-        become lunch.
-      </p>
-      <label for="name">WHAT SHOULD WE CALL YOU?</label
+      <h1>Welcome to the<br /><em>foodchain.</em></h1>
+      <label class="sr-only" for="name">Your name</label
       ><input
         id="name"
         maxlength="18"
         placeholder="Little fish"
         autocomplete="nickname"
       />
-      <div class="group-label" id="species-label">PICK YOUR FISH</div>
+      <div class="group-label sr-only" id="species-label">Pick your fish</div>
       <div class="species-strip">
         <button
           class="species-nav"
@@ -98,7 +104,6 @@
           Play with friends <span>→</span>
         </button>
       </div>
-      <div class="hint">ONE AQUARIUM · UP TO 8 FRIENDS · TWO MINUTE ROUNDS</div>
       <p class="error" id="error" role="alert"></p>
     </main>
     <section id="hud" hidden>
@@ -157,7 +162,6 @@
         <span class="divider">/</span> Mouse to aim · Click to capture · Esc to
         release
       </div>
-      <span>THE AQUARIUM · 001</span>
     </footer>
     <div id="touch" hidden>
       <div id="move-zone" class="touch-zone steer-zone" aria-label="Steer">

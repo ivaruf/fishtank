@@ -37,19 +37,32 @@ header {
   pointer-events: none;
 }
 .brand {
-  font-size: 29px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  font-size: 30px;
   font-weight: 800;
-  letter-spacing: -1px;
+  letter-spacing: -1.4px;
   color: inherit;
   text-decoration: none;
   pointer-events: auto;
 }
-.brand span {
-  display: block;
-  font-size: 8px;
-  letter-spacing: 2.4px;
-  margin-top: 7px;
-  font-weight: 400;
+.brand .mark {
+  width: 58px;
+  height: 34px;
+  flex: none;
+  fill: #d1ed9e;
+  /* The chase reads as motion even standing still. */
+  filter: drop-shadow(0 2px 5px #00000055);
+}
+.brand .mark .prey {
+  fill: #7fa89c;
+}
+.brand .mark .pupil {
+  fill: #0d2b2a;
+}
+.brand:hover .mark {
+  fill: #e6ffb8;
 }
 .connection {
   font-size: 10px;
@@ -71,14 +84,15 @@ header {
   font-weight: bold;
 }
 h1 {
-  font-size: clamp(48px, 5.8vw, 83px);
-  line-height: 1.02;
-  letter-spacing: -4px;
-  margin: 24px 0;
+  font-size: clamp(44px, 5.4vw, 76px);
+  line-height: 0.95;
+  letter-spacing: -3.6px;
+  font-weight: 800;
+  margin: 0 0 34px;
+  text-shadow: 0 3px 22px #01191ea8;
 }
 h1 em {
-  font-family: Georgia, serif;
-  font-weight: normal;
+  font-style: normal;
   color: #d1ed9e;
 }
 p {
@@ -95,6 +109,20 @@ label,
 }
 .group-label {
   margin-top: 22px;
+}
+/* Labels the layout no longer shows but assistive tech still needs. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.species-strip {
+  margin-top: 16px;
 }
 .species {
   display: flex;
@@ -195,12 +223,6 @@ button span {
   background: #224c4bb3;
   border: 1px solid #60837a;
   color: #edf8ef;
-}
-.hint {
-  font-size: 8px;
-  letter-spacing: 1.35px;
-  margin-top: 20px;
-  color: #9bb5ae;
 }
 .error {
   color: #ffd2a4;
@@ -643,9 +665,11 @@ select {
   }
   .brand {
     font-size: 25px;
+    gap: 8px;
   }
-  .brand span {
-    font-size: 6px;
+  .brand .mark {
+    width: 43px;
+    height: 31px;
   }
   .panel {
     left: 7%;
@@ -655,16 +679,10 @@ select {
   h1 {
     letter-spacing: -2px;
   }
-  .panel p {
-    font-size: 13px;
-  }
   footer {
     left: 22px;
     right: 22px;
     font-size: 8px;
-  }
-  footer > span {
-    display: none;
   }
   .stats {
     top: 85px;
@@ -698,9 +716,6 @@ select {
   }
   .buttons button span {
     margin-left: 5px;
-  }
-  .hint {
-    font-size: 7px;
   }
 }
 @media (pointer: coarse) {
@@ -759,9 +774,11 @@ select {
   }
   .brand {
     font-size: 23px;
+    gap: 7px;
   }
-  .brand span {
-    display: none;
+  .brand .mark {
+    width: 38px;
+    height: 27px;
   }
   .header-tools {
     gap: 6px;
@@ -782,46 +799,29 @@ select {
     grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
     column-gap: 20px;
   }
-  .panel .eyebrow {
-    grid-column: 1;
-    margin-top: 10px;
-  }
+  /* Copy on the left, form on the right; the labels are screen-reader only, so
+     they take no grid rows. */
   .panel h1 {
     grid-column: 1;
-    grid-row: 2 / span 4;
+    grid-row: 1 / span 4;
     font-size: 40px;
-    margin: 12px 0;
+    margin: 6px 0 0;
     letter-spacing: -2px;
-  }
-  .panel > p:not(.error) {
-    grid-column: 1;
-    grid-row: 6;
-    margin: 0;
-    font-size: 11px;
-  }
-  .panel > label {
-    grid-column: 2;
-    grid-row: 1;
-    margin: 8px 0 6px;
   }
   .panel > input {
     grid-column: 2;
-    grid-row: 2;
+    grid-row: 1;
     padding: 9px 12px;
     font-size: 14px;
-  }
-  .panel .group-label {
-    grid-column: 2;
-    grid-row: 3;
-    margin: 8px 0 4px;
   }
   /* One-row carousel: swipe or tap the arrows; the fish never stack up. */
   .panel .species-strip {
     grid-column: 2;
-    grid-row: 4;
+    grid-row: 2;
     display: flex;
     align-items: center;
     gap: 4px;
+    margin-top: 6px;
   }
   .panel .species {
     flex: 1 1 0;
@@ -862,7 +862,7 @@ select {
   }
   .panel .buttons {
     grid-column: 2;
-    grid-row: 5;
+    grid-row: 3;
     margin-top: 8px;
   }
   .panel .buttons button {
@@ -871,15 +871,9 @@ select {
   .panel .buttons button span {
     display: none;
   }
-  .panel .hint {
-    grid-column: 2;
-    grid-row: 6;
-    font-size: 7px;
-    margin-top: 8px;
-  }
   .panel .error {
     grid-column: 2;
-    grid-row: 7;
+    grid-row: 4;
     margin: 4px 0 0;
   }
 }

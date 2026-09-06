@@ -269,7 +269,7 @@ function leave(message = "") {
   $("overlay").hidden = true;
   $("touch").hidden = true;
   $("error").textContent = message;
-  $("connection").textContent = "● YOUR NEXT ADVENTURE";
+  $("connection").textContent = "";
   audio.music("menu");
 }
 function join(mode) {
