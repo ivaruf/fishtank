@@ -1,7 +1,7 @@
 import { setupFullscreen } from "./fullscreen.js";
 import { createAquarium } from "./world.js";
 import { createFish, loadFishModels } from "./fish.js";
-import { modelDetail } from "./rendering.js";
+import { modelDetail, reliefStep } from "./rendering.js";
 import { createPuffs, createSparks, createStream } from "./effects.js";
 import { createFilter } from "./filter.js";
 import { createAudio } from "./audio.js";
@@ -890,12 +890,29 @@ portrait.addEventListener("change", () => {
   );
   requestAnimationFrame(() => engine.resize());
 });
+// Adaptive resolution, checked a couple of times a second on Babylon's own
+// smoothed frame rate. Slow devices quietly draw fewer pixels instead of
+// asking anyone to find the quality menu, and ease back when they can.
+let reliefAt = 0,
+  relief = 1;
+function adaptResolution(now) {
+  if (now - reliefAt < 2000) return;
+  reliefAt = now;
+  const next = reliefStep(relief, engine.getFps());
+  if (next !== relief && aquarium.setRelief(next)) {
+    console.info(
+      `Adaptive resolution: ${engine.getFps().toFixed(0)} fps, drawing at 1/${next.toFixed(2)} scale.`,
+    );
+    relief = next;
+  }
+}
 engine.runRenderLoop(() => {
   if (portrait.matches) return;
   const dt = Math.min(engine.getDeltaTime() / 1000, 0.05);
   time += dt;
   aquarium.animate(dt);
   const now = performance.now();
+  adaptResolution(now);
   const me = state?.players.find((p) => p.id === myId);
   if (touchMode) controls.assist(me?.alive ? biteAssist(me) : null);
   const input = controls.read(dt, follow.yaw);

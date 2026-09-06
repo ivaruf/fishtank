@@ -18,9 +18,11 @@ export function createAquarium(canvas) {
     stencil: true,
   });
   const resolution = document.getElementById("resolution");
+  // Multiplied into the chosen tier's scaling by the adaptive loop in main.js.
+  let relief = 1;
   const resize = () => {
     engine.setHardwareScalingLevel(
-      hardwareScaling(resolution.value, window.devicePixelRatio),
+      hardwareScaling(resolution.value, window.devicePixelRatio) * relief,
     );
     engine.resize();
   };
@@ -365,6 +367,14 @@ function buildKelp(scene, rnd) {
     };
   });
   return {
+    // Adaptive resolution relief, 1 being the chosen tier's own resolution.
+    // Returns whether it actually changed, so the caller can log a real step.
+    setRelief(value) {
+      if (value === relief) return false;
+      relief = value;
+      resize();
+      return true;
+    },
     animate(time) {
       for (const { merged, rest, live, meta } of forests) {
         for (let v = 0, m = 0; v < rest.length; v += 3, m += 3) {

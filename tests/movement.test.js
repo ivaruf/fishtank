@@ -1,7 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { movementVector, parseInput } from "../shared/movement.js";
-import { hardwareScaling, modelDetail } from "../client/js/rendering.js";
+import {
+  hardwareScaling,
+  modelDetail,
+  reliefStep,
+  RELIEF,
+} from "../client/js/rendering.js";
 
 test("camera-relative diagonals do not exceed speed and analogue magnitude survives", () => {
   for (const yaw of [0, 1, 2, 3])
@@ -47,4 +52,35 @@ test("high-DPI screens render above CSS resolution with bounded quality choices"
   assert.equal(modelDetail("sharp"), "high");
   assert.equal(modelDetail("balanced"), "standard");
   assert.equal(modelDetail("battery"), "low");
+});
+
+// Adaptive resolution must converge, not oscillate: a frame rate parked inside
+// the dead band has to leave the relief factor exactly where it is.
+test("adaptive resolution steps down when slow, recovers when fast, and holds in between", () => {
+  // Nothing measured yet: never guess.
+  assert.equal(reliefStep(1, 0), 1);
+  assert.equal(reliefStep(1, undefined), 1);
+
+  // Slow frames give up pixels, down to a floor.
+  assert.ok(reliefStep(1, 25) > 1, "a slow device draws fewer pixels");
+  let relief = 1;
+  for (let i = 0; i < 50; i++) relief = reliefStep(relief, 20);
+  assert.equal(relief, RELIEF.MAX, "relief stops at its floor");
+
+  // Fast frames hand the pixels back, no further than the tier itself.
+  for (let i = 0; i < 50; i++) relief = reliefStep(relief, 60);
+  assert.equal(relief, 1, "never sharper than the chosen tier");
+
+  // Anything inside the dead band is left alone, so it cannot hunt.
+  for (const fps of [RELIEF.LOW, 48, RELIEF.HIGH]) {
+    assert.equal(reliefStep(1.45, fps), 1.45, `holds steady at ${fps} fps`);
+  }
+  // A rate that would sit between two steps still settles rather than cycling.
+  let seen = new Set();
+  relief = 1;
+  for (let i = 0; i < 40; i++) {
+    relief = reliefStep(relief, relief > 1.2 ? 58 : 30);
+    seen.add(relief);
+  }
+  assert.ok(seen.size <= 4, `settles into a small range, saw ${[...seen]}`);
 });
