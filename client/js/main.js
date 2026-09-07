@@ -10,6 +10,7 @@ import { connect, AWAY } from "./networking.js";
 import { playLocally } from "./local.js";
 import { hostGame, joinGame, createHostEngine } from "./peer.js";
 import { hostRendezvous, joinRendezvous } from "./rendezvous.js";
+import { BUILD } from "./build.js";
 import {
   CONFIG as C,
   SPECIES,
@@ -164,11 +165,33 @@ const serverProbe = ask("healthz")
   .catch(() => ask("version.json"));
 serverProbe
   .then(({ version, started, protocol }) => {
-    $("version").textContent = `build ${version}`;
+    // `version` is the build being served; BUILD is the build this page is
+    // made of. When they disagree, something between the two — the HTTP cache
+    // or an installed service worker — is still handing out old code, and
+    // reporting the served number would be a straight lie: it is the case the
+    // line exists to catch.
+    const stale = BUILD !== "dev" && version !== BUILD;
+    $("version").textContent = stale
+      ? `build ${BUILD} · TAP FOR THE NEW ONE`
+      : `build ${version}`;
+    $("version").classList.toggle("stale", stale);
     const when = new Date(started);
-    $("version").title =
-      `Build ${version}, protocol ${protocol}, running since ` +
-      (isNaN(when) ? started : when.toLocaleString());
+    $("version").title = stale
+      ? `This page is running build ${BUILD}, but build ${version} is deployed. Tap to reload.`
+      : `Build ${version}, protocol ${protocol}, running since ` +
+        (isNaN(when) ? started : when.toLocaleString());
+    if (stale)
+      $("version").onclick = () =>
+        // Drop the worker's copy too, and wait for it: a reload that overtakes
+        // the deletions just serves the same files back. Best effort either
+        // way — the reload happens however the cleanup goes.
+        Promise.resolve()
+          .then(() => caches?.keys())
+          .then((all) =>
+            Promise.all((all ?? []).map((key) => caches.delete(key))),
+          )
+          .catch(() => {})
+          .finally(() => location.reload());
   })
   .catch(() => {
     // Say it is unknown rather than show a stale or invented version.
@@ -696,12 +719,29 @@ let signalling = null;
 // HUD both show it, because a host who cannot find their own code again has
 // nothing to invite anyone with.
 let invite = null;
+// A host that falls asleep stops answering its own code, so ask the device to
+// stay awake while it is hosting. Best effort by design: not every browser has
+// this, and the game must not care if the request is refused.
+let wakeLock = null;
+async function keepAwake() {
+  try {
+    wakeLock = (await navigator.wakeLock?.request("screen")) ?? null;
+  } catch {
+    /* Denied or unsupported: the lobby still warns if the code drops. */
+  }
+}
 function stopSignalling() {
   try {
     signalling?.close();
   } catch {
     /* Already gone. */
   }
+  try {
+    wakeLock?.release();
+  } catch {
+    /* Already released. */
+  }
+  wakeLock = null;
   signalling = null;
   invite = null;
 }
@@ -738,7 +778,20 @@ $("host-peer").onclick = async () => {
     signalling = await hostRendezvous(code, (id, channel) =>
       host.accept(id, channel),
     );
-    invite = { code, mode: signalling.mode, detail: signalling.detail };
+    invite = {
+      code,
+      mode: signalling.mode,
+      detail: signalling.detail,
+      note: "",
+    };
+    // Holding a code is not the same as still holding it: the rendezvous tells
+    // us when it drops, so the lobby can stop claiming the code works.
+    signalling.watch?.(({ note }) => {
+      if (!invite) return;
+      invite.note = note;
+      if (state) updateUI();
+    });
+    keepAwake();
     peerNote(
       signalling.mode === "tabs"
         ? `Code ${code}, but this only reaches other tabs here: ${signalling.detail}`
@@ -746,7 +799,7 @@ $("host-peer").onclick = async () => {
     );
     if (state) updateUI();
   } catch (error) {
-    invite = { code, mode: "failed", detail: error.message };
+    invite = { code, mode: "failed", detail: error.message, note: "" };
     peerNote(error.message);
     if (state) updateUI();
   }

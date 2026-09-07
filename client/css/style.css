@@ -286,6 +286,15 @@ button span {
   color: #7f9c94;
   white-space: nowrap;
 }
+/* Running old code while a new build is deployed. Worth interrupting for:
+   until it is reloaded, nothing you were told was fixed is fixed. */
+.version.stale {
+  color: #183c33;
+  background: #d1ed9e;
+  border-radius: 999px;
+  padding: 3px 9px;
+  cursor: pointer;
+}
 .key {
   display: inline-block;
   border: 1px solid #6e8a80;

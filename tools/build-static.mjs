@@ -62,6 +62,32 @@ for (const [name, from] of [
 ])
   await cp(path.join(root, from), path.join(out, "client/vendor", name));
 
+// Stamp the build into the code itself, so the page can tell which build it is
+// *running* rather than only which one is deployed. Both stamps are exact
+// string swaps against a committed placeholder: no templating, and the files
+// stay valid and runnable straight out of the repo.
+for (const [file, from, to] of [
+  [
+    "client/js/build.js",
+    `export const BUILD = "dev";`,
+    `export const BUILD = "${version}";`,
+  ],
+  // The cache name is what retires old entries, so tying it to the build means
+  // a deploy invalidates the precache instead of outliving it.
+  [
+    "client/sw.js",
+    `const CACHE = "fishtank-dev";`,
+    `const CACHE = "fishtank-${version}";`,
+  ],
+]) {
+  const target = path.join(out, file);
+  const source = await readFile(target, "utf8");
+  if (!source.includes(from))
+    throw new Error(
+      `${file} no longer contains ${from} to stamp the build into`,
+    );
+  await writeFile(target, source.replace(from, to));
+}
 // Stands in for /healthz, which a static host cannot answer, so the menu can
 // still show which build it is running.
 await writeFile(

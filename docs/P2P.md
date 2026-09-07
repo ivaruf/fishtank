@@ -141,6 +141,17 @@ A public broker is a real trade, and worth stating plainly:
 - Its id space is shared with every other PeerJS app, so codes are namespaced
   `fishtank-v1-` and six characters long, and a taken code is reported rather
   than silently failing.
+- **It drops a peer whose heartbeat stops, and releases the id with it.** This
+  one cost real debugging: hosting worked, and the same code minutes later was
+  "no tank found" on the friend's device. Measured — freeze the host page for
+  90 seconds, which is what a screen lock or an app switch does, and the code
+  is gone, with the host's own page still showing an open lobby. So the host
+  reclaims its id on `disconnected`, on a five-second beat, and on returning
+  to visibility (the event alone is not enough: it can fire while the page is
+  frozen, where the reconnect cannot get out). The lobby reports reachability
+  rather than assuming it, the hosting device asks for a wake lock, and the
+  guest's "no tank found" now mentions a sleeping host as a cause. Same test
+  now passes across 90 frozen seconds.
 
 The relay path is still there and still tested: a real data-channel-only
 offer framed to 849 bytes, inside the socket's 2 KB payload guard, with

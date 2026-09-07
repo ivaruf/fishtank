@@ -106,10 +106,61 @@ export async function hostRendezvous(code, onPeer) {
         onPeer(connection.peer, wrapConnection(connection)),
       ),
     );
+    // Holding the code is not a one-off. The broker drops any peer whose
+    // heartbeat stops and releases its id with it, and a locked screen or a
+    // switched-to app is enough to stop the heartbeat. Nothing tells the host:
+    // the page still looks like an open tank while the code has quietly
+    // stopped resolving, which is exactly what a friend's "no tank found" is.
+    // Measured: 90 seconds frozen was plenty to lose it.
+    //
+    // So reclaim the id whenever we notice it is gone. The event alone is not
+    // enough — it can fire while the page is frozen, where the reconnect
+    // cannot get out — so a slow beat and the return to visibility both look
+    // again. reconnect() asks for the same id back, so the code survives.
+    let watchers = new Set();
+    let health = { reachable: true, note: "" };
+    const report = (reachable, note) => {
+      health = { reachable, note };
+      for (const watcher of watchers) watcher(health);
+    };
+    const revive = () => {
+      if (peer.destroyed || !peer.disconnected) return;
+      report(false, "Reopening the tank — the code may not work just now.");
+      try {
+        peer.reconnect();
+      } catch {
+        /* The next beat tries again. */
+      }
+    };
+    peer.on("disconnected", revive);
+    // Emitted again each time reconnect() succeeds, so this is the all-clear.
+    peer.on("open", () => report(true, ""));
+    peer.on("error", (error) =>
+      report(
+        false,
+        error.type === "unavailable-id"
+          ? "Something else took this code. Host again for a fresh one."
+          : `Matchmaking trouble (${error.type}).`,
+      ),
+    );
+    const beat = setInterval(revive, 5000);
+    document.addEventListener("visibilitychange", revive);
     return {
       mode: "broker",
       detail: "no server needed",
-      close: () => peer.destroy(),
+      // Lets the lobby say whether the code is actually live, rather than
+      // assume it stayed live because it once was.
+      watch(fn) {
+        watchers.add(fn);
+        fn(health);
+        return () => watchers.delete(fn);
+      },
+      close: () => {
+        clearInterval(beat);
+        document.removeEventListener("visibilitychange", revive);
+        watchers = new Set();
+        peer.destroy();
+      },
     };
   } catch (error) {
     // Offline or blocked: still useful for two tabs on this device, and the
@@ -145,12 +196,15 @@ export async function joinRendezvous(code) {
   const connection = peer.connect(brokerId(code), { reliable: true });
   await new Promise((resolve, reject) => {
     connection.on("open", resolve);
-    // peer-unavailable is the ordinary case of a mistyped or finished game.
+    // peer-unavailable is a mistyped code, a finished game — or a host whose
+    // screen went to sleep, which drops it off the broker. Worth saying,
+    // because from here the three are indistinguishable and only one of them
+    // is the player's own fault.
     peer.on("error", (error) =>
       reject(
         new Error(
           error.type === "peer-unavailable"
-            ? `No tank found with code ${code}.`
+            ? `No tank found with code ${code}. Check the code, and that your friend still has the lobby open with their screen awake.`
             : `Could not reach the tank (${error.type}).`,
         ),
       ),

@@ -13,14 +13,17 @@
 //                     serving them instantly and refreshing behind the scenes
 //                     costs one stale load after a rebuild and nothing else.
 //
-// Bump CACHE whenever this file changes: the name is what retires old entries.
-const CACHE = "fishtank-v1";
+// The name is what retires old entries, so it carries the build:
+// tools/build-static.mjs rewrites this line when it publishes. A fixed name
+// meant a deploy could not evict anything this worker had already precached.
+const CACHE = "fishtank-dev";
 // Enough to boot the menu and start a solo game with no network at all.
 const SHELL = [
   "./",
   "index.html",
   "css/style.css",
   "js/main.js",
+  "js/build.js",
   "js/local.js",
   "js/peer.js",
   "js/webrtc.js",
@@ -69,9 +72,28 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+// "Network first" is only as fresh as the network it asks. GitHub Pages sends
+// `max-age=600` with no revalidation, so a plain fetch can be answered from the
+// browser's own HTTP cache with ten-minute-old code and look like a hit — which
+// is how a phone kept running a build that had already been replaced. Asking
+// for a revalidation makes it a conditional request instead: a 304 costs
+// nothing and cannot be stale.
+function revalidating(request) {
+  try {
+    return new Request(request, { cache: "no-cache" });
+  } catch {
+    // A navigation request cannot be reconstructed. Its own document is the
+    // cheapest thing here to be stale about, and the code it pulls in is
+    // covered above.
+    return request;
+  }
+}
+
 async function networkFirst(request, cache) {
   try {
-    const response = await fetch(request);
+    const response = await fetch(revalidating(request));
+    // Store under the original request, or the cache key carries the
+    // revalidation mode and later lookups miss.
     if (response.ok) cache.put(request, response.clone());
     return response;
   } catch (error) {
