@@ -103,6 +103,18 @@ export function createAquarium(canvas) {
     scene,
     camera,
     glow,
+    // Adaptive resolution relief, 1 being the chosen tier's own resolution.
+    // Returns whether it actually changed, so the caller can log a real step.
+    // Must live here, beside `relief` and `resize`: it was briefly attached to
+    // the kelp builder's object instead, which has its own animate() and so
+    // looked plausible, and nothing noticed until a device slow enough to call
+    // it turned up.
+    setRelief(value) {
+      if (value === relief) return false;
+      relief = value;
+      resize();
+      return true;
+    },
     animate(dt) {
       time += dt;
       for (const b of bubbles) {
@@ -367,14 +379,6 @@ function buildKelp(scene, rnd) {
     };
   });
   return {
-    // Adaptive resolution relief, 1 being the chosen tier's own resolution.
-    // Returns whether it actually changed, so the caller can log a real step.
-    setRelief(value) {
-      if (value === relief) return false;
-      relief = value;
-      resize();
-      return true;
-    },
     animate(time) {
       for (const { merged, rest, live, meta } of forests) {
         for (let v = 0, m = 0; v < rest.length; v += 3, m += 3) {

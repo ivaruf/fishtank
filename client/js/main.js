@@ -933,6 +933,15 @@ portrait.addEventListener("change", () => {
 // asking anyone to find the quality menu, and ease back when they can.
 let reliefAt = 0,
   relief = 1;
+// Checked at startup rather than the first time frames dip. This contract was
+// broken for several commits - setRelief went onto the kelp builder's object,
+// which also has an animate() - and no test or fast machine ever reached the
+// call, so only an older iPad found it. A missing method is now a loud failure
+// on every load instead of a crash that needs slow hardware to reproduce.
+if (typeof aquarium.setRelief !== "function")
+  throw new TypeError(
+    "createAquarium must expose setRelief() for adaptive resolution",
+  );
 function adaptResolution(now) {
   if (now - reliefAt < 2000) return;
   reliefAt = now;
