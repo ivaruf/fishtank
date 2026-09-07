@@ -23,7 +23,7 @@ const fromDisk = (scene) => (species, detail) =>
   BABYLON.LoadAssetContainerAsync(
     new Uint8Array(
       readFileSync(
-        new URL(`../client${modelUrl(species, detail)}`, import.meta.url),
+        new URL(`../client/${modelUrl(species, detail)}`, import.meta.url),
       ),
     ),
     scene,

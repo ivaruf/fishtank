@@ -86,7 +86,7 @@ export const modelUrl = (species, detail = "standard") => {
       : DETAILED_SPECIES.has(species) && ["low", "high"].includes(detail)
         ? `-${detail}`
         : "";
-  return `/assets/models/${species}${suffix}.glb`;
+  return `assets/models/${species}${suffix}.glb`;
 };
 export async function loadFishModels(
   scene,

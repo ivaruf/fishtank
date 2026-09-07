@@ -17,24 +17,24 @@
 const CACHE = "fishtank-v1";
 // Enough to boot the menu and start a solo game with no network at all.
 const SHELL = [
-  "/",
-  "/index.html",
-  "/css/style.css",
-  "/js/main.js",
-  "/js/local.js",
-  "/js/networking.js",
-  "/js/world.js",
-  "/js/fish.js",
-  "/js/controls.js",
-  "/js/effects.js",
-  "/js/filter.js",
-  "/js/audio.js",
-  "/js/rendering.js",
-  "/js/fullscreen.js",
-  "/shared/config.js",
-  "/shared/movement.js",
-  "/shared/world.js",
-  "/manifest.webmanifest",
+  "./",
+  "index.html",
+  "css/style.css",
+  "js/main.js",
+  "js/local.js",
+  "js/networking.js",
+  "js/world.js",
+  "js/fish.js",
+  "js/controls.js",
+  "js/effects.js",
+  "js/filter.js",
+  "js/audio.js",
+  "js/rendering.js",
+  "js/fullscreen.js",
+  "../shared/config.js",
+  "../shared/movement.js",
+  "../shared/world.js",
+  "manifest.webmanifest",
 ];
 // Big, rarely-changing things: models, sounds, thumbnails, icons, and the
 // Babylon bundles whether they come from the CDN or the /vendor/ fallback.
@@ -75,7 +75,7 @@ async function networkFirst(request, cache) {
     if (hit) return hit;
     // A navigation with nothing cached still deserves the menu, not a crash.
     if (request.mode === "navigate") {
-      const shell = await cache.match("/index.html");
+      const shell = await cache.match("index.html");
       if (shell) return shell;
     }
     throw error;
@@ -105,9 +105,12 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   // Never cache the live build report or anything that is not http(s):
   // /healthz is how the menu proves which build is running.
-  if (url.pathname === "/healthz" || !url.protocol.startsWith("http")) return;
+  // Suffix, not equality: under a project Pages site everything lives beneath
+  // /<repo>/, so these are not at the origin root.
+  if (url.pathname.endsWith("/healthz") || !url.protocol.startsWith("http"))
+    return;
   // WebSockets do not pass through here, but be explicit about intent.
-  if (url.pathname === "/ws") return;
+  if (url.pathname.endsWith("/ws")) return;
   if (url.origin !== self.location.origin && !isAsset(url)) return;
   event.respondWith(
     caches

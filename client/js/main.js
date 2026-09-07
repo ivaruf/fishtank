@@ -19,7 +19,7 @@ import {
   speciesLabel,
   outweighs,
   FILTER,
-} from "/shared/config.js";
+} from "../../shared/config.js";
 const B = window.BABYLON,
   $ = (id) => document.getElementById(id);
 // The quality choice survives reloads; restore it before the engine reads it.
@@ -141,14 +141,20 @@ let network = null,
 if ("serviceWorker" in navigator && window.isSecureContext)
   window.addEventListener("load", () =>
     navigator.serviceWorker
-      .register("/sw.js")
+      .register("sw.js")
       .catch((error) => console.info("Offline support unavailable:", error)),
   );
 // Which build is serving us, shown on the menu so a deploy can be confirmed
 // without guessing. Read from the server rather than baked into the page: it
 // is the server that gets replaced, and /healthz is never cached.
-fetch("/healthz", { cache: "no-store" })
-  .then((r) => (r.ok ? r.json() : Promise.reject(new Error(r.status))))
+// Relative, so it works under a project Pages subpath too. A static host has
+// no /healthz, so fall back to a version.json the deploy writes.
+const ask = (url) =>
+  fetch(url, { cache: "no-store" }).then((r) =>
+    r.ok ? r.json() : Promise.reject(new Error(r.status)),
+  );
+ask("healthz")
+  .catch(() => ask("version.json"))
   .then(({ version, started, protocol }) => {
     $("version").textContent = `build ${version}`;
     const when = new Date(started);
@@ -234,7 +240,7 @@ $("species").replaceChildren(
       }
     });
     const thumb = document.createElement("img");
-    thumb.src = `/assets/thumbs/${species}.png`;
+    thumb.src = `assets/thumbs/${species}.png`;
     thumb.alt = "";
     thumb.width = 58;
     thumb.height = 48;

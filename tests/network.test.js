@@ -342,8 +342,10 @@ test("assets are compressed, revalidated by content hash, and Babylon has a work
       html,
       new RegExp(`babylonjs@${version.replace(/\./g, "\\.")}/`),
     );
-    assert.match(html, /\/vendor\/babylon\.js/);
-    assert.match(html, /\/vendor\/loaders\.js/);
+    // Relative now, so the same page works at a domain root and under a
+    // GitHub Pages project subpath.
+    assert.match(html, /vendor\/babylon\.js/);
+    assert.match(html, /vendor\/loaders\.js/);
     assert.equal((await fetch(`${base}/vendor/babylon.js`)).status, 200);
     assert.equal((await fetch(`${base}/vendor/loaders.js`)).status, 200);
 
@@ -489,7 +491,10 @@ test("the app is installable and its offline shell is complete", async () => {
     assert.equal(res.status, 200);
     assert.equal(res.headers.get("content-type"), "application/manifest+json");
     const manifest = await res.json();
-    assert.equal(manifest.start_url, "/");
+    // Relative, so an install under a GitHub Pages project subpath scopes to
+    // the app rather than to the domain root.
+    assert.equal(manifest.start_url, ".");
+    assert.equal(manifest.scope, "./");
     assert.equal(manifest.display, "standalone");
     // Landscape-only is a real constraint of the game, not a preference.
     assert.equal(manifest.orientation, "landscape");
@@ -499,7 +504,9 @@ test("the app is installable and its offline shell is complete", async () => {
     );
     // Every icon the manifest promises has to exist, or install silently fails.
     for (const icon of manifest.icons) {
-      const hit = await fetch(`${base}${icon.src}`);
+      const hit = await fetch(
+        new URL(icon.src, `${base}/manifest.webmanifest`),
+      );
       assert.equal(hit.status, 200, `${icon.src} is missing`);
       assert.equal(hit.headers.get("content-type"), "image/png");
     }
@@ -511,6 +518,9 @@ test("the app is installable and its offline shell is complete", async () => {
       (await fetch(`${base}/assets/icons/apple-touch-icon.png`)).status,
       200,
     );
+    // The static build must ship the Babylon fallback too, since Pages has no
+    // node_modules to serve it from.
+    assert.match(html, /vendor\/babylon\.js/);
 
     // The worker itself must be served, and from the root so its scope covers
     // the whole game.
@@ -524,14 +534,16 @@ test("the app is installable and its offline shell is complete", async () => {
     // precisely because they are excluded from caching.
     const list = source.match(/const SHELL = \[([\s\S]*?)\];/);
     assert.ok(list, "could not find the precache list");
-    const shell = [...list[1].matchAll(/"([^"]+)"/g)]
-      .map((m) => m[1])
-      .filter((p) => p !== "/");
-    for (const path of shell)
-      assert.equal((await fetch(`${base}${path}`)).status, 200, `${path} 404s`);
+    // Entries are relative to the worker's own URL, exactly as the browser
+    // resolves them, which is what lets the app live under a subpath.
+    const shell = [...list[1].matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+    for (const entry of shell) {
+      const url = new URL(entry, `${base}/sw.js`);
+      assert.equal((await fetch(url)).status, 200, `${entry} 404s at ${url}`);
+    }
     // Solo has to be in the shell, or an offline launch cannot start a game.
-    assert.ok(shell.includes("/js/local.js"));
-    assert.ok(shell.includes("/shared/world.js"));
+    assert.ok(shell.includes("js/local.js"));
+    assert.ok(shell.includes("../shared/world.js"));
   } finally {
     await new Promise((resolve) => wss.close(resolve));
     await new Promise((resolve) => server.close(resolve));

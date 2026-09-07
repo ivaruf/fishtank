@@ -17,7 +17,7 @@ const EFFECTS = [
   "buzz",
   "zap",
 ];
-export function createAudio({ base = "/assets/audio/" } = {}) {
+export function createAudio({ base = "assets/audio/" } = {}) {
   let context = null,
     master,
     musicBus,

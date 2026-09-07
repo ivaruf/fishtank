@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "test": "node --test",
-    "format:check": "prettier --check client shared server.js tools tests README.md docs"
+    "format:check": "prettier --check client shared server.js tools tests README.md docs",
+    "build:static": "node tools/build-static.mjs"
   },
   "engines": {
     "node": ">=22"

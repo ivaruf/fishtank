@@ -3,3 +3,4 @@ node_modules/
 *.log
 *.blend1
 __pycache__/
+_site/

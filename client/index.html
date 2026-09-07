@@ -7,7 +7,7 @@
       content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover"
     />
     <title>Fishtank — Welcome to the foodchain</title>
-    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="manifest" href="manifest.webmanifest" />
     <meta name="theme-color" content="#052b32" />
     <meta name="mobile-web-app-capable" content="yes" />
     <!-- iOS still reads its own prefixed pair for a home-screen launch. -->
@@ -17,9 +17,9 @@
       name="apple-mobile-web-app-status-bar-style"
       content="black-translucent"
     />
-    <link rel="icon" href="/assets/icons/favicon-32.png" sizes="32x32" />
-    <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
-    <link rel="stylesheet" href="/css/style.css" />
+    <link rel="icon" href="assets/icons/favicon-32.png" sizes="32x32" />
+    <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png" />
+    <link rel="stylesheet" href="css/style.css" />
   </head>
   <body>
     <div id="crash" hidden></div>
@@ -71,7 +71,7 @@
     <canvas id="game" tabindex="0" aria-label="3D aquarium"></canvas>
     <div class="vignette"></div>
     <header>
-      <a class="brand" href="/">
+      <a class="brand" href="./">
         <svg class="mark" viewBox="0 0 48 48" aria-hidden="true">
           <path class="mark-ring" d="M36 8A20 20 0 1 0 43 25" />
           <path
@@ -342,7 +342,7 @@
     ></script>
     <script>
       window.BABYLON ||
-        document.write('<script src="/vendor/babylon.js"><\/script>');
+        document.write('<script src="vendor/babylon.js"><\/script>');
     </script>
     <script
       src="https://cdn.jsdelivr.net/npm/babylonjs-loaders@8.56.2/babylonjs.loaders.min.js"
@@ -351,8 +351,8 @@
     ></script>
     <script>
       window.BABYLON?.GLTFFileLoader ||
-        document.write('<script src="/vendor/loaders.js"><\/script>');
+        document.write('<script src="vendor/loaders.js"><\/script>');
     </script>
-    <script type="module" src="/js/main.js"></script>
+    <script type="module" src="js/main.js"></script>
   </body>
 </html>
