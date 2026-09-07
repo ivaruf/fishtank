@@ -24,6 +24,7 @@ const SHELL = [
   "js/local.js",
   "js/peer.js",
   "js/webrtc.js",
+  "js/rendezvous.js",
   "js/host-worker.js",
   "js/networking.js",
   "js/world.js",

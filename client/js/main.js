@@ -9,7 +9,7 @@ import { createControls } from "./controls.js";
 import { connect, AWAY } from "./networking.js";
 import { playLocally } from "./local.js";
 import { hostGame, joinGame, createHostEngine } from "./peer.js";
-import { chooseSignalling, hostOverWebRTC, joinOverWebRTC } from "./webrtc.js";
+import { hostRendezvous, joinRendezvous } from "./rendezvous.js";
 import {
   CONFIG as C,
   SPECIES,
@@ -682,7 +682,7 @@ function stopSignalling() {
 // no characters that look like each other.
 const newCode = () =>
   Array.from(
-    { length: 4 },
+    { length: 6 },
     () => "BCDFGHJKLMNPQRSTVWXZ23456789"[Math.floor(Math.random() * 28)],
   ).join("");
 function peerNote(text) {
@@ -692,13 +692,7 @@ $("host-peer").onclick = async () => {
   audio.play("click");
   if (network || joining) return;
   const code = newCode();
-  const chosen = chooseSignalling(code);
-  signalling = chosen.signalling;
-  peerNote(
-    chosen.mode === "relay"
-      ? `Your code is ${code}. Tell a friend, and keep this tab in front — the tank runs here.`
-      : `Your code is ${code}. No relay is set, so this only reaches other tabs on this device.`,
-  );
+  peerNote(`Setting up ${code}…`);
   const host = hostGame({
     // In a worker, so looking at another tab does not freeze everyone else.
     engine: createHostEngine,
@@ -706,8 +700,19 @@ $("host-peer").onclick = async () => {
     ...handlers(() => host, "peer"),
     onPeers: (n) => peerNote(`Code ${code} · ${n} fish in the tank`),
   });
-  hostOverWebRTC(signalling, (id, channel) => host.accept(id, channel));
   network = host;
+  try {
+    signalling = await hostRendezvous(code, (id, channel) =>
+      host.accept(id, channel),
+    );
+    peerNote(
+      signalling.mode === "tabs"
+        ? `Code ${code}, but this only reaches other tabs here: ${signalling.detail}`
+        : `Code ${code} · tell a friend (${signalling.detail})`,
+    );
+  } catch (error) {
+    peerNote(error.message);
+  }
 };
 $("join-peer").onclick = async () => {
   audio.play("click");
@@ -716,15 +721,14 @@ $("join-peer").onclick = async () => {
   if (!code) return peerNote("Enter the code your friend gave you.");
   joining = true;
   peerNote(`Looking for ${code}…`);
-  const chosen = chooseSignalling(code);
-  signalling = chosen.signalling;
   try {
-    const channel = await joinOverWebRTC(signalling);
+    const found = await joinRendezvous(code);
+    signalling = found;
     joining = false;
     peerNote(`Playing in ${code}. The tank runs on your friend's device.`);
     const guest = joinGame({
       join: { name: $("name").value, species: chosenSpecies },
-      channel,
+      channel: found.channel,
       ...handlers(() => guest, "peer"),
     });
     network = guest;

@@ -113,27 +113,56 @@ was still registered from `/sw.js`, so it never installed.
 
 `.github/workflows/pages.yml` builds and deploys on pushes to this branch.
 
-## Signalling
+## Signalling, with nothing of ours running
 
-The server that already exists relays it: only OFFER, ANSWER and ICE, only
-between sockets in the same signalling room, so it cannot become a general
-message bus. A socket that only signals never joins a game room, holds no
-seat, and costs a few hundred bytes. Once peers connect it is not involved
-again. `chooseSignalling` picks a relay when one is configured (a
-`meta[name="signal-url"]`) or same-origin, and otherwise falls back to
-`BroadcastChannel`, telling the player plainly that this only reaches other
-tabs — so a failed cross-device attempt is not a mystery.
+Two browsers cannot exchange WebRTC offers without a rendezvous, and that is
+the only part a static site cannot do alone. Pointing it at our own Node
+server was the obvious answer and the wrong one: on a free tier it sleeps, so
+multiplayer would only work when somebody had already woken it.
 
-A real data-channel-only offer framed to 849 bytes, comfortably inside the
-socket's 2 KB payload guard, with candidates trickling separately.
+`client/js/rendezvous.js` tries three, in order:
 
-**For Pages, this needs pointing somewhere.** Add
-`<meta name="signal-url" content="wss://<the-render-host>/ws">` to
-`client/index.html`, or the static build falls back to same-tab only.
+- **relay** — an explicit `meta[name="signal-url"]`, for running your own.
+- **broker** — PeerJS's public broker. Nothing of ours runs, which is the
+  point. Verified end to end with the Node server stopped entirely: a host
+  minted a code, a guest on another tab found it through the broker, and both
+  played.
+- **tabs** — `BroadcastChannel`, which reaches other tabs in this browser and
+  nothing else. A last resort, and the UI says so rather than looking broken.
+
+A public broker is a real trade, and worth stating plainly:
+
+- It is a third party with no promises. If it is down, no _new_ games can be
+  started; games already connected are unaffected, because it carries no game
+  traffic.
+- It sees room codes and connection metadata. It never sees game data.
+- It provides no TURN, so a minority of network situations - roughly the
+  usual tenth - will fail to connect at all, with no fallback.
+- Its id space is shared with every other PeerJS app, so codes are namespaced
+  `fishtank-v1-` and six characters long, and a taken code is reported rather
+  than silently failing.
+
+The relay path is still there and still tested: a real data-channel-only
+offer framed to 849 bytes, inside the socket's 2 KB payload guard, with
+candidates trickling separately.
 
 ## What is left
 
-Item 5, the binary snapshot codec. Nothing else from the work order.
+Item 5, the binary snapshot codec: 17.2 KB a frame is 6.3 Mbit/s of host
+upload at three peers, against a measured 1.4 KB packed.
+
+Beyond the work order, the things that are genuinely hard rather than merely
+undone:
+
+- **No TURN.** Some pairs of networks will not connect, and there is no free
+  way around it. A relay costs bandwidth by the gigabyte, which is what this
+  whole exercise was avoiding.
+- **The host must stay on the page.** The worker keeps the simulation running
+  in a background tab, but a closed tab or a locked phone still ends the game
+  for everyone. Host migration would need a full state handoff and fresh
+  signalling between guests, who only hold connections to the host.
+- **Same-network play still needs the internet** to shake hands, even for two
+  devices on the same wifi. There is no browser-only way around that.
 
 ## Cheating
 
