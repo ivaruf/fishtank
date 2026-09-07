@@ -41,6 +41,22 @@ canvas {
   outline: none;
   touch-action: none;
 }
+/* Only ever visible when startup has already failed, so it can afford to be
+   loud and to sit above everything. */
+#crash {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  padding: 10px 14px;
+  background: #58150f;
+  color: #ffd2a4;
+  font-size: 12px;
+  line-height: 1.5;
+  font-family: ui-monospace, Menlo, monospace;
+  word-break: break-word;
+}
 .vignette {
   position: fixed;
   inset: 0;

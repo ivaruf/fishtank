@@ -22,6 +22,52 @@
     <link rel="stylesheet" href="/css/style.css" />
   </head>
   <body>
+    <div id="crash" hidden></div>
+    <script>
+      // A tablet has no console. A script error that lands mid-startup leaves
+      // the HTML UI looking perfectly fine while the canvas is never drawn, so
+      // report the first fatal one on screen where it can actually be read.
+      // Inline and before the modules, to catch their evaluation too.
+      (function () {
+        var shown = false;
+        function report(what) {
+          if (shown) return;
+          shown = true;
+          var box = document.getElementById("crash");
+          if (!box) return;
+          box.textContent = what;
+          box.hidden = false;
+        }
+        addEventListener(
+          "error",
+          function (e) {
+            // Script errors carry a message; a failed <script> tag does not,
+            // and is equally fatal. Other failed subresources are not.
+            if (e.message)
+              report(
+                e.message +
+                  " — " +
+                  String(e.filename || "")
+                    .split("/")
+                    .pop() +
+                  ":" +
+                  e.lineno,
+              );
+            else if (e.target && e.target.tagName === "SCRIPT")
+              report(
+                "Could not load " +
+                  String(e.target.src || "")
+                    .split("/")
+                    .pop(),
+              );
+          },
+          true,
+        );
+        addEventListener("unhandledrejection", function (e) {
+          report("Unhandled: " + ((e.reason && e.reason.message) || e.reason));
+        });
+      })();
+    </script>
     <canvas id="game" tabindex="0" aria-label="3D aquarium"></canvas>
     <div class="vignette"></div>
     <header>
