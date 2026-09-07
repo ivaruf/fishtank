@@ -146,6 +146,76 @@ test("losing a guest frees its seat, and losing the host ends the game", async (
   assert.equal(told?.reason, "Host left", "guests learn the host went away");
 });
 
+// A hosted tank exists to be joined, so it has to wait somewhere while the
+// code is carried to another device. Without this it went straight into a
+// round, and a host who backed out of that round to look for a lobby took the
+// tank with them: the friend's code then found nothing.
+test("a hosted tank waits in a lobby and starts on the host's word", async () => {
+  const hostStates = [],
+    guestStates = [];
+  const host = hostGame({
+    lobby: true,
+    join: { name: "Ivar" },
+    onWelcome: () => {},
+    onState: (s) => hostStates.push(s),
+    onError: () => assert.fail("host should not error"),
+    onClose: () => {},
+  });
+  try {
+    await settle(200);
+    assert.equal(hostStates.at(-1).phase, "lobby", "hosting does not deal in");
+    assert.equal(
+      hostStates.at(-1).lobby.host,
+      "host",
+      "the one who hosts runs the lobby",
+    );
+
+    const [hostSide, guestSide] = pair();
+    host.accept("kid", hostSide);
+    const guest = joinGame({
+      join: { name: "Kid" },
+      channel: guestSide,
+      onWelcome: () => {},
+      onState: (s) => guestStates.push(s),
+      onError: () => {},
+      onClose: () => {},
+    });
+    await settle(250);
+    assert.equal(
+      guestStates.at(-1).phase,
+      "lobby",
+      "the guest lands in it too",
+    );
+    assert.equal(guestStates.at(-1).players.length, 2);
+
+    // A guest cannot start the game, however it asks.
+    guest.request("START");
+    await settle(200);
+    assert.equal(hostStates.at(-1).phase, "lobby", "only the host starts it");
+
+    // Nor can the host, until everyone has readied up.
+    host.request("START");
+    await settle(200);
+    assert.equal(hostStates.at(-1).phase, "lobby", "not before everyone is in");
+
+    guest.request("READY", { ready: true });
+    host.request("READY", { ready: true });
+    await settle(200);
+    assert.deepEqual(
+      [...hostStates.at(-1).lobby.ready].sort(),
+      ["host", "kid"],
+      "both are ready",
+    );
+    host.request("START");
+    await settle(250);
+    assert.equal(hostStates.at(-1).phase, "playing");
+    assert.equal(guestStates.at(-1).phase, "playing", "and for the guest");
+  } finally {
+    host.close();
+    await settle(120);
+  }
+});
+
 test("a full tank turns a peer away instead of seating it", async () => {
   const host = hostGame({
     join: { name: "Host" },

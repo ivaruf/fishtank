@@ -474,6 +474,9 @@ function handlers(current, kind) {
       $("connection").textContent = solo
         ? "● SOLO AQUARIUM · OFFLINE"
         : `● ${(roomName ?? "shared tank").toUpperCase()}`;
+      // A host can still be joined mid-round, so keep the code on screen: the
+      // menu that showed it is gone once the round starts.
+      if (invite) $("connection").textContent += ` · CODE ${invite.code}`;
       if (protocol !== PROTOCOL) {
         console.warn(
           `Server speaks protocol ${protocol}, this client expects ${PROTOCOL}. Restart the server (npm start).`,
@@ -689,6 +692,10 @@ $("multi").onclick = () => {
 // and the others connect straight to them, which is what lets a static site
 // run multiplayer at all.
 let signalling = null;
+// The code this device is hosting under, if it is hosting: the lobby and the
+// HUD both show it, because a host who cannot find their own code again has
+// nothing to invite anyone with.
+let invite = null;
 function stopSignalling() {
   try {
     signalling?.close();
@@ -696,6 +703,7 @@ function stopSignalling() {
     /* Already gone. */
   }
   signalling = null;
+  invite = null;
 }
 // Short, unambiguous, and shoutable across a room: no vowels to spell out and
 // no characters that look like each other.
@@ -711,8 +719,14 @@ $("host-peer").onclick = async () => {
   audio.play("click");
   if (network || joining) return;
   const code = newCode();
+  invite = { code, mode: "opening", detail: "" };
   peerNote(`Setting up ${code}…`);
   const host = hostGame({
+    // A tank you host is a tank you are inviting people to, so it waits in the
+    // lobby like a server tank rather than dropping you into a round alone —
+    // and a round nobody could join is what a friend's code hits when the
+    // host, seeing no lobby, backs out to the menu and tears the tank down.
+    lobby: true,
     // In a worker, so looking at another tab does not freeze everyone else.
     engine: createHostEngine,
     join: { name: $("name").value, species: chosenSpecies },
@@ -724,13 +738,17 @@ $("host-peer").onclick = async () => {
     signalling = await hostRendezvous(code, (id, channel) =>
       host.accept(id, channel),
     );
+    invite = { code, mode: signalling.mode, detail: signalling.detail };
     peerNote(
       signalling.mode === "tabs"
         ? `Code ${code}, but this only reaches other tabs here: ${signalling.detail}`
         : `Code ${code} · tell a friend (${signalling.detail})`,
     );
+    if (state) updateUI();
   } catch (error) {
+    invite = { code, mode: "failed", detail: error.message };
     peerNote(error.message);
+    if (state) updateUI();
   }
 };
 $("join-peer").onclick = async () => {
@@ -822,6 +840,21 @@ function updateLobby(me) {
       return li;
     }),
   );
+  // Only a host has a code to give out, and only it knows how far that code
+  // reaches: a tabs-only fallback looks exactly like success until a friend on
+  // another device tries it, so say so here rather than let them find out.
+  $("lobby-invite").hidden = !invite;
+  if (invite) {
+    $("lobby-code").textContent = invite.code;
+    $("lobby-reach").textContent =
+      invite.mode === "tabs"
+        ? `⚠ This code only reaches other tabs in this browser — ${invite.detail}`
+        : invite.mode === "failed"
+          ? `⚠ ${invite.detail} Nobody can join with this code.`
+          : invite.mode === "opening"
+            ? "Opening the tank…"
+            : "Have them type it into “Play with a friend”, on any device.";
+  }
   const minutes = Math.round(lobby.duration / 60);
   if (!dragging) $("lobby-slider").value = String(minutes);
   $("lobby-slider").disabled = !iAmHost;
