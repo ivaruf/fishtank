@@ -87,10 +87,38 @@ Host **upload**, since the host sends to every peer:
 
 Binary packing is therefore not a nicety here, it is required: it fixes the
 size limit and the bandwidth at once, with no dependency on
-`CompressionStream` support. The shape would be a roster of names, species and
-colours sent reliably when players change, plus a per-frame binary of the
-numeric state only — which is the A3 idea from the network worklist, made
-mandatory by this transport rather than merely nice.
+`CompressionStream` support.
+
+### Done: shared/snapshot-codec.js
+
+A roster of ids, names, species and colours on the reliable lane, sent as a
+delta only when the cast changes, plus a per-frame binary of numbers on the
+lossy lane. Every frame carries the roster version it was packed against and a
+guest drops any frame it cannot read yet — the two lanes have no ordering
+guarantee between each other, and one dropped frame at 15 Hz is invisible.
+
+Measured in the suite, 116 fish with 16 players, and then on a real connection
+between two separate browsers through the public broker:
+
+|        | per frame | 3 peers    | 15 peers    |
+| ------ | --------- | ---------- | ----------- |
+| JSON   | 19.8 KB   | 7.3 Mbit/s | 36.6 Mbit/s |
+| packed | 1.6 KB    | 0.6 Mbit/s | 3.0 Mbit/s  |
+
+On the wire, two peers playing: **1352 bytes a frame**, 15.3 frames a second,
+0.17 Mbit/s to one peer, no text messages at all in a quiet round. 91.9% off,
+and a frame is now an order of magnitude inside the 16 KB interoperable limit
+rather than above it.
+
+Two things the tests caught that the design did not:
+
+- **Headings are not wrapped.** A fish turning steadily was measured at -4.712
+  rad, which an i16 at ×10000 clamps to a heading it is not facing. Wrapped
+  before quantising now. Safe, because the client steers by
+  `wrap(target - current)` and only the heading counts.
+- **A delta stream has no beginning.** A peer seated mid-game only ever
+  receives the changes since it arrived, so it decoded a tank containing
+  itself and nothing else. `packer.full()` now goes out with the WELCOME.
 
 ## GitHub Pages: done
 
@@ -159,10 +187,7 @@ candidates trickling separately.
 
 ## What is left
 
-Item 5, the binary snapshot codec: 17.2 KB a frame is 6.3 Mbit/s of host
-upload at three peers, against a measured 1.4 KB packed.
-
-Beyond the work order, the things that are genuinely hard rather than merely
+The work order is done. Beyond it, the things that are genuinely hard rather than merely
 undone:
 
 - **No TURN.** Some pairs of networks will not connect, and there is no free

@@ -71,14 +71,14 @@ function wrap(reliable, fast, connection) {
   let closed = false;
   const channel = {
     send(value) {
-      const text = JSON.stringify(value);
-      // Snapshots take the lossy lane; everything else must arrive.
-      const lane =
-        value.type === "WORLD_STATE" && fast?.readyState === "open"
-          ? fast
-          : reliable;
+      // Packed frames are the only binary we send, and the only thing we can
+      // afford to lose: they take the lossy lane, everything else must arrive.
+      const packed = value instanceof Uint8Array;
+      const lane = packed && fast?.readyState === "open" ? fast : reliable;
       if (lane.readyState !== "open") throw new Error("channel not open");
-      lane.send(text);
+      // A subarray shares its buffer with the whole allocation, so send a copy
+      // of just this frame rather than everything the packer had room for.
+      lane.send(packed ? value.slice() : JSON.stringify(value));
     },
     close() {
       if (closed) return;
@@ -94,6 +94,11 @@ function wrap(reliable, fast, connection) {
     onClose: null,
   };
   const receive = (e) => {
+    // Anything that is not text is a packed frame, handed up as bytes.
+    if (typeof e.data !== "string") {
+      channel.onMessage?.(new Uint8Array(e.data));
+      return;
+    }
     let value;
     try {
       value = JSON.parse(e.data);
@@ -102,7 +107,13 @@ function wrap(reliable, fast, connection) {
     }
     channel.onMessage?.(value);
   };
-  for (const lane of [reliable, fast]) if (lane) lane.onmessage = receive;
+  for (const lane of [reliable, fast])
+    if (lane) {
+      // Not the default everywhere, and a Blob would arrive as a promise the
+      // receive path above cannot read synchronously.
+      lane.binaryType = "arraybuffer";
+      lane.onmessage = receive;
+    }
   connection.onconnectionstatechange = () => {
     if (
       ["failed", "closed", "disconnected"].includes(connection.connectionState)

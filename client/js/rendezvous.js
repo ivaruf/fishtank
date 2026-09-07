@@ -58,13 +58,32 @@ function loadBroker() {
 // Wrap a PeerJS data connection as the plain channel peer.js expects.
 function wrapConnection(connection) {
   const channel = {
-    send: (value) => connection.send(value),
+    // Packed frames go as an ArrayBuffer, which is the one binary type PeerJS
+    // documents carrying, rather than trusting its packer to round-trip a
+    // typed array. slice() first: a subarray shares the packer's whole
+    // allocation, and sending .buffer directly would send all of it.
+    send: (value) =>
+      connection.send(
+        value instanceof Uint8Array ? value.slice().buffer : value,
+      ),
     close: () => connection.close(),
     onMessage: null,
     onClose: null,
   };
   // PeerJS serialises structured data for us, so nothing is stringified here.
-  connection.on("data", (value) => channel.onMessage?.(value));
+  // Binary comes back as an ArrayBuffer — or a Blob on some paths, which has
+  // to be read asynchronously. Either is safe to delay: every frame is a whole
+  // snapshot, so a late one is simply the next one.
+  connection.on("data", (value) => {
+    if (value instanceof ArrayBuffer)
+      channel.onMessage?.(new Uint8Array(value));
+    else if (typeof Blob !== "undefined" && value instanceof Blob)
+      value
+        .arrayBuffer()
+        .then((buffer) => channel.onMessage?.(new Uint8Array(buffer)))
+        .catch(() => {});
+    else channel.onMessage?.(value);
+  });
   connection.on("close", () => channel.onClose?.());
   connection.on("error", () => channel.onClose?.());
   return channel;

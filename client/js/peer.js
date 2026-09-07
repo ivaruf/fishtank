@@ -1,5 +1,6 @@
 import { World } from "../../shared/world.js";
 import { CONFIG as C, PROTOCOL, SPECIES } from "../../shared/config.js";
+import { createPacker, createUnpacker } from "../../shared/snapshot-codec.js";
 // Host-authoritative peer-to-peer, with no server in the game loop at all.
 //
 // One player runs the simulation - the same shared/world.js the Node server
@@ -132,18 +133,31 @@ export function hostGame({
   const seated = new Set(); // peers the simulation has actually admitted
   let closed = false;
   const announce = () => onPeers?.(peers.size + 1);
+  // Packed once per frame, not once per peer: the bytes are identical for
+  // everyone, and at sixteen players this is the difference between 3 Mbit/s
+  // of upload and 37.
+  const packer = createPacker();
 
   // One snapshot, drained once, delivered to everyone including the host.
   const publish = (state) => {
+    const { roster, frame } = packer.pack(state);
+    // Events are discrete and must not be dropped — a missed ZAP is a sound
+    // and a toast that never happen — so they travel the reliable lane
+    // separately rather than riding the lossy frame.
+    const events = state.events?.length ? state.events : null;
     for (const [id, channel] of peers) {
       try {
-        channel.send({ type: "WORLD_STATE", ...state });
+        // Order matters: a frame is unreadable until its roster has landed.
+        if (roster) channel.send(roster);
+        if (events) channel.send({ type: "EVENTS", events });
+        channel.send(frame);
       } catch {
         // A channel that cannot take a frame is treated as gone; the close
         // handler will tidy up the player.
         drop(id);
       }
     }
+    // The host reads its own world directly: no packing, no quantisation.
     onState(state);
   };
   const sim = engine({ lobby, onState: publish });
@@ -187,6 +201,10 @@ export function hostGame({
             if (closed || !peers.has(id)) return;
             seated.add(id);
             channel.send({ type: "WELCOME", id, protocol: PROTOCOL });
+            // The whole cast, once, before any frame reaches this peer: the
+            // rosters that go out with frames are deltas, and a newcomer has
+            // none of the history they amend.
+            channel.send(packer.full());
             announce();
           },
         );
@@ -259,12 +277,27 @@ export function joinGame({
 }) {
   let closed = false,
     seated = false;
+  const unpacker = createUnpacker();
+  // Events arrive on the reliable lane, ahead of the frame they belong to, and
+  // are handed on with the next snapshot — which is how they reached the
+  // client when both shared one message.
+  let pending = [];
   channel.onMessage = (message) => {
+    // A frame: numbers only, and worthless until its roster has arrived.
+    if (message instanceof Uint8Array) {
+      const state = unpacker.unpack(message);
+      if (!state) return;
+      state.events = pending;
+      pending = [];
+      onState(state);
+      return;
+    }
     if (!message || typeof message !== "object") return;
     if (message.type === "WELCOME") {
       seated = true;
       onWelcome(message.id, message.protocol, "Their tank");
-    } else if (message.type === "WORLD_STATE") onState(message);
+    } else if (message.type === "ROSTER") unpacker.roster(message);
+    else if (message.type === "EVENTS") pending.push(...message.events);
     else if (message.type === "ERROR") onError?.(message.message);
     else if (message.type === "HOST_LEFT") {
       // Not a network fault: the person running the game left.

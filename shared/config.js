@@ -48,7 +48,7 @@ export const TANKS = Object.freeze(
 export const isTank = (id) => TANKS.some((t) => t.id === id);
 // Bumped whenever snapshots or join messages change shape, so a client can
 // tell when it is talking to a server process started from older code.
-export const PROTOCOL = 7;
+export const PROTOCOL = 8;
 export const radius = (mass) => Math.cbrt(mass) * 0.48;
 export const outweighs = (predator, prey) =>
   predator.mass > prey.mass * CONFIG.eatRatio;
