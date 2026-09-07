@@ -744,6 +744,31 @@ header,
   color: #b6d2c6;
   font-size: 14px;
 }
+/* The way out of the overlay for a phone that would rather stay portrait:
+   fullscreen pins landscape, so this is the button that actually starts the
+   game rather than asking again. */
+.rotate-go {
+  margin: 18px 0 0;
+  padding: 14px 22px;
+  border: 0;
+  border-radius: 999px;
+  background: #d1ed9e;
+  color: #183c33;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.rotate-go span {
+  margin-left: 4px;
+}
+/* Beats `.rotate p` above, which would otherwise win on colour and size. */
+.rotate .rotate-note {
+  margin: 12px 0 0;
+  max-width: 32ch;
+  font-size: 12px;
+  color: #ffd2a4;
+}
 .rotate-art {
   width: min(62vw, 300px);
   height: auto;
