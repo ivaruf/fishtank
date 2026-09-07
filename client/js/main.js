@@ -155,8 +155,14 @@ const ask = (url) =>
   fetch(url, { cache: "no-store" }).then((r) =>
     r.ok ? r.json() : Promise.reject(new Error(r.status)),
   );
-ask("healthz")
-  .catch(() => ask("version.json"))
+let hasServer = false;
+const serverProbe = ask("healthz")
+  .then((report) => {
+    hasServer = true;
+    return report;
+  })
+  .catch(() => ask("version.json"));
+serverProbe
   .then(({ version, started, protocol }) => {
     $("version").textContent = `build ${version}`;
     const when = new Date(started);
@@ -167,7 +173,7 @@ ask("healthz")
   .catch(() => {
     // Say it is unknown rather than show a stale or invented version.
     $("version").textContent = "build unknown";
-    $("version").title = "Could not reach the server to check its build.";
+    $("version").title = "Could not find a build number to report.";
   });
 // Touch camera: settles in behind the fish's own heading instead of an aim.
 const follow = { yaw: 0, pitch: 0 };
@@ -636,11 +642,24 @@ function renderGames(games) {
     }),
   );
 }
-function browseGames() {
+async function browseGames() {
   if (browser || network) return;
   $("games").hidden = false;
   $("games-list").replaceChildren();
   $("games-hint").textContent = "Looking for games…";
+  $("quick-join").hidden = false;
+  $("games-title").textContent = "Three tanks, one foodchain";
+  // Wait to learn whether a server exists before reaching for one. Hosted
+  // tanks need one; peer to peer does not, which is the only kind of
+  // multiplayer a static site can offer.
+  await serverProbe.catch(() => {});
+  if (!hasServer) {
+    $("games-title").textContent = "Play with a friend";
+    $("games-hint").textContent =
+      "No game server here, so there are no shared tanks. Host a tank below and send the code to a friend: their fish swims in yours, with nothing in between.";
+    $("quick-join").hidden = true;
+    return;
+  }
   browser = connect({
     onGames: renderGames,
     onWelcome() {},
