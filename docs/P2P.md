@@ -29,36 +29,44 @@ moves the guest's fish in response to its input, a guest's claimed mass is
 ignored, a leaving guest frees its seat, a full tank is refused, and closing
 the host tells guests "Host left" rather than freezing them.
 
-## The finding that shapes everything: background tabs
+## Background tabs, found and fixed
 
-**A host whose tab is not in front stops simulating for everyone.** Browsers
-throttle `setInterval` in background tabs, and measured over the same fifteen
-seconds:
+**A host whose tab was not in front stopped simulating for everyone.** Browsers
+throttle `setInterval` in background tabs, measured over the same fifteen
+seconds with the simulation in the page:
 
 | host tab   | snapshots delivered | round timer | guest moved |
 | ---------- | ------------------- | ----------- | ----------- |
 | background | 3                   | frozen      | 0.23 units  |
 | foreground | 62                  | counting    | 4.66 units  |
 
-So if the host switches app, locks their tablet, or just looks at another tab,
-the whole game freezes for every player. This is not a bug in the transport; it
-is what browser-hosted authority means.
+The simulation now runs in a Web Worker (`client/js/host-worker.js`), which
+`shared/world.js` allows because it has no DOM dependencies — the same
+property that let it move client-side for solo. Worker timers are not
+throttled the same way, and it also gets the simulation off the host's render
+thread, which matters because the host does strictly more work than any guest.
 
-The fix is to run the world in a **Web Worker**. `shared/world.js` has no DOM
-dependencies — that is what let it move client-side in the first place — so it
-can move again, and worker timers are throttled far less aggressively. It would
-also get the simulation off the host's render thread, which matters because the
-host is doing strictly more work than anyone else.
+Re-measured with the host tab deliberately left in the background: the guest's
+round timer ran 1:48 to 1:33 across fifteen seconds, so the tank keeps living
+while the host looks elsewhere.
 
-Until that is done, a host has to keep the tab in front, and the UI should say
-so plainly rather than letting the game mysteriously freeze.
+`hostGame` drives an engine rather than a `World` directly, and the two
+engines — in the page, or in a worker — sit behind the same small surface. The
+protocol has one implementation and cannot drift between them; the in-page one
+is what the Node tests exercise.
 
-## The other blocker: snapshots are too big for a data channel
+## Snapshot size: a bandwidth problem, and a portability risk
 
-A snapshot is 17.2 KB of JSON. The interoperable SCTP message limit is 16 KB,
-and on an unreliable channel a single lost fragment loses the whole message. We
-also lose `permessage-deflate` entirely, because data channels do not compress:
-the WebSocket build gets 1.8 KB a frame, this gets 17.2 KB.
+Correcting an earlier version of this document, which called the 16 KB data
+channel message limit a proven blocker. It is not: 17.2 KB messages flowed
+fine Chrome to Chrome in testing, and every stall observed turned out to be
+the background throttling above. 16 KB is the _interoperable_ limit, so
+Safari to Chrome remains a genuine risk to check on real devices — but it has
+not been seen to fail here.
+
+What is certain is the bandwidth. A snapshot is 17.2 KB of JSON and data
+channels do not compress, so `permessage-deflate` is gone: the WebSocket build
+sends 1.8 KB a frame, this sends 17.2 KB.
 
 Measured, one frame of 104 fish:
 
@@ -84,24 +92,48 @@ colours sent reliably when players change, plus a per-frame binary of the
 numeric state only — which is the A3 idea from the network worklist, made
 mandatory by this transport rather than merely nice.
 
-## Still to do for GitHub Pages
+## GitHub Pages: done
 
-Pages serves a project site from `/<repo>/`, and **every path in the app is
-absolute**: `/js/`, `/shared/`, `/css/`, `/assets/`, `/vendor/`,
-`/manifest.webmanifest`, and `main.js` even does
-`import … from "/shared/config.js"`. All of it 404s under a subpath. Making
-them relative is mechanical but touches the service worker's precache list, the
-audio base path and the module imports.
+Every path in the app is relative now, and `tools/build-static.mjs` publishes
+the repository's own shape — `client/` and `shared/` as siblings, with a
+redirect at the root. That is the whole trick: `../../shared/x.js` then
+resolves identically on disk and under `/<repo>/`, without relying on browsers
+clamping `..` at the origin root, which the old paths were quietly depending
+on. The build also copies Babylon out of `node_modules`, so the CDN stays a
+fallback, and writes a `version.json` standing in for `/healthz`.
 
-Also missing on Pages, which has no server:
+Verified by serving the output under a `/fishtank/` prefix and watching for
+anything that escaped it: the redirect lands, no crash banner, 14 of 14
+thumbnails resolve, 1416 instanced meshes means the real Blender fish rather
+than the procedural fallback, and zero requests escape the subpath. Two bugs
+only a subpath reveals turned up there: the model and thumbnail URLs are built
+with template literals, so an earlier grep for absolute paths missed them and
+the game had silently fallen back to procedural fish; and the service worker
+was still registered from `/sw.js`, so it never installed.
 
-- `/healthz` does not exist, so the build line says "build unknown". A deploy
-  workflow could write a small `version.json` instead.
-- The `/vendor/` Babylon fallback has no `node_modules` to serve from. The
-  workflow should copy those two files into the published output, or the CDN
-  becomes a hard dependency.
-- Signalling needs `relaySignalling` pointed at something. A Worker, or the
-  Render server that already exists.
+`.github/workflows/pages.yml` builds and deploys on pushes to this branch.
+
+## Signalling
+
+The server that already exists relays it: only OFFER, ANSWER and ICE, only
+between sockets in the same signalling room, so it cannot become a general
+message bus. A socket that only signals never joins a game room, holds no
+seat, and costs a few hundred bytes. Once peers connect it is not involved
+again. `chooseSignalling` picks a relay when one is configured (a
+`meta[name="signal-url"]`) or same-origin, and otherwise falls back to
+`BroadcastChannel`, telling the player plainly that this only reaches other
+tabs — so a failed cross-device attempt is not a mystery.
+
+A real data-channel-only offer framed to 849 bytes, comfortably inside the
+socket's 2 KB payload guard, with candidates trickling separately.
+
+**For Pages, this needs pointing somewhere.** Add
+`<meta name="signal-url" content="wss://<the-render-host>/ws">` to
+`client/index.html`, or the static build falls back to same-tab only.
+
+## What is left
+
+Item 5, the binary snapshot codec. Nothing else from the work order.
 
 ## Cheating
 

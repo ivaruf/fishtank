@@ -8,7 +8,7 @@ import { createAudio } from "./audio.js";
 import { createControls } from "./controls.js";
 import { connect, AWAY } from "./networking.js";
 import { playLocally } from "./local.js";
-import { hostGame, joinGame } from "./peer.js";
+import { hostGame, joinGame, createHostEngine } from "./peer.js";
 import { chooseSignalling, hostOverWebRTC, joinOverWebRTC } from "./webrtc.js";
 import {
   CONFIG as C,
@@ -700,6 +700,8 @@ $("host-peer").onclick = async () => {
       : `Your code is ${code}. No relay is set, so this only reaches other tabs on this device.`,
   );
   const host = hostGame({
+    // In a worker, so looking at another tab does not freeze everyone else.
+    engine: createHostEngine,
     join: { name: $("name").value, species: chosenSpecies },
     ...handlers(() => host, "peer"),
     onPeers: (n) => peerNote(`Code ${code} · ${n} fish in the tank`),

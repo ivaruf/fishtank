@@ -19,6 +19,95 @@ import { CONFIG as C, PROTOCOL, SPECIES } from "../../shared/config.js";
 // Guests address the host as this; the host's own player id is its peer id.
 const HOST = "host";
 
+// The host's simulation, behind a surface small enough that it can run either
+// in the page or in a worker without the protocol above knowing which. There
+// is one protocol implementation, and the two engines cannot drift.
+function localEngine({ lobby, onState }) {
+  const world = new World(Math.random, { lobby });
+  const per = Math.max(1, Math.round(C.tickRate / C.broadcastRate));
+  let ticker = null,
+    tick = 0;
+  const step = () => {
+    world.tick(1 / C.tickRate);
+    if (++tick % per) return;
+    onState({ ...world.snapshot(), events: world.events.splice(0) });
+  };
+  return {
+    world,
+    start: () => (ticker = setInterval(step, 1000 / C.tickRate)),
+    count: () => world.players.size,
+    add: (id, name, species, seated) => {
+      world.addPlayer(id, name, species);
+      seated?.();
+    },
+    remove: (id) => world.removePlayer(id),
+    input: (id, input) => world.setInput(id, input),
+    request: (id, request, payload = {}) => {
+      if (request === "NEXT_ROUND") world.nextRound();
+      if (request === "READY") world.setReady(id, !!payload.ready);
+      if (request === "SETTINGS") world.setDuration(id, payload.duration);
+      if (request === "START") world.start(id);
+    },
+    stop: () => {
+      if (ticker) clearInterval(ticker);
+      ticker = null;
+    },
+  };
+}
+
+// The same simulation in a worker, so a backgrounded host keeps running.
+function workerEngine({ lobby, onState, url }) {
+  const worker = new Worker(url, { type: "module" });
+  const seating = new Map();
+  let count = 0;
+  worker.onmessage = ({ data }) => {
+    if (data.type === "STATE") onState(data.state);
+    else if (data.type === "ADDED") {
+      count = data.players;
+      seating.get(data.id)?.();
+      seating.delete(data.id);
+    } else if (data.type === "REMOVED") count = data.players;
+  };
+  return {
+    world: null,
+    start: () => worker.postMessage({ type: "START", lobby }),
+    // Counted optimistically: the worker's reply corrects it, but two joins
+    // landing together must not both see a free seat.
+    count: () => count,
+    add: (id, name, species, seated) => {
+      count++;
+      seating.set(id, seated);
+      worker.postMessage({ type: "ADD", id, name, species });
+    },
+    remove: (id) => {
+      count = Math.max(0, count - 1);
+      worker.postMessage({ type: "REMOVE", id });
+    },
+    input: (id, input) => worker.postMessage({ type: "INPUT", id, input }),
+    request: (id, request, payload = {}) =>
+      worker.postMessage({ type: "REQUEST", id, request, payload }),
+    stop: () => {
+      worker.postMessage({ type: "STOP" });
+      worker.terminate();
+    },
+  };
+}
+
+// Prefer the worker, because a throttled host freezes the game for everyone,
+// but never fail outright if it is unavailable.
+export function createHostEngine(options) {
+  try {
+    if (typeof Worker === "function")
+      return workerEngine({
+        ...options,
+        url: new URL("./host-worker.js", import.meta.url),
+      });
+  } catch {
+    /* Fall through to running it in the page. */
+  }
+  return localEngine(options);
+}
+
 const cleanName = (name) =>
   String(name ?? "")
     .trim()
@@ -35,20 +124,17 @@ export function hostGame({
   onClose,
   onPeers,
   lobby = false,
+  // A factory rather than an instance, because the engine needs the publish
+  // function that is defined just below it.
+  engine = localEngine,
 }) {
-  const world = new World(Math.random, { lobby });
   const peers = new Map(); // peer id -> channel
-  let ticker = null,
-    closed = false,
-    tick = 0;
-  const per = Math.max(1, Math.round(C.tickRate / C.broadcastRate));
+  const seated = new Set(); // peers the simulation has actually admitted
+  let closed = false;
   const announce = () => onPeers?.(peers.size + 1);
 
-  const step = () => {
-    world.tick(1 / C.tickRate);
-    if (++tick % per) return;
-    // One snapshot, drained once, delivered to everyone including the host.
-    const state = { ...world.snapshot(), events: world.events.splice(0) };
+  // One snapshot, drained once, delivered to everyone including the host.
+  const publish = (state) => {
     for (const [id, channel] of peers) {
       try {
         channel.send({ type: "WORLD_STATE", ...state });
@@ -60,11 +146,12 @@ export function hostGame({
     }
     onState(state);
   };
+  const sim = engine({ lobby, onState: publish });
 
   function drop(id) {
     const channel = peers.get(id);
     peers.delete(id);
-    world.removePlayer(id);
+    sim.remove(id);
     try {
       channel?.close();
     } catch {
@@ -86,59 +173,62 @@ export function hostGame({
         // Capacity is decided here rather than on connect, as the server does
         // it: a peer that has connected but not asked for a seat holds none,
         // and refusing before its JOIN arrives would race its own message.
-        if (world.players.size >= C.maxPlayers) {
+        if (sim.count() >= C.maxPlayers) {
           channel.send({ type: "ERROR", message: "This tank is full." });
           return;
         }
-        world.addPlayer(
+        // Welcome only once the simulation confirms the seat, since a worker
+        // seats players a message later than the page asks.
+        sim.add(
           id,
           cleanName(message.name),
           cleanSpecies(message.species),
+          () => {
+            if (closed || !peers.has(id)) return;
+            seated.add(id);
+            channel.send({ type: "WELCOME", id, protocol: PROTOCOL });
+            announce();
+          },
         );
-        channel.send({ type: "WELCOME", id, protocol: PROTOCOL });
-        announce();
         return;
       }
       // Everything else is only meaningful once seated.
-      if (!world.players.has(id)) return;
-      if (message.type === "INPUT") world.setInput(id, message);
-      if (message.type === "NEXT_ROUND") world.nextRound();
-      if (message.type === "READY") world.setReady(id, !!message.ready);
-      if (message.type === "SETTINGS") world.setDuration(id, message.duration);
-      if (message.type === "START") world.start(id);
+      if (!seated.has(id)) return;
+      if (message.type === "INPUT") sim.input(id, message);
+      else sim.request(id, message.type, message);
     };
     channel.onClose = () => drop(id);
   }
 
   const start = ({ name, species } = {}) => {
-    world.addPlayer(HOST, cleanName(name), cleanSpecies(species));
-    queueMicrotask(() => {
+    sim.start();
+    sim.add(HOST, cleanName(name), cleanSpecies(species), () => {
       if (closed) return;
+      seated.add(HOST);
       onWelcome(HOST, PROTOCOL, "Your tank");
       announce();
-      ticker = setInterval(step, 1000 / C.tickRate);
     });
   };
   if (join) start(join);
 
   return {
     accept,
-    world,
+    // Present only for the in-page engine, which the protocol tests use.
+    get world() {
+      return sim.world;
+    },
+    players: () => sim.count(),
     join: start,
     send(input) {
-      world.setInput(HOST, input);
+      sim.input(HOST, input);
     },
     request(type, payload = {}) {
-      if (type === "NEXT_ROUND") world.nextRound();
-      if (type === "READY") world.setReady(HOST, !!payload.ready);
-      if (type === "SETTINGS") world.setDuration(HOST, payload.duration);
-      if (type === "START") world.start(HOST);
+      sim.request(HOST, type, payload);
     },
     close() {
       if (closed) return;
       closed = true;
-      if (ticker) clearInterval(ticker);
-      ticker = null;
+      sim.stop();
       // Tell everyone before going, so guests can say why rather than just
       // freezing: losing the host ends the game for all of them.
       for (const [id, channel] of peers) {
@@ -148,9 +238,10 @@ export function hostGame({
         } catch {
           /* Already gone. */
         }
-        world.removePlayer(id);
+        sim.remove(id);
       }
       peers.clear();
+      seated.clear();
       queueMicrotask(() => onClose?.({ code: 1000, reason: "Host closed" }));
     },
     onError,
