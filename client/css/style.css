@@ -542,6 +542,25 @@ header,
 .game .seats i.taken {
   background: #d1ed9e;
 }
+/* The peer-to-peer half of the picker: no server involved once connected. */
+.peer {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #6eaaa42b;
+}
+.peer .buttons {
+  flex-wrap: wrap;
+  align-items: center;
+}
+.peer input {
+  width: 7em;
+  max-width: none;
+  padding: 12px 14px;
+  font-size: 15px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  text-align: center;
+}
 .games-hint {
   font-size: 11px;
   line-height: 1.6;

@@ -230,6 +230,27 @@
         <button id="quick-join" type="button">Quick join <span>→</span></button>
         <button id="games-back" class="secondary" type="button">Back</button>
       </div>
+      <!-- Peer to peer needs no game server: one player runs the tank and the
+           others connect straight to them. -->
+      <div class="peer">
+        <div class="eyebrow">OR PLAY WITHOUT A SERVER</div>
+        <div class="buttons">
+          <button id="host-peer" class="secondary" type="button">
+            Host a tank
+          </button>
+          <label class="sr-only" for="peer-code">Game code</label>
+          <input
+            id="peer-code"
+            maxlength="12"
+            placeholder="CODE"
+            autocapitalize="characters"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <button id="join-peer" class="secondary" type="button">Join</button>
+        </div>
+        <p class="games-hint" id="peer-hint"></p>
+      </div>
     </section>
     <section id="lobby" class="glass lobby" hidden>
       <div class="eyebrow">THE LOBBY <span id="lobby-count"></span></div>

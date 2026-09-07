@@ -66,6 +66,23 @@ export function relaySignalling(code, url) {
   };
 }
 
+// Which rendezvous this page can actually use. A relay reaches other devices;
+// BroadcastChannel only reaches other tabs here, which is still useful for
+// trying it out and is what a static host falls back to with no relay set.
+export function chooseSignalling(code) {
+  const configured = document
+    .querySelector('meta[name="signal-url"]')
+    ?.content?.trim();
+  const sameOrigin =
+    location.protocol.startsWith("http") && !location.host.endsWith("github.io")
+      ? `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`
+      : "";
+  const url = configured || sameOrigin;
+  return url
+    ? { mode: "relay", url, signalling: relaySignalling(code, url) }
+    : { mode: "local", url: "", signalling: broadcastSignalling(code) };
+}
+
 // Wrap a pair of data channels so peer.js sees one simple channel.
 function wrap(reliable, fast, connection) {
   let closed = false;

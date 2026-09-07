@@ -49,6 +49,9 @@ const BUILD = (() => {
   }
 })();
 const STARTED = new Date().toISOString();
+// The WebRTC handshake messages the relay forwards verbatim. Nothing else is
+// relayed, so this cannot become a general-purpose message bus.
+const SIGNAL_TYPES = new Set(["OFFER", "ANSWER", "ICE"]);
 // PNG and M4A are already compressed; measured 0% gain and pure CPU cost.
 const COMPRESSIBLE = new Set([
   ".html",
@@ -188,6 +191,9 @@ export function createGameServer({ idleTimeout = C.idleTimeout } = {}) {
   const wss = new WebSocketServer({
     server,
     path: "/ws",
+    // Input messages are tiny and this is the abuse guard. A measured
+    // data-channel-only WebRTC offer frames to 849 bytes, and candidates
+    // trickle separately, so signalling fits with room to spare.
     maxPayload: 2048,
     // Snapshots are large, repetitive JSON and barely change tick to tick, so
     // deflate earns its keep here. Keeping the compression context between
@@ -230,6 +236,28 @@ export function createGameServer({ idleTimeout = C.idleTimeout } = {}) {
       if (!m || typeof m !== "object") return;
       // AWAKE carries nothing: having arrived is the whole message.
       if (m.type === "AWAKE") return;
+      // Signalling relay for the peer-to-peer build. Two browsers cannot
+      // exchange WebRTC offers without a rendezvous, and that is the only
+      // thing a static host cannot do for itself. This carries no game
+      // traffic: once the peers connect, they talk directly and none of this
+      // is involved again. A socket that only signals never joins a room, so
+      // it holds no seat and costs nothing but these few hundred bytes.
+      if (m.type === "SIGNAL_JOIN" && typeof m.room === "string") {
+        socket.signalRoom = m.room.slice(0, 32);
+        return;
+      }
+      if (m.type?.startsWith("SIGNAL_") || SIGNAL_TYPES.has(m.type)) {
+        if (!socket.signalRoom || socket.signalRoom !== m.room) return;
+        const relayed = JSON.stringify(m);
+        for (const other of wss.clients)
+          if (
+            other !== socket &&
+            other.signalRoom === socket.signalRoom &&
+            other.readyState === WebSocket.OPEN
+          )
+            other.send(relayed);
+        return;
+      }
       if (m.type === "JOIN" && !socket.room) {
         const solo = m.mode === "single";
         // Only the listed tanks are joinable by name, so a client can never

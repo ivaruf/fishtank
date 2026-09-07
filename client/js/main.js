@@ -8,6 +8,8 @@ import { createAudio } from "./audio.js";
 import { createControls } from "./controls.js";
 import { connect, AWAY } from "./networking.js";
 import { playLocally } from "./local.js";
+import { hostGame, joinGame } from "./peer.js";
+import { chooseSignalling, hostOverWebRTC, joinOverWebRTC } from "./webrtc.js";
 import {
   CONFIG as C,
   SPECIES,
@@ -429,6 +431,8 @@ function leave(message = "") {
   joining = false;
   deathCam = null;
   clearFish();
+  stopSignalling();
+  $("peer-hint").textContent = "";
   $("menu").hidden = false;
   $("hud").hidden = true;
   $("games").hidden = true;
@@ -441,16 +445,12 @@ function leave(message = "") {
 }
 // mode "single" plays immediately; "multiplayer" needs a tank, either the one
 // the player picked or, with room omitted, whichever the server has space in.
-function join(mode, room) {
-  if (joining || network) return;
-  joining = true;
-  // Solo runs the same World in this tab: no socket, no traffic, no latency,
-  // and it keeps working with the network gone. Only shared tanks need a host.
-  const solo = mode === "single";
-  const open = solo ? playLocally : connect;
-  $("error").textContent = solo ? "" : "Connecting…";
-  const connection = open({
-    join: { name: $("name").value, mode, species: chosenSpecies, room },
+// The callbacks every transport shares. `current` is read lazily because a
+// transport's own object does not exist yet when these are built, and `kind`
+// only changes the label: a snapshot means the same thing however it arrived.
+function handlers(current, kind) {
+  const solo = kind === "solo";
+  return {
     onWelcome(id, protocol, roomName) {
       myId = id;
       joining = false;
@@ -554,7 +554,7 @@ function join(mode, room) {
       $("error").textContent = message;
     },
     onClose(event) {
-      if (network !== connection) return;
+      if (network !== current()) return;
       // Being dropped for going away is normal, not a fault: say which it was.
       leave(
         event?.code === AWAY
@@ -564,6 +564,19 @@ function join(mode, room) {
             : "Connection closed. Dive in again to reconnect.",
       );
     },
+  };
+}
+function join(mode, room) {
+  if (joining || network) return;
+  joining = true;
+  // Solo runs the same World in this tab: no socket, no traffic, no latency,
+  // and it keeps working with the network gone. Only shared tanks need a host.
+  const solo = mode === "single";
+  const open = solo ? playLocally : connect;
+  $("error").textContent = solo ? "" : "Connecting…";
+  const connection = open({
+    join: { name: $("name").value, mode, species: chosenSpecies, room },
+    ...handlers(() => connection, solo ? "solo" : "server"),
   });
   network = connection;
 }
@@ -652,6 +665,72 @@ $("solo").onclick = () => {
 $("multi").onclick = () => {
   audio.play("click");
   browseGames();
+};
+// Peer to peer: no game server in the loop. One player hosts the simulation
+// and the others connect straight to them, which is what lets a static site
+// run multiplayer at all.
+let signalling = null;
+function stopSignalling() {
+  try {
+    signalling?.close();
+  } catch {
+    /* Already gone. */
+  }
+  signalling = null;
+}
+// Short, unambiguous, and shoutable across a room: no vowels to spell out and
+// no characters that look like each other.
+const newCode = () =>
+  Array.from(
+    { length: 4 },
+    () => "BCDFGHJKLMNPQRSTVWXZ23456789"[Math.floor(Math.random() * 28)],
+  ).join("");
+function peerNote(text) {
+  $("peer-hint").textContent = text;
+}
+$("host-peer").onclick = async () => {
+  audio.play("click");
+  if (network || joining) return;
+  const code = newCode();
+  const chosen = chooseSignalling(code);
+  signalling = chosen.signalling;
+  peerNote(
+    chosen.mode === "relay"
+      ? `Your code is ${code}. Tell a friend, and keep this tab in front — the tank runs here.`
+      : `Your code is ${code}. No relay is set, so this only reaches other tabs on this device.`,
+  );
+  const host = hostGame({
+    join: { name: $("name").value, species: chosenSpecies },
+    ...handlers(() => host, "peer"),
+    onPeers: (n) => peerNote(`Code ${code} · ${n} fish in the tank`),
+  });
+  hostOverWebRTC(signalling, (id, channel) => host.accept(id, channel));
+  network = host;
+};
+$("join-peer").onclick = async () => {
+  audio.play("click");
+  if (network || joining) return;
+  const code = $("peer-code").value.trim().toUpperCase();
+  if (!code) return peerNote("Enter the code your friend gave you.");
+  joining = true;
+  peerNote(`Looking for ${code}…`);
+  const chosen = chooseSignalling(code);
+  signalling = chosen.signalling;
+  try {
+    const channel = await joinOverWebRTC(signalling);
+    joining = false;
+    peerNote(`Playing in ${code}. The tank runs on your friend's device.`);
+    const guest = joinGame({
+      join: { name: $("name").value, species: chosenSpecies },
+      channel,
+      ...handlers(() => guest, "peer"),
+    });
+    network = guest;
+  } catch (error) {
+    joining = false;
+    stopSignalling();
+    peerNote(error.message);
+  }
 };
 $("games-back").onclick = () => {
   audio.play("click");
