@@ -9,7 +9,7 @@ import {
   symbolsOf,
 } from "../client/js/codes.js";
 
-test("a code is four pictures, and one code serves both ways in", () => {
+test("a code is three pictures, and one code serves both ways in", () => {
   for (let i = 0; i < 200; i++) {
     const code = newCode();
     const symbols = symbolsOf(code);
@@ -24,35 +24,35 @@ test("a code is four pictures, and one code serves both ways in", () => {
 });
 
 test("the parser forgives however the code was written down", () => {
-  const code = "boat-fish-star-duck";
+  const code = "boat-fish-star";
   for (const written of [
-    "boat-fish-star-duck",
-    "BOAT FISH STAR DUCK",
-    "Boat, Fish, Star, Duck",
-    "  boat   fish   star   duck  ",
-    "boat/fish/star/duck",
-    "⛵🐟⭐🦆",
-    "⛵ 🐟 ⭐ 🦆",
+    "boat-fish-star",
+    "BOAT FISH STAR",
+    "Boat, Fish, Star",
+    "  boat   fish   star  ",
+    "boat/fish/star",
+    "⛵🐟⭐",
+    "⛵ 🐟 ⭐",
     // Read down a phone and half remembered: every name is unique in its
     // first three letters, so a prefix is enough.
-    "boa fis sta duc",
+    "bo fi st",
   ])
     assert.equal(parseCode(written), code, `"${written}" is the same room`);
 });
 
 test("the parser refuses what it cannot turn into a room", () => {
-  for (const junk of ["", "   ", null, undefined, "fish", "fish-fish-fish"])
+  for (const junk of ["", "   ", null, undefined, "fish", "fish-fish"])
     assert.equal(
       parseCode(junk),
       null,
       `${JSON.stringify(junk)} is not a code`,
     );
   // A prefix may only shorten a name, never extend it.
-  assert.equal(parseCode("boat fish star ducky"), null);
+  assert.equal(parseCode("boat fish starry"), null);
   // Ambiguous: "s" could be shark, shell or star, so it is not a guess worth
   // making - a wrong room is a worse outcome than being asked again.
-  assert.equal(parseCode("b-b-b-b"), null);
-  assert.equal(parseCode("b-fish-star-duck"), null, "bee, boat or ball?");
+  assert.equal(parseCode("b-b-b"), null);
+  assert.equal(parseCode("b-fish-star"), null, "bee, boat or ball?");
 });
 
 test("a code from another build is passed through, not rejected", () => {

@@ -828,7 +828,7 @@ async function joinPeer(code) {
     stopSignalling();
     peerNote(error.message);
     // A wrong code has to be cheap to recover from, so leave the pad empty and
-    // ready rather than making them undo four taps.
+    // ready rather than making them undo every tap.
     picked.length = 0;
     drawPicked();
   }
@@ -839,7 +839,7 @@ $("join-peer").onclick = () => {
   const code = parseCode($("peer-code").value);
   if (!code)
     return peerNote(
-      "That is not a code. Tap the four pictures, or type them as words.",
+      "That is not a code. Tap the three pictures, or type them as words.",
     );
   joinPeer(code);
 };
@@ -975,7 +975,7 @@ function updateLobby(me) {
           ? `⚠ ${invite.detail} Nobody can join with this code.`
           : invite.mode === "opening"
             ? "Opening the tank…"
-            : "They can tap the four pictures, or type the words, in “Play with a friend” on any device.";
+            : "They can tap the three pictures, or type the words, in “Play with a friend” on any device.";
   }
   const minutes = Math.round(lobby.duration / 60);
   if (!dragging) $("lobby-slider").value = String(minutes);

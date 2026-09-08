@@ -2,17 +2,23 @@
 //
 // A code used to be six consonants, which is fine to shout across a room and
 // miserable for a seven-year-old with a tablet and no interest in typing. So a
-// code is now four pictures, and the important part is that it is *one* code
-// rather than two systems: "boat-fish-star-duck" is the thing a kid taps out
+// code is now three pictures, and the important part is that it is *one* code
+// rather than two systems: "boat-fish-star" is the thing a kid taps out
 // on the dialpad and the thing a parent pastes into a chat. Nothing has to be
-// translated between them, and a code read out loud over the phone is four
+// translated between them, and a code read out loud over the phone is three
 // ordinary words instead of "B, D as in delta, four, X...".
 //
-// Twelve pictures, four slots, so 20,736 codes. That is far more than enough:
-// only rooms open at the same moment can collide, there are never more than a
-// handful, and the rendezvous already says "that code is already in use" and
-// hands out another. Four slots rather than three because tapping is the easy
-// part - it is typing that was hard.
+// Twelve pictures, three slots, so 1,728 codes. It was four slots and 20,736,
+// and three is the owner's call, made explicitly: getting in easily matters
+// more than the chance of landing in a stranger's tank, which is remote
+// anyway. Worth keeping the arithmetic where the decision is, because the
+// instinct on reading 1,728 is to widen it again.
+//
+// Only rooms open at the same moment can collide, and there are a handful at
+// most: with five live tanks a random three taps has about a 0.3% chance of
+// reaching one of them, and two hosts colliding is not a silent failure - the
+// rendezvous says the code is taken and hands out another. Against that, a
+// quarter fewer taps for a player for whom every tap is the hard part.
 //
 // One thing per category, and that is the whole rule. The first set of twelve
 // was all sea life - fish, shark, dolphin, whale, octopus, turtle - and being
@@ -47,7 +53,7 @@ export const SYMBOLS = Object.freeze(
     { name: "ball", icon: "⚽" },
   ].map(Object.freeze),
 );
-export const CODE_LENGTH = 4;
+export const CODE_LENGTH = 3;
 const byName = new Map(SYMBOLS.map((s) => [s.name, s]));
 const byIcon = new Map(SYMBOLS.map((s) => [s.icon, s]));
 export const newCode = () =>
@@ -76,15 +82,15 @@ function match(word) {
   return hits.length === 1 ? hits[0] : undefined;
 }
 // Read a code out of whatever the player typed, pasted or tapped. Separators,
-// case and spelling-out are all forgiven: "Boat Fish Star Duck",
-// "boat-fish-star-duck" and "⛵🐟⭐🦆" are the same room.
+// case and spelling-out are all forgiven: "Boat Fish Star",
+// "boat-fish-star" and "⛵🐟⭐" are the same room.
 //
-// What is not four pictures is refused, with one exception: the codes this
+// What is not three pictures is refused, with one exception: the codes this
 // game used to hand out, so a guest on this build can still join a friend
 // still running the old one. That exception is written as narrowly as the old
 // generator was - five to twelve characters, no vowels, none of the letters it
 // left out - because the obvious loose version ("anything code-shaped") also
-// swallowed "fish" and "ba-fish-star-duck", turning a half-typed picture code
+// swallowed "fish" and "ba-fish-star", turning a half-typed picture code
 // into a nonsense room and a confusing failure at the broker instead of a
 // plain "that is not a code, try again".
 const OLD_CODE = /^[BCDFGHJKLMNPQRSTVWXZ23456789]{5,12}$/i;
@@ -104,7 +110,7 @@ export function parseCode(text) {
     return words.map((s) => s.name).join("-");
   return OLD_CODE.test(raw) ? raw.toUpperCase() : null;
 }
-// "boat-fish-star-duck" as "BOAT FISH STAR DUCK", for reading aloud and for
+// "boat-fish-star" as "BOAT FISH STAR", for reading aloud and for
 // pasting into a chat. A code that is not made of pictures - one passed
 // through from an older build - is handed back as it came, since spelling out
 // something this does not understand would only garble it.
