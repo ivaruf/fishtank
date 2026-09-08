@@ -22,6 +22,8 @@ const SHELL = [
   "./",
   "index.html",
   "css/style.css",
+  // The menu's title art: the first screen looks wrong without it.
+  "assets/brand/fishtank-title.webp",
   "js/main.js",
   "js/build.js",
   "js/codes.js",

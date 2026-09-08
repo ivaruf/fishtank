@@ -144,7 +144,18 @@
       <span>Your fish · Drag to explore</span>
     </div>
     <main id="menu" class="panel">
-      <h1>Welcome to the<br /><em>foodchain.</em></h1>
+      <!-- The title is painted art, not type: assets/brand/ holds the source
+           and tools/make-title.py derives this. The alt text carries the same
+           two lines the artwork does, so nothing is lost with images off. -->
+      <h1 class="title">
+        <img
+          src="assets/brand/fishtank-title.webp"
+          alt="Fishtank — welcome to the foodchain"
+          width="1200"
+          height="403"
+          decoding="async"
+        />
+      </h1>
       <label class="sr-only" for="name">Your name</label
       ><input
         id="name"

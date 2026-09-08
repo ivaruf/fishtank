@@ -103,6 +103,15 @@ header {
 .brand:hover .mark {
   fill: #e6ffb8;
 }
+/* The corner brand steps aside while the menu is up, because the title art is
+   already saying the name three times the size directly below it. It comes
+   back for the game, where it is the only place the name appears - and where
+   the painted version would be mush at 34 px, which is why the small mark is
+   still a drawing and not a crop of the artwork. Hidden rather than removed,
+   so the header's spacing does not shift when a round starts. */
+body:has(#menu:not([hidden])) .brand {
+  visibility: hidden;
+}
 .connection {
   font-size: 10px;
   letter-spacing: 1.6px;
@@ -130,9 +139,16 @@ h1 {
   margin: 0 0 34px;
   text-shadow: 0 3px 22px #01191ea8;
 }
-h1 em {
-  font-style: normal;
-  color: #d1ed9e;
+/* The menu title is artwork. Its own shadow and highlights are painted in, so
+   it takes none of the type styling above - only the space. */
+.title {
+  margin: 0 0 26px;
+  line-height: 0;
+}
+.title img {
+  width: 100%;
+  max-width: 470px;
+  height: auto;
 }
 p {
   font-size: 15px;
@@ -1041,6 +1057,11 @@ select {
     font-size: 40px;
     margin: 6px 0 0;
     letter-spacing: -2px;
+  }
+  /* Narrow and landscape: the art shares a row with the form, so it is the
+     column width that constrains it rather than a type size. */
+  .panel .title img {
+    max-width: 100%;
   }
   .panel > input {
     grid-column: 2;
