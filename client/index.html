@@ -86,13 +86,6 @@
       <div class="header-tools">
         <div class="connection" id="connection"></div>
         <div class="display-controls">
-          <label class="resolution-label touch-only" id="movestyle-label"
-            ><span>Controls</span>
-            <select id="movestyle" aria-label="Touch controls">
-              <option value="stick">Stick and look</option>
-              <option value="always">Always swimming</option>
-            </select>
-          </label>
           <label class="resolution-label"
             ><span>Quality</span>
             <select id="resolution" aria-label="Render quality">
@@ -343,13 +336,11 @@
         <div id="move-stick" class="joystick floating" hidden>
           <div class="knob"></div>
         </div>
-        <span class="zone-hint" id="steer-hint">STEER · TOUCH AND DRAG</span>
+        <span class="zone-hint">MOVE · PUSH THE STICK</span>
       </div>
-      <div id="depth-zone" class="touch-zone depth-zone" aria-label="Depth">
-        <div id="depth-gauge" class="depth-gauge floating" hidden>
-          <div class="knob"></div>
-        </div>
-        <span class="zone-hint" id="depth-hint">DIVE · DRAG DOWN OR UP</span>
+      <!-- No widget on this side: the camera turning is the feedback. -->
+      <div id="depth-zone" class="touch-zone depth-zone" aria-label="Look">
+        <span class="zone-hint">LOOK · DRAG ANYWHERE HERE</span>
       </div>
     </div>
     <div id="rotate" class="rotate" role="dialog" aria-live="polite">

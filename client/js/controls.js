@@ -6,27 +6,26 @@ import { clamp, wrap } from "../../shared/config.js";
 // the camera behind the fish. Both produce the same {forward, strafe, yaw,
 // pitch} for the server.
 //
-// Two touch styles. "stick" is the default and mirrors the keyboard exactly:
-// the left stick is WASD (it moves you, and releasing it stops you) while
-// dragging anywhere on the right is the mouse (it aims the camera). Movement
-// and aim are independent, so you can swim one way and look another.
-// "always" is the older, simpler scheme: the fish never stops, one thumb
-// steers its heading, the other drags for depth, and the camera trails behind.
-const TURN = 2.4, // rad/s the touch heading may change in "always"
-  ASSIST = 0.9, // rad/s the bite assist may nudge when the thumb is idle
-  LEVEL = 1.2, // 1/s pitch decay back to level in "always"
-  STICK = 48, // px of thumb travel for full deflection
-  DEPTH = 150, // px of drag for a full dive or climb in "always"
-  LOOK = 0.005, // rad per px of look drag in "stick"
+// Touch mirrors the keyboard exactly: the left stick is WASD (it moves you, and
+// releasing it stops you) while dragging anywhere on the right is the mouse (it
+// aims the camera). Movement and aim are independent, so you can swim one way
+// and look another.
+//
+// There was a second scheme once - "always swimming", where the fish never
+// stopped, one thumb steered its heading, the other dragged for depth and the
+// camera trailed behind. It is gone, and with it a bite assist that nudged the
+// heading toward nearby prey, a pitch that decayed back to level on its own,
+// and a camera that had to follow the fish rather than the player's aim. Two
+// input schemes is two of everything downstream of input.
+const STICK = 48, // px of thumb travel for full deflection
+  LOOK = 0.005, // rad per px of look drag
   DEAD = 0.2, // stick deflection below this is treated as centred
   FULL = 0.8; // deflection at which the fish is at full speed
 export function createControls(canvas, onStop = () => {}) {
   const keys = new Set();
   const aim = { yaw: 0, pitch: 0 };
   let active = false,
-    touchMode = false,
-    moveStyle = "stick",
-    assist = null;
+    touchMode = false;
   const allowed = [
     "w",
     "a",
@@ -43,13 +42,15 @@ export function createControls(canvas, onStop = () => {}) {
   };
   // Touch zones: each tracks one pointer and shows a floating visual under it.
   const steer = { pointer: null, x: 0, y: 0 },
-    depth = { pointer: null, value: 0, base: 0 };
+    // The look zone keeps no value of its own: a drag turns the camera and
+    // that is the whole state. lx/ly are just the last point, for the delta.
+    depth = { pointer: null };
   function release(zone) {
     if (zone.pointer !== null && zone.element.hasPointerCapture(zone.pointer))
       zone.element.releasePointerCapture(zone.pointer);
     zone.pointer = null;
-    zone.x = zone.y = zone.value = 0;
-    zone.visual.hidden = true;
+    zone.x = zone.y = 0;
+    if (zone.visual) zone.visual.hidden = true;
   }
   function reset() {
     keys.clear();
@@ -107,17 +108,18 @@ export function createControls(canvas, onStop = () => {}) {
   document.addEventListener("pointerlockerror", () => {
     /* Keep hover aiming. */
   });
-  function track(zone, id, visualId, onDown, onMove, wantsVisual = () => true) {
+  // visualId may be null: the look zone has nothing to draw, because the
+  // camera turning is the feedback.
+  function track(zone, id, visualId, onDown, onMove) {
     zone.element = document.getElementById(id);
-    zone.visual = document.getElementById(visualId);
-    zone.knob = zone.visual.querySelector(".knob");
+    zone.visual = visualId ? document.getElementById(visualId) : null;
+    zone.knob = zone.visual?.querySelector(".knob") ?? null;
     zone.element.addEventListener("pointerdown", (e) => {
       if (!active || !touchMode || zone.pointer !== null) return;
       e.preventDefault();
       zone.pointer = e.pointerId;
       zone.element.setPointerCapture(e.pointerId);
-      // Free look shows nothing: the camera moving is the feedback.
-      if (wantsVisual()) {
+      if (zone.visual) {
         const rect = zone.element.getBoundingClientRect();
         zone.visual.style.left = `${e.clientX - rect.left}px`;
         zone.visual.style.top = `${e.clientY - rect.top}px`;
@@ -161,33 +163,18 @@ export function createControls(canvas, onStop = () => {}) {
   track(
     depth,
     "depth-zone",
-    "depth-gauge",
+    null,
     (e) => {
-      depth.oy = e.clientY;
       depth.lx = e.clientX;
       depth.ly = e.clientY;
-      depth.base = aim.pitch;
-      depth.value = aim.pitch;
     },
     (e) => {
-      if (moveStyle === "stick") {
-        // Free look: drag anywhere on this side and the camera turns, exactly
-        // as the mouse does on desktop. Relative, so it never snaps.
-        look((e.clientX - depth.lx) * LOOK, -(e.clientY - depth.ly) * LOOK);
-        depth.lx = e.clientX;
-        depth.ly = e.clientY;
-        return;
-      }
-      // "always": drag up to rise, down to dive, relative to the pitch you
-      // started at.
-      depth.value = clamp(
-        depth.base - ((e.clientY - depth.oy) / DEPTH) * 1.1,
-        -1.1,
-        1.1,
-      );
-      depth.knob.style.transform = `translateY(${(-depth.value / 1.1) * 60}px)`;
+      // Free look: drag anywhere on this side and the camera turns, exactly as
+      // the mouse does on desktop. Relative, so it never snaps.
+      look((e.clientX - depth.lx) * LOOK, -(e.clientY - depth.ly) * LOOK);
+      depth.lx = e.clientX;
+      depth.ly = e.clientY;
     },
-    () => moveStyle !== "stick",
   );
   return {
     setActive(value) {
@@ -202,71 +189,28 @@ export function createControls(canvas, onStop = () => {}) {
       touchMode = value;
       if (!value) for (const zone of [steer, depth]) release(zone);
     },
-    // "stick" (left thumb moves, right thumb looks) or "always" (never stops).
-    setMoveStyle(value) {
-      moveStyle = value === "always" ? "always" : "stick";
-      for (const zone of [steer, depth]) release(zone);
-      onStop();
-    },
-    // main.js aims the camera itself in "always"; in "stick" the player does.
-    get freeLook() {
-      return moveStyle === "stick";
-    },
-    // A {yaw, pitch} to drift toward while the thumb is idle, or null.
-    assist(target) {
-      assist = target;
-    },
     orient(yaw, pitch) {
       aim.yaw = yaw;
       aim.pitch = pitch;
     },
-    // cameraYaw makes stick directions screen-relative on touch.
-    read(dt = 0, cameraYaw = aim.yaw) {
+    // The stick is already screen-relative: its deflection becomes
+    // forward/strafe, and the server resolves those against the aim being sent
+    // alongside them. Nothing here needs the clock or the camera any more.
+    read() {
       const push = Math.hypot(steer.x, steer.y);
       const held = steer.pointer !== null && push > DEAD;
-      // A fish that is standing still must stay still: the bite assist may
-      // only nudge the heading of a fish that is actually swimming, or a
-      // parked fish would slowly rotate on its own. In "stick" the player
-      // aims for themselves, so nothing steers but the thumb.
-      const swimming = moveStyle === "always" || held;
-      if (active && touchMode && moveStyle === "always") {
-        if (held) {
-          const wanted = cameraYaw + Math.atan2(steer.x, -steer.y);
-          aim.yaw = wrap(
-            aim.yaw + clamp(wrap(wanted - aim.yaw), -TURN * dt, TURN * dt),
-          );
-        } else if (assist && swimming) {
-          aim.yaw = wrap(
-            aim.yaw +
-              clamp(wrap(assist.yaw - aim.yaw), -ASSIST * dt, ASSIST * dt),
-          );
-        }
-        if (depth.pointer !== null) aim.pitch = depth.value;
-        else if (assist && swimming)
-          aim.pitch += clamp(
-            assist.pitch - aim.pitch,
-            -ASSIST * dt,
-            ASSIST * dt,
-          );
-        else aim.pitch *= Math.exp(-dt * LEVEL);
-      }
-      // "always" swims at full speed regardless of the thumb. "stick" is the
-      // keyboard: the thumb's direction becomes forward/strafe against the way
-      // you are looking, ramping from a standstill at the deadzone to full at
-      // FULL, so letting go stops the fish outright.
+      // The thumb's direction becomes forward/strafe against the way you are
+      // looking, ramping from a standstill at the deadzone to full at FULL, so
+      // letting go stops the fish outright. Nothing steers but the thumb.
       const ramp = held ? Math.min(1, (push - DEAD) / (FULL - DEAD)) / push : 0;
       const forward = !touchMode
         ? Number(keys.has("w") || keys.has("arrowup")) -
           Number(keys.has("s") || keys.has("arrowdown"))
-        : moveStyle === "always"
-          ? 1
-          : -steer.y * ramp;
+        : -steer.y * ramp;
       const strafe = !touchMode
         ? Number(keys.has("d") || keys.has("arrowright")) -
           Number(keys.has("a") || keys.has("arrowleft"))
-        : moveStyle === "always"
-          ? 0
-          : steer.x * ramp;
+        : steer.x * ramp;
       return {
         ...aim,
         // Adding zero normalises -0, which a stick pushed exactly sideways

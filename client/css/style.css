@@ -469,23 +469,6 @@ header,
   border-radius: 50%;
   background: #d1ed9e99;
 }
-.depth-gauge {
-  width: 26px;
-  height: 150px;
-  border-radius: 13px;
-  background: #abc8bf1a;
-  border: 1px solid #d1ed9e88;
-}
-.depth-gauge .knob {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 34px;
-  height: 34px;
-  margin: -17px;
-  border-radius: 50%;
-  background: #d1ed9e99;
-}
 #next-round {
   margin-top: 18px;
 }

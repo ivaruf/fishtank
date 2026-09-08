@@ -40,16 +40,6 @@ try {
 } catch {
   /* Storage unavailable: keep the default. */
 }
-// Touch swimming style: "always" keeps the fish moving, "hold" only swims
-// while a thumb pushes the stick. Restored before the first frame so a player
-// who needs stop-and-go never sees the other one.
-try {
-  const saved = localStorage.getItem("fishtank.movestyle");
-  if ([...$("movestyle").options].some((o) => o.value === saved))
-    $("movestyle").value = saved;
-} catch {
-  /* Storage unavailable: keep the default. */
-}
 let aquarium;
 try {
   aquarium = createAquarium($("game"));
@@ -112,26 +102,6 @@ $("resolution").addEventListener("change", () => {
     /* Not remembered this time. */
   }
   loadModels();
-});
-function syncMoveStyle() {
-  const style = $("movestyle").value;
-  controls.setMoveStyle(style);
-  const stick = style === "stick";
-  $("steer-hint").textContent = stick
-    ? "MOVE · PUSH THE STICK"
-    : "STEER · TOUCH AND DRAG";
-  $("depth-hint").textContent = stick
-    ? "LOOK · DRAG ANYWHERE HERE"
-    : "DIVE · DRAG DOWN OR UP";
-}
-$("movestyle").addEventListener("change", () => {
-  try {
-    localStorage.setItem("fishtank.movestyle", $("movestyle").value);
-  } catch {
-    /* Not remembered this time. */
-  }
-  syncMoveStyle();
-  audio.play("click");
 });
 let network = null,
   myId = null,
@@ -201,12 +171,6 @@ ask("version.json")
     $("version").textContent = "build unknown";
     $("version").title = "Could not find a build number to report.";
   });
-// Touch camera: settles in behind the fish's own heading instead of an aim.
-const follow = { yaw: 0, pitch: 0 };
-// Applied here rather than beside the listener above: setMoveStyle reports a
-// stop through the controls callback, which reads `network`, so it cannot run
-// before that binding exists.
-syncMoveStyle();
 // How long the camera lingers on the predator before the banner appears.
 const DEATH_CAM_SECONDS = 2.2;
 const demos = Array.from({ length: 18 }, (_, i) => ({
@@ -522,8 +486,6 @@ function handlers(current, kind) {
         (!before || (!before.alive && me.alive) || next.round !== state?.round)
       ) {
         controls.orient(me.yaw, me.pitch);
-        follow.yaw = me.yaw;
-        follow.pitch = 0;
       }
       if (before && !before.alive && me?.alive) {
         audio.play("respawn");
@@ -1021,29 +983,6 @@ function placeLabels() {
       labels.delete(id);
     }
 }
-// Touch bite assist: the nearest lighter fish inside a narrow cone ahead.
-function biteAssist(me) {
-  const heading = direction(me),
-    reach = 7 + radius(me.mass) * 3;
-  let best = null,
-    nearest = Infinity;
-  for (const f of [...state.npcs, ...state.players]) {
-    if (f.id === me.id || !f.alive || !outweighs(me, f)) continue;
-    const dx = f.x - me.x,
-      dy = f.y - me.y,
-      dz = f.z - me.z,
-      dist = Math.hypot(dx, dy, dz);
-    if (dist > reach || dist < 0.01 || dist >= nearest) continue;
-    const along = (dx * heading.x + dy * heading.y + dz * heading.z) / dist;
-    if (along < Math.cos(0.35)) continue;
-    nearest = dist;
-    best = {
-      yaw: Math.atan2(dx, dz),
-      pitch: Math.atan2(dy, Math.hypot(dx, dz)),
-    };
-  }
-  return best;
-}
 // Death cam: swing to the predator's mouth from the side and watch it chew.
 function deathCamera(dt, now) {
   const elapsed = (now - deathCam.start) / 1000,
@@ -1132,8 +1071,7 @@ engine.runRenderLoop(() => {
   const now = performance.now();
   adaptResolution(now);
   const me = state?.players.find((p) => p.id === myId);
-  if (touchMode) controls.assist(me?.alive ? biteAssist(me) : null);
-  const input = controls.read(dt, follow.yaw);
+  const input = controls.read();
   if (network && myId && now - lastSend > 50) {
     network.send(input);
     lastSend = now;
@@ -1223,18 +1161,9 @@ engine.runRenderLoop(() => {
   else if (mine) {
     const r = radius(me.mass),
       p = mine.root.position;
-    let d;
-    // "always" trails the camera behind the fish's own heading, because the
-    // thumb steers the fish rather than the view. With the stick scheme the
-    // right thumb aims the camera directly, exactly like the mouse.
-    if (touchMode && !controls.freeLook) {
-      const k = 1 - Math.exp(-dt * 3);
-      follow.yaw = wrap(
-        follow.yaw + wrap(mine.root.rotation.y - follow.yaw) * k,
-      );
-      follow.pitch += (-mine.root.rotation.x * 0.5 - follow.pitch) * k;
-      d = direction(follow);
-    } else d = direction(input);
+    // The camera looks where the player is aiming, on touch exactly as on
+    // desktop: one scheme, one camera.
+    const d = direction(input);
     // The follow distance is what decides whether growing is visible at all,
     // and it used to be 7 + r * 3 - three units back for every one unit of
     // radius gained, so it cancelled most of the growth as it happened. Over
