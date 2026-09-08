@@ -79,16 +79,16 @@ The plants, rocks, glass and office are decoration without obstacle collision. N
 
 ## Audio
 
-Music and effects are Sonic Pi pieces in `tools/sonic-pi/`: a calm menu theme ("Below the surface", 60 bpm, 32-beat loop), a gameplay loop ("Feeding time", 100 bpm, 64 beats), and one-shots for your bite, being eaten, a fish eaten nearby (fades with distance), respawning, a predator swimming close (at most every six seconds), the round ending, menu clicks, and the filter's arming chime, too-early buzz and lightning crack. `client/js/audio.js` plays them through Web Audio: loops crossfade between menu and game, effects share a bus, and the 🔊 button in the header mutes everything and remembers it. Audio starts on the first click or key press, as browsers require.
+Music and effects are Sonic Pi pieces in `tools/audio/`: a calm menu theme ("Below the surface", 60 bpm, 32-beat loop), a gameplay loop ("Feeding time", 100 bpm, 64 beats), and one-shots for your bite, being eaten, a fish eaten nearby (fades with distance), respawning, a predator swimming close (at most every six seconds), the round ending, menu clicks, and the filter's arming chime, too-early buzz and lightning crack. `client/js/audio.js` plays them through Web Audio: loops crossfade between menu and game, effects share a bus, and the 🔊 button in the header mutes everything and remembers it. Audio starts on the first click or key press, as browsers require.
 
-The recorder itself, `render.rb`, is not in this repo: it is generic and shared by every game in the hub, so it lives one level up in `../tools/sonic-pi/`. The pieces and `encode.mjs` here are fishtank's own.
+The recorder itself, `render.rb`, is not in this repo: it is generic and shared by every game in the hub, so it lives one level up in `../tools/audio/`. The pieces and `encode.mjs` here are fishtank's own.
 
 Rendering needs Sonic Pi 5 installed (`/Applications/Sonic Pi.app`, override with `SONIC_PI_APP`), ffmpeg on the PATH, and the real audio device, so it cannot run in a sandbox and you will hear it render in real time:
 
 ```sh
 SP="/Applications/Sonic Pi.app/Contents/Resources/app/server/native/ruby/bin/ruby"
-SONIC_PI_PIECES=tools/sonic-pi "$SP" ../tools/sonic-pi/render.rb /tmp/fishtank-audio music-menu=70 music-game=83 chomp=2 eaten=3 nearby=1.5 respawn=2.5 round-end=4 click=1 danger=3 pad=1.5 buzz=1.5 zap=2.5
-node tools/sonic-pi/encode.mjs /tmp/fishtank-audio client/assets/audio
+SONIC_PI_PIECES=tools/audio "$SP" ../tools/audio/render.rb /tmp/fishtank-audio music-menu=70 music-game=83 chomp=2 eaten=3 nearby=1.5 respawn=2.5 round-end=4 click=1 danger=3 pad=1.5 buzz=1.5 zap=2.5
+node tools/audio/encode.mjs /tmp/fishtank-audio client/assets/audio
 ```
 
 `render.rb` is adapted from Sonic Pi's own headless recorder, which pings the daemon every 4 s although the daemon wants a keep-alive more often than every 3 s and otherwise stops the take; this one pings every second and records every piece in a single engine session. Music pieces open with a marker tick and play their loop twice; `encode.mjs` cuts the second pass to the exact loop length (so reverb tails wrap around), trims effects to their sound, peak-normalises to -1 dBFS, and writes AAC (`.m4a`), which every major browser decodes.
