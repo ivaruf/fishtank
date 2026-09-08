@@ -168,7 +168,7 @@ A public broker is a real trade, and worth stating plainly:
   usual tenth - will fail to connect at all, with no fallback.
 - Its id space is shared with every other PeerJS app, so codes are namespaced
   `fishtank-v1-`, and a taken code is reported rather than silently failing.
-  A code is four picture names joined by dashes — `fishtank-v1-boat-fish-star-crab`
+  A code is four picture names joined by dashes — `fishtank-v1-boat-fish-star-duck`
   — which is 20,736 of them. Fewer than the six-consonant codes it replaced,
   and still far more than enough, because only rooms open at the same moment
   can collide and there are never more than a handful. See `client/js/codes.js`

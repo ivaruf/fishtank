@@ -24,18 +24,18 @@ test("a code is four pictures, and one code serves both ways in", () => {
 });
 
 test("the parser forgives however the code was written down", () => {
-  const code = "boat-fish-star-crab";
+  const code = "boat-fish-star-duck";
   for (const written of [
-    "boat-fish-star-crab",
-    "BOAT FISH STAR CRAB",
-    "Boat, Fish, Star, Crab",
-    "  boat   fish   star   crab  ",
-    "boat/fish/star/crab",
-    "⛵🐟⭐🦀",
-    "⛵ 🐟 ⭐ 🦀",
+    "boat-fish-star-duck",
+    "BOAT FISH STAR DUCK",
+    "Boat, Fish, Star, Duck",
+    "  boat   fish   star   duck  ",
+    "boat/fish/star/duck",
+    "⛵🐟⭐🦆",
+    "⛵ 🐟 ⭐ 🦆",
     // Read down a phone and half remembered: every name is unique in its
     // first three letters, so a prefix is enough.
-    "boa fis sta cra",
+    "boa fis sta duc",
   ])
     assert.equal(parseCode(written), code, `"${written}" is the same room`);
 });
@@ -48,11 +48,11 @@ test("the parser refuses what it cannot turn into a room", () => {
       `${JSON.stringify(junk)} is not a code`,
     );
   // A prefix may only shorten a name, never extend it.
-  assert.equal(parseCode("boat fish star crabby"), null);
+  assert.equal(parseCode("boat fish star ducky"), null);
   // Ambiguous: "s" could be shark, shell or star, so it is not a guess worth
   // making - a wrong room is a worse outcome than being asked again.
-  assert.equal(parseCode("s-s-s-s"), null);
-  assert.equal(parseCode("sh-fish-star-crab"), null, "shark or shell?");
+  assert.equal(parseCode("b-b-b-b"), null);
+  assert.equal(parseCode("b-fish-star-duck"), null, "bee, boat or ball?");
 });
 
 test("a code from another build is passed through, not rejected", () => {
@@ -69,11 +69,13 @@ test("every picture is distinct, and every name is prefix-unique", () => {
   assert.equal(new Set(SYMBOLS.map((s) => s.name)).size, SYMBOLS.length);
   for (const s of SYMBOLS) {
     assert.match(s.name, /^[a-z]+$/, "names are plain lowercase words");
-    const three = s.name.slice(0, 3);
+    // Short: these get read aloud, half remembered and typed by someone who
+    // finds typing hard. Five letters is the ceiling.
+    assert.ok(s.name.length <= 5, `${s.name} is too long for a code word`);
     assert.equal(
-      SYMBOLS.filter((o) => o.name.startsWith(three)).length,
+      SYMBOLS.filter((o) => o.name.startsWith(s.name.slice(0, 2))).length,
       1,
-      `${s.name} is not unique in its first three letters`,
+      `${s.name} is not unique in its first two letters`,
     );
     // One code point per picture, so counting characters counts pictures and
     // a code renders at a predictable width.
