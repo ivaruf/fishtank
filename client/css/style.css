@@ -562,12 +562,13 @@ header,
   align-items: center;
 }
 .peer input {
-  width: 7em;
-  max-width: none;
+  /* Wide enough for four words now that a code is "boat-fish-star-crab"
+     rather than six letters, and no letter-spacing, because the words carry
+     the meaning and spacing them out only makes them harder to read. */
+  width: 100%;
+  max-width: 300px;
   padding: 12px 14px;
   font-size: 15px;
-  letter-spacing: 3px;
-  text-transform: uppercase;
   text-align: center;
 }
 .games-hint {
@@ -679,6 +680,82 @@ header,
   font-size: 11px;
   line-height: 1.45;
   color: #9bb5ae;
+}
+/* The code as pictures, above the same code as words. Both, always: one is
+   for the player who cannot type it and one is for the parent pasting it
+   into a chat. */
+.lobby-icons {
+  font-size: 40px;
+  letter-spacing: 6px;
+  line-height: 1.1;
+}
+.lobby-invite #lobby-code {
+  font-size: 17px;
+  letter-spacing: 3px;
+}
+.lobby-invite button {
+  margin: 2px 0 10px;
+  padding: 8px 14px;
+  font-size: 12px;
+}
+/* The dialpad. Keys are deliberately large: this exists for a player who
+   finds a keyboard hard, and a 64px target that responds the instant it is
+   touched is the whole point. */
+.dialpad {
+  margin-top: 14px;
+}
+.dialpad-slots {
+  text-align: center;
+}
+.dialpad-slots span {
+  display: block;
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: #9bb5ae;
+}
+.dialpad-slots b {
+  display: block;
+  min-height: 44px;
+  margin: 4px 0 2px;
+  font-size: 34px;
+  letter-spacing: 8px;
+  line-height: 1.2;
+}
+.dialpad-keys {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+  margin: 6px 0 10px;
+}
+.dialpad-keys button {
+  min-height: 64px;
+  padding: 6px 0;
+  border: 1px solid #6eaaa44a;
+  border-radius: 12px;
+  background: #0e2b2655;
+  font-size: 30px;
+  line-height: 1;
+  cursor: pointer;
+  /* No tap-highlight lag and no double-tap zoom stealing the second key. */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    transform 0.06s ease-out,
+    background 0.12s ease-out;
+}
+.dialpad-keys button:active {
+  transform: scale(0.92);
+  background: #1d4c4488;
+}
+.dialpad button.secondary {
+  width: 100%;
+  padding: 10px;
+  font-size: 12px;
+}
+@media (max-width: 460px) {
+  .dialpad-keys {
+    grid-template-columns: repeat(4, 1fr);
+  }
 }
 .lobby .buttons {
   margin-top: 16px;

@@ -12,6 +12,14 @@ import { hostGame, joinGame, createHostEngine } from "./peer.js";
 import { hostRendezvous, joinRendezvous } from "./rendezvous.js";
 import { BUILD } from "./build.js";
 import {
+  CODE_LENGTH,
+  SYMBOLS,
+  newCode,
+  parseCode,
+  spellCode,
+  symbolsOf,
+} from "./codes.js";
+import {
   CONFIG as C,
   SPECIES,
   PROTOCOL,
@@ -499,7 +507,8 @@ function handlers(current, kind) {
         : `● ${(roomName ?? "shared tank").toUpperCase()}`;
       // A host can still be joined mid-round, so keep the code on screen: the
       // menu that showed it is gone once the round starts.
-      if (invite) $("connection").textContent += ` · CODE ${invite.code}`;
+      if (invite)
+        $("connection").textContent += ` · CODE ${spellCode(invite.code)}`;
       if (protocol !== PROTOCOL) {
         console.warn(
           `Server speaks protocol ${protocol}, this client expects ${PROTOCOL}. Restart the server (npm start).`,
@@ -745,13 +754,6 @@ function stopSignalling() {
   signalling = null;
   invite = null;
 }
-// Short, unambiguous, and shoutable across a room: no vowels to spell out and
-// no characters that look like each other.
-const newCode = () =>
-  Array.from(
-    { length: 6 },
-    () => "BCDFGHJKLMNPQRSTVWXZ23456789"[Math.floor(Math.random() * 28)],
-  ).join("");
 function peerNote(text) {
   $("peer-hint").textContent = text;
 }
@@ -760,7 +762,7 @@ $("host-peer").onclick = async () => {
   if (network || joining) return;
   const code = newCode();
   invite = { code, mode: "opening", detail: "" };
-  peerNote(`Setting up ${code}…`);
+  peerNote(`Setting up ${spellCode(code)}…`);
   const host = hostGame({
     // A tank you host is a tank you are inviting people to, so it waits in the
     // lobby like a server tank rather than dropping you into a round alone —
@@ -771,7 +773,7 @@ $("host-peer").onclick = async () => {
     engine: createHostEngine,
     join: { name: $("name").value, species: chosenSpecies },
     ...handlers(() => host, "peer"),
-    onPeers: (n) => peerNote(`Code ${code} · ${n} fish in the tank`),
+    onPeers: (n) => peerNote(`Code ${spellCode(code)} · ${n} fish in the tank`),
   });
   network = host;
   try {
@@ -794,8 +796,8 @@ $("host-peer").onclick = async () => {
     keepAwake();
     peerNote(
       signalling.mode === "tabs"
-        ? `Code ${code}, but this only reaches other tabs here: ${signalling.detail}`
-        : `Code ${code} · tell a friend (${signalling.detail})`,
+        ? `Code ${spellCode(code)}, but this only reaches other tabs here: ${signalling.detail}`
+        : `Code ${spellCode(code)} · tell a friend (${signalling.detail})`,
     );
     if (state) updateUI();
   } catch (error) {
@@ -804,18 +806,17 @@ $("host-peer").onclick = async () => {
     if (state) updateUI();
   }
 };
-$("join-peer").onclick = async () => {
-  audio.play("click");
+async function joinPeer(code) {
   if (network || joining) return;
-  const code = $("peer-code").value.trim().toUpperCase();
-  if (!code) return peerNote("Enter the code your friend gave you.");
   joining = true;
-  peerNote(`Looking for ${code}…`);
+  peerNote(`Looking for ${spellCode(code)}…`);
   try {
     const found = await joinRendezvous(code);
     signalling = found;
     joining = false;
-    peerNote(`Playing in ${code}. The tank runs on your friend's device.`);
+    peerNote(
+      `Playing in ${spellCode(code)}. The tank runs on your friend's device.`,
+    );
     const guest = joinGame({
       join: { name: $("name").value, species: chosenSpecies },
       channel: found.channel,
@@ -826,7 +827,70 @@ $("join-peer").onclick = async () => {
     joining = false;
     stopSignalling();
     peerNote(error.message);
+    // A wrong code has to be cheap to recover from, so leave the pad empty and
+    // ready rather than making them undo four taps.
+    picked.length = 0;
+    drawPicked();
   }
+}
+$("join-peer").onclick = () => {
+  audio.play("click");
+  if (network || joining) return;
+  const code = parseCode($("peer-code").value);
+  if (!code)
+    return peerNote(
+      "That is not a code. Tap the four pictures, or type them as words.",
+    );
+  joinPeer(code);
+};
+// The dialpad. Tapping the fourth picture joins on the spot: this is here for
+// a player who finds typing hard, and "now press Join" is exactly the extra
+// step that was worth removing. A mistake costs one tap of Undo, or nothing at
+// all once the attempt fails and the pad clears itself.
+const picked = [];
+function drawPicked() {
+  $("dialpad-picked").textContent =
+    picked.map((s) => s.icon).join("") +
+    "·".repeat(CODE_LENGTH - picked.length);
+  $("dialpad-back").disabled = !picked.length;
+}
+for (const symbol of SYMBOLS) {
+  const key = document.createElement("button");
+  key.type = "button";
+  key.textContent = symbol.icon;
+  // The picture is the label on screen; the name is the label for a screen
+  // reader, and for anyone whose font has no glyph for it.
+  key.setAttribute("aria-label", symbol.name);
+  key.title = symbol.name;
+  key.onclick = () => {
+    if (network || joining || picked.length >= CODE_LENGTH) return;
+    audio.play("click");
+    picked.push(symbol);
+    drawPicked();
+    if (picked.length === CODE_LENGTH)
+      joinPeer(picked.map((s) => s.name).join("-"));
+  };
+  $("dialpad-keys").append(key);
+}
+$("dialpad-back").onclick = () => {
+  audio.play("click");
+  picked.pop();
+  drawPicked();
+};
+drawPicked();
+$("copy-code").onclick = async () => {
+  audio.play("click");
+  const text = invite ? spellCode(invite.code) : "";
+  if (!text) return;
+  try {
+    await navigator.clipboard.writeText(text);
+    $("copy-code").textContent = "Copied!";
+  } catch {
+    // No clipboard permission, or an insecure context on the LAN. The code is
+    // selectable on screen either way, so say that rather than fail silently.
+    $("copy-code").textContent = "Select it above to copy";
+  }
+  setTimeout(() => ($("copy-code").textContent = "Copy the code"), 2000);
 };
 $("games-back").onclick = () => {
   audio.play("click");
@@ -898,7 +962,12 @@ function updateLobby(me) {
   // another device tries it, so say so here rather than let them find out.
   $("lobby-invite").hidden = !invite;
   if (invite) {
-    $("lobby-code").textContent = invite.code;
+    // Both forms, always: the pictures for whoever is going to tap them in,
+    // the words underneath for whoever is going to paste or read them out.
+    $("lobby-icons").textContent = symbolsOf(invite.code)
+      .map((s) => s?.icon ?? "?")
+      .join("");
+    $("lobby-code").textContent = spellCode(invite.code);
     $("lobby-reach").textContent =
       invite.mode === "tabs"
         ? `⚠ This code only reaches other tabs in this browser — ${invite.detail}`
@@ -906,7 +975,7 @@ function updateLobby(me) {
           ? `⚠ ${invite.detail} Nobody can join with this code.`
           : invite.mode === "opening"
             ? "Opening the tank…"
-            : "Have them type it into “Play with a friend”, on any device.";
+            : "They can tap the four pictures, or type the words, in “Play with a friend” on any device.";
   }
   const minutes = Math.round(lobby.duration / 60);
   if (!dragging) $("lobby-slider").value = String(minutes);

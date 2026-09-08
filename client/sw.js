@@ -24,6 +24,7 @@ const SHELL = [
   "css/style.css",
   "js/main.js",
   "js/build.js",
+  "js/codes.js",
   "js/local.js",
   "js/peer.js",
   "js/webrtc.js",

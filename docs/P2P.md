@@ -167,8 +167,12 @@ A public broker is a real trade, and worth stating plainly:
 - It provides no TURN, so a minority of network situations - roughly the
   usual tenth - will fail to connect at all, with no fallback.
 - Its id space is shared with every other PeerJS app, so codes are namespaced
-  `fishtank-v1-` and six characters long, and a taken code is reported rather
-  than silently failing.
+  `fishtank-v1-`, and a taken code is reported rather than silently failing.
+  A code is four picture names joined by dashes — `fishtank-v1-boat-fish-star-crab`
+  — which is 20,736 of them. Fewer than the six-consonant codes it replaced,
+  and still far more than enough, because only rooms open at the same moment
+  can collide and there are never more than a handful. See `client/js/codes.js`
+  for why the code is pictures.
 - **It drops a peer whose heartbeat stops, and releases the id with it.** This
   one cost real debugging: hosting worked, and the same code minutes later was
   "no tank found" on the friend's device. Measured — freeze the host page for
