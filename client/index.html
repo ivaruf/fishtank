@@ -88,11 +88,7 @@
         <div class="display-controls">
           <!-- Menu only: during play the same picker lives in the pause
                dialog, so the HUD is not carrying a settings row. -->
-          <div
-            class="tiers menu-only"
-            id="quality-menu"
-            aria-label="Graphics"
-          ></div>
+          <div class="quality-slot menu-only" id="quality-menu"></div>
           <button
             id="mute"
             class="secondary sound-toggle"
@@ -323,7 +319,7 @@
         main menu.
       </p>
       <div class="group-label">GRAPHICS</div>
-      <div class="tiers" id="quality-play" aria-label="Graphics"></div>
+      <div class="quality-slot" id="quality-play"></div>
       <div class="dialog-actions">
         <button id="continue" type="button" autofocus>Continue</button>
         <button id="confirm-leave" class="secondary" type="button">

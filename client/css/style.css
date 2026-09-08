@@ -824,45 +824,117 @@ header,
   align-items: flex-end;
   gap: 12px;
 }
-/* The graphics picker: a row of the game's own buttons rather than an OS
-   dropdown, which is the one control that used to give away that this is a
-   web page. Pressed state is aria-pressed, so the thing a screen reader is
-   told and the thing that is lit are the same fact. */
-.tiers {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
+/* The graphics dropdown. A `<select>` cannot be this: its popup is drawn by
+   the operating system and is the one part of a form CSS never reaches, which
+   is exactly what gave away that this is a web page. So it is a disclosure
+   button and a list of real buttons, in the game's own glass and lime. */
+.picker {
+  position: relative;
   margin: 0;
   pointer-events: auto;
 }
-.tiers .tier {
-  padding: 9px 11px;
+.picker-open {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 8px 12px;
   border: 1px solid #5b827a;
-  border-radius: 8px;
+  border-radius: 9px;
   background: #153e40a8;
-  color: #b6d2c6;
-  font-size: 10px;
+  color: #edf8ef;
+  font-size: 12px;
   font-weight: 600;
-  letter-spacing: 0.6px;
+  letter-spacing: 0.4px;
   white-space: nowrap;
-  transition:
-    border-color 0.15s,
-    background 0.15s,
-    color 0.15s;
 }
-.tiers .tier:hover {
+.picker-open:hover {
   border-color: #8fb3a8;
   filter: none;
 }
-.tiers .tier[aria-pressed="true"] {
+.picker-open[aria-expanded="true"] {
   border-color: #d1ed9e;
   background: #1f5a52c0;
-  color: #edf8ef;
-  box-shadow: 0 0 0 1px #d1ed9e66;
 }
-.tiers .tier:focus-visible {
+.picker-eyebrow {
+  font-size: 9px;
+  letter-spacing: 1.6px;
+  color: #9bb5ae;
+  font-weight: 700;
+}
+.picker-caret {
+  margin-left: auto;
+  font-size: 10px;
+  color: #b5d9b0;
+}
+.picker-open[aria-expanded="true"] .picker-caret {
+  color: #d1ed9e;
+}
+/* Opens downward in both places it is mounted: the header is at the top of
+   the screen and the pause panel's own scroll can take it if it is short of
+   room. The z-index clears the HUD panels, which are 2. */
+.picker-list {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 6;
+  display: grid;
+  gap: 2px;
+  width: max-content;
+  min-width: 100%;
+  max-width: min(320px, 80vw);
+  /* If a screen really is too short for five rows, the list scrolls - never
+     the panel it hangs off. Capped under half the viewport, since it opens
+     downward in the header and upward in the pause panel and either
+     direction has roughly half a screen to work with. */
+  max-height: min(46vh, 320px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 6px;
+  border: 1px solid #6eaaa44a;
+  border-radius: 12px;
+  background: #092f36f2;
+  backdrop-filter: blur(14px);
+  box-shadow: 0 18px 50px #00131799;
+}
+.picker-option {
+  display: grid;
+  gap: 1px;
+  padding: 9px 11px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #d7e7e0;
+  text-align: left;
+  font-weight: 600;
+}
+.picker-option b {
+  font-size: 12px;
+  letter-spacing: 0.3px;
+}
+.picker-option small {
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.35;
+  color: #9bb5ae;
+}
+.picker-option:hover {
+  background: #1f5a5299;
+  filter: none;
+}
+/* The chosen row is lit the way a chosen fish is, and marked with the tick
+   rather than by colour alone. */
+.picker-option[aria-checked="true"] {
+  background: #1f5a52c0;
+  color: #edf8ef;
+  box-shadow: inset 0 0 0 1px #d1ed9e66;
+}
+.picker-option[aria-checked="true"] b::after {
+  content: " ✓";
+  color: #d1ed9e;
+}
+.picker-option:focus-visible {
   outline: 2px solid #d1ed9e;
-  outline-offset: 2px;
+  outline-offset: -2px;
 }
 /* Only while the menu is up. The pause dialog carries the other copy. */
 body:not(:has(#menu:not([hidden]))) .menu-only {
@@ -1349,10 +1421,12 @@ select {
   background: #072c32d9;
   box-shadow: 0 6px 24px #001c2426;
 }
-/* Touch: the row wraps rather than scrolling off the header. */
-.tiers .tier {
-  padding: 10px 12px;
-  font-size: 11px;
+/* Touch: a comfortable target without widening the header. */
+.picker-open {
+  padding: 9px 12px;
+}
+.picker-option {
+  padding: 11px 12px;
 }
 .sound-toggle,
 .fullscreen-toggle {
@@ -1434,21 +1508,27 @@ select:focus-visible {
    able to watch it is what says so. */
 #leave-dialog {
   width: min(440px, calc(100vw - 32px));
-  max-height: calc(100vh - 32px);
-  max-height: calc(100dvh - 32px);
   margin: auto;
   padding: 28px 30px;
   border: 1px solid #6eaaa44a;
   border-radius: 18px;
-  background: #092f36e0;
-  backdrop-filter: blur(14px);
+  background: #092f36e8;
   color: #edf8ef;
   box-shadow: 0 24px 100px #0009;
+  /* No backdrop-filter on the panel itself, and no max-height. Both were
+     wrong here for the same reason: `backdrop-filter` makes an element a
+     containing block that clips its absolutely positioned children, and with
+     a max-height on top of it the graphics dropdown was cut off at the panel's
+     own rounded edge and had to be scrolled inside it. The blur lives on the
+     ::backdrop below, which softens the tank without boxing anything in, so
+     the list is free to hang past the panel like a dropdown should. */
+  overflow: visible;
 }
 #leave-dialog::backdrop {
-  /* Enough to lift the panel off the water, not enough to hide it. */
-  background: #00191d66;
-  backdrop-filter: blur(3px);
+  /* Enough to lift the panel off the water, not enough to hide it: the point
+     of pausing here is that the aquarium keeps going. */
+  background: #00191d73;
+  backdrop-filter: blur(6px);
 }
 #leave-dialog h2 {
   margin: 12px 0 8px;
@@ -1465,8 +1545,21 @@ select:focus-visible {
   margin: 0 0 8px;
   color: #9bb5ae;
 }
-#leave-dialog .tiers {
+#leave-dialog .quality-slot {
   margin-bottom: 22px;
+}
+/* In the panel the dropdown is the full width of it, its list lines up with
+   the left edge rather than the right, and it opens upward: the trigger sits
+   low in the panel, so downward would cover the Continue and Leave buttons -
+   and upward is where the room is on a short screen. */
+#leave-dialog .picker-open {
+  width: 100%;
+}
+#leave-dialog .picker-list {
+  top: auto;
+  bottom: calc(100% + 6px);
+  right: auto;
+  left: 0;
 }
 .dialog-actions {
   display: grid;
@@ -1484,11 +1577,10 @@ select:focus-visible {
     gap: 7px;
     font-size: 24px;
   }
-  /* A small landscape phone has no room for five labels in the header. The
-     pause dialog is where a setting gets changed on a phone anyway. */
-  .menu-only .tier {
-    padding: 8px 9px;
-    font-size: 10px;
+  /* A small landscape phone has room for the trigger but not for a label
+     beside it; the list it opens is unaffected. */
+  .picker-eyebrow {
+    display: none;
   }
   .display-controls {
     padding: 3px;
