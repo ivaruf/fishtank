@@ -71,17 +71,16 @@
     <canvas id="game" tabindex="0" aria-label="3D aquarium"></canvas>
     <div class="vignette"></div>
     <header>
+      <!-- The corner logo is the painting's own wordmark, cut from the same
+           source as the menu's title by tools/make-brand.py. The alt text is
+           what names the link. -->
       <a class="brand" href="./">
-        <svg class="mark" viewBox="0 0 48 48" aria-hidden="true">
-          <path class="mark-ring" d="M36 8A20 20 0 1 0 43 25" />
-          <path
-            class="mark-fish"
-            d="M12 24 7 17v14l5-7c7-10 18-10 27 0-9 10-20 10-27 0Z"
-          />
-          <circle class="pupil" cx="31" cy="22" r="1.6" />
-          <path class="mark-current" d="M33 7h9m-5 5h7" />
-        </svg>
-        <span class="wordmark">fishtank</span>
+        <img
+          src="assets/brand/fishtank-wordmark.webp"
+          alt="Fishtank"
+          width="480"
+          height="140"
+        />
       </a>
       <div class="header-tools">
         <div class="connection" id="connection"></div>
@@ -306,18 +305,8 @@
         Start the next round <span>→</span>
       </button>
     </section>
-    <dialog
-      id="leave-dialog"
-      aria-labelledby="leave-title"
-      aria-describedby="leave-description"
-    >
+    <dialog id="leave-dialog" aria-label="Paused">
       <div class="eyebrow">FISHTANK</div>
-      <h2 id="leave-title">Taking a breather?</h2>
-      <p id="leave-description">
-        The tank keeps running while you decide — you can watch it through this
-        panel. Change how it looks, stay for another swim, or head back to the
-        main menu.
-      </p>
       <div class="group-label">GRAPHICS</div>
       <div class="quality-slot" id="quality-play"></div>
       <div class="dialog-actions">

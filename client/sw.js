@@ -22,8 +22,11 @@ const SHELL = [
   "./",
   "index.html",
   "css/style.css",
-  // The menu's title art: the first screen looks wrong without it.
+  // The title art and the in-game corner logo. Both are brand, both are on
+  // screen within a second of a cold start, and a menu or a HUD with a hole
+  // where its logo goes is not one that works offline.
   "assets/brand/fishtank-title.webp",
+  "assets/brand/fishtank-wordmark.webp",
   "js/main.js",
   "js/build.js",
   "js/codes.js",

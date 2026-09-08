@@ -36,7 +36,7 @@ Two devices on the same wifi still need the internet to _find_ each other, becau
 - New and respawning players have three seconds of protection: they cannot eat or be eaten. When you are eaten the camera swings to the predator's mouth to watch it chew you down before "You became lunch" appears; you return after five seconds. Score survives death.
 - Rounds (two minutes solo, one to five in a lobby) rank players by score, then mass, so no lead lasts long; the current leader wears a small gold crown (and a 👑 on their name label) for everyone to see. Results also show the largest fish and stay up until someone presses **Start the next round**.
 - Leave tank returns to the menu. After a connection failure, join again to start as a new fish.
-- Esc, or the ✕ button, pauses to a panel you can see the tank through — the aquarium keeps running while you decide. Graphics live there rather than on the HUD, so nothing but the game is on screen while you are playing.
+- Esc, or the ✕ button, pauses to a panel you can see the tank through, so the fish keep swimming while you choose. Graphics live there rather than on the HUD, so nothing but the game is on screen while you are playing.
 - A room code is three pictures — 🐟 🦆 🐝 ⛵ 🚗 🍕 🌲 ⭐ 🌙 🔑 🎩 ⚽, one thing per category so nobody has to ask which fish it was — so **Play with a friend** can be joined by tapping three big keys on a dialpad rather than typing anything. It is one code, not two systems: the host's lobby shows the pictures with `BOAT FISH STAR` underneath and a Copy button, so whoever is sharing it pastes words into a chat while whoever is joining taps pictures. Typing still works and is deliberately forgiving — any separators, any case, two-letter prefixes, or the emoji pasted straight in. The third tap joins on the spot, because "now press Join" is exactly the extra step this exists to remove. Three pictures is 1,728 codes rather than the 20,736 four would give, which is a deliberate trade: getting in easily matters more than the remote chance of reaching a stranger's tank, and a code already in use is reported rather than silently wrong.
 
 ## Architecture
@@ -69,19 +69,27 @@ What the tests cannot cover is two separate devices finding each other through t
 
 Manual browser check: host in one window and join from another, move and aim independently, eat small NPCs, compare growth across windows, then eat a smaller player. Verify stopping on key release, dual-stick movement and aiming on a phone, respawn, and results after two minutes. Browser/device coverage is not implied by automated tests.
 
-## The title art
+## The brand art
 
-The menu's title is a painted piece rather than type, and `assets/brand/fishtank-title.png` is it exactly as delivered — 2000 × 819, background and all. `tools/make-title.py` derives what ships:
+Every shipped brand asset comes out of one painting. `assets/brand/fishtank-title.png` is it exactly as delivered — 2000 × 819, background and all — and `tools/make-brand.py` cuts the rest:
 
 ```sh
-python3 tools/make-title.py
+python3 tools/make-brand.py
 ```
 
-It keys out the flat `#003E4E` background, trims the margin, resizes to 1200 px and writes `client/assets/brand/fishtank-title.webp` (147 KB, against 564 KB for the same pixels as PNG — worth it on the first screen a player sees, and a browser without WebP was never going to manage the WebGL or the data channels either). `docs/title-on-water.png` is the proof sheet, the cut-out composited over the colour the menu actually sits on, because that is the only background against which a cut-out can be judged.
+| what                    | from                            | where                                        |
+| ----------------------- | ------------------------------- | -------------------------------------------- |
+| the menu's title        | the whole lockup                | `client/assets/brand/fishtank-title.webp`    |
+| the in-game corner logo | the wordmark alone              | `client/assets/brand/fishtank-wordmark.webp` |
+| the app icons           | the little fish and its bubbles | `client/assets/icons/*.png`                  |
+
+WebP for the two brand images: 147 KB against 564 KB for the same pixels as PNG, which is worth having on the first screen a player sees, and a browser without WebP was never going to manage the WebGL or the data channels either. `docs/title-on-water.png` and `docs/icons.png` are the proof sheets, composited over the colours these are actually seen against, because that is the only background against which a cut-out can be judged.
 
 The keying is a flood fill inward from the border, not a threshold on colour, and that is the whole trick: the letters are outlined in a dark teal close enough to the background that any global threshold eats them, while the background is the only region of that colour touching the border. Filling from the edge takes it and leaves every enclosed dark pixel alone — the outlines, the fish's eye, the counters in the _a_ and the _o_. Alpha then ramps across a band either side of the threshold rather than switching, or the letters pick up the one-pixel dark fringe that gives a badly cut-out logo away.
 
-The corner brand in the header stays a drawn SVG and is not a crop of this. At 34 px the painted version is mush, and a hand-drawn mark is simply the right tool at that size; instead the corner brand hides itself while the menu is up, since the art is already saying the name three times larger immediately below it, and comes back for the game where it is the only place the name appears.
+The corner logo in the header is the painting's own wordmark, cut at the row where the wordmark and the tagline are least tangled. They do interlock — the tagline's ascenders reach up into the wordmark's band and its glow touches them — so neither a straight cut nor connected components separate them. What does is a per-column rule: in the strip where they overlap, keep only the run of ink still connected to the top of the strip, since everything else there belongs to whatever is below it. Without that the corner logo carries a dotted line under the word, which is what the tagline's ascender tips look like at 40 px. It is sized by height at 46 px, which is about the smallest this reads at — the word is legible from around 40 and the tail on the f survives, while 28 is a smudge — stepping down to 34 on a landscape phone. It still hides itself while the menu is up, since the art is already saying the name three times larger immediately below.
+
+The app icons are the little fish and its bubbles rather than any part of the word. A fragment of a letter cannot be an icon here: the letters run into each other, so every square crop of them is visibly clipped, and the whole wordmark in a square is a strip that is unreadable by 32 px. The fish is the one self-contained motif in the piece, it is what the game is about, and it still reads as a fish at 32. Two edges of its crop box are load-bearing and commented as such — the `k`'s bitten edge reaches right into the fish's column but only below it, and the tagline runs on underneath, so a box any taller picks up a speck of it. The maskable icon fills appreciably less of its square than the others, because Android crops it to whatever shape it likes and guarantees only the inner 80%.
 
 ## Blender fish models
 

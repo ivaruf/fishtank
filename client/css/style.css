@@ -76,39 +76,27 @@ header {
   pointer-events: none;
 }
 .brand {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  font-size: 30px;
-  font-weight: 800;
-  letter-spacing: -1.4px;
-  color: inherit;
-  text-decoration: none;
+  display: block;
+  line-height: 0;
   pointer-events: auto;
 }
-.brand .mark {
-  width: 58px;
-  height: 34px;
-  flex: none;
-  fill: #d1ed9e;
-  /* The chase reads as motion even standing still. */
-  filter: drop-shadow(0 2px 5px #00000055);
+/* Sized by height, because it is a wordmark and its width follows. 46 px is
+   the smallest this reads at: the word is legible from about 40 and the tail
+   on the f survives, while 28 is a smudge. That is also why the corner logo
+   is the word and not the little fish - a mark that small has to be a shape,
+   and the shape here is the whole word. */
+.brand img {
+  display: block;
+  height: 46px;
+  width: auto;
 }
-.brand .mark .prey {
-  fill: #7fa89c;
+.brand:hover img {
+  filter: brightness(1.08);
 }
-.brand .mark .pupil {
-  fill: #0d2b2a;
-}
-.brand:hover .mark {
-  fill: #e6ffb8;
-}
-/* The corner brand steps aside while the menu is up, because the title art is
-   already saying the name three times the size directly below it. It comes
-   back for the game, where it is the only place the name appears - and where
-   the painted version would be mush at 34 px, which is why the small mark is
-   still a drawing and not a crop of the artwork. Hidden rather than removed,
-   so the header's spacing does not shift when a round starts. */
+/* The corner logo steps aside while the menu is up, because the title art is
+   already saying the name three times the size directly below it, and comes
+   back for the game where it is the only place the name appears. Hidden rather
+   than removed, so the header's spacing does not shift when a round starts. */
 body:has(#menu:not([hidden])) .brand {
   visibility: hidden;
 }
@@ -1012,13 +1000,8 @@ select {
     max-width: 110px;
     text-align: right;
   }
-  .brand {
-    font-size: 25px;
-    gap: 8px;
-  }
-  .brand .mark {
-    width: 43px;
-    height: 31px;
+  .brand img {
+    height: 40px;
   }
   .panel {
     left: 7%;
@@ -1121,13 +1104,8 @@ select {
     left: max(20px, env(safe-area-inset-left));
     right: max(20px, env(safe-area-inset-right));
   }
-  .brand {
-    font-size: 23px;
-    gap: 7px;
-  }
-  .brand .mark {
-    width: 38px;
-    height: 27px;
+  .brand img {
+    height: 36px;
   }
   .header-tools {
     gap: 6px;
@@ -1392,35 +1370,6 @@ select {
   }
 }
 
-/* A quieter identity and a single visual language for the menus. */
-.brand {
-  gap: 10px;
-  font-weight: 600;
-  letter-spacing: -1.3px;
-}
-.brand .mark {
-  width: 42px;
-  height: 42px;
-  fill: none;
-  filter: none;
-}
-.brand .mark-ring {
-  stroke: #9ed9c5;
-  stroke-width: 1.5;
-  fill: none;
-}
-.brand .mark-fish {
-  fill: #d1ed9e;
-}
-.brand .mark-current {
-  fill: none;
-  stroke: #d1ed9e;
-  stroke-width: 1.5;
-  stroke-linecap: round;
-}
-.brand:hover .mark {
-  fill: none;
-}
 .display-controls {
   gap: 6px;
   padding: 5px;
@@ -1538,15 +1487,6 @@ select:focus-visible {
   background: #00191d73;
   backdrop-filter: blur(6px);
 }
-#leave-dialog h2 {
-  margin: 12px 0 8px;
-  font-size: 28px;
-  letter-spacing: -0.8px;
-}
-#leave-dialog p {
-  margin: 0 0 18px;
-  font-size: 14px;
-}
 /* The label above the graphics row: the dialog is tight, so it does not get
    the generous spacing the menu's own group labels have. */
 #leave-dialog .group-label {
@@ -1577,13 +1517,10 @@ select:focus-visible {
   border-radius: 10px;
 }
 @media (max-width: 650px), (max-height: 520px) {
-  .brand .mark {
-    width: 32px;
-    height: 32px;
-  }
-  .brand {
-    gap: 7px;
-    font-size: 24px;
+  /* A landscape phone: small enough to leave the header room, large enough
+     that the word is still a word. */
+  .brand img {
+    height: 34px;
   }
   /* A small landscape phone has room for the trigger but not for a label
      beside it; the list it opens is unaffected. */
@@ -1613,15 +1550,6 @@ select:focus-visible {
     max-height: calc(100dvh - 16px);
     overflow-y: auto;
     overscroll-behavior: contain;
-  }
-  #leave-dialog h2 {
-    margin: 6px 0 6px;
-    font-size: 21px;
-  }
-  #leave-dialog p {
-    margin: 0 0 14px;
-    font-size: 13px;
-    line-height: 1.5;
   }
   #leave-dialog .quality-slot {
     margin-bottom: 16px;
