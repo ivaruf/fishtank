@@ -577,6 +577,7 @@ function handlers(current, kind) {
           });
         }
         visuals.get(e.predator)?.bite();
+        visuals.get(e.predator)?.grow(e.grew ?? 1);
         const prey = visuals.get(e.prey);
         if (prey) {
           // The player's own swallow runs longer so the death cam can watch it.
@@ -1234,10 +1235,23 @@ engine.runRenderLoop(() => {
       follow.pitch += (-mine.root.rotation.x * 0.5 - follow.pitch) * k;
       d = direction(follow);
     } else d = direction(input);
+    // The follow distance is what decides whether growing is visible at all,
+    // and it used to be 7 + r * 3 - three units back for every one unit of
+    // radius gained, so it cancelled most of the growth as it happened. Over
+    // the whole mass range, 8 to the 1800 cap, a fish went from filling 19% of
+    // the screen to 46%: 225 times the mass for 2.4 times the size, with a
+    // hard ceiling of 65% however big you ever got.
+    //
+    // 8.6 + r * 1.5 keeps the spawn framing almost exactly as it was and
+    // halves the cancellation above it: a good round now reads 19% -> 30%
+    // instead of 19% -> 27%, and the cap fills two thirds of the frame. Mass
+    // is still the cube of the thing you can see, so the rest of the feeling
+    // has to come from the pop in fish.js.
+    const back = 8.6 + r * 1.5;
     const desired = new B.Vector3(
-      p.x - d.x * (7 + r * 3),
-      p.y + 2 + r * 0.4 - d.y * (7 + r * 3),
-      p.z - d.z * (7 + r * 3),
+      p.x - d.x * back,
+      p.y + 2 + r * 0.4 - d.y * back,
+      p.z - d.z * back,
     );
     desired.x = Math.max(-35, Math.min(35, desired.x));
     desired.y = Math.max(1.5, Math.min(29, desired.y));
@@ -1250,7 +1264,12 @@ engine.runRenderLoop(() => {
       desired,
       1 - Math.exp(-dt * 20),
     );
-    camera.setTarget(p.add(new B.Vector3(d.x * 3, d.y * 2, d.z * 3)));
+    // Look further ahead the bigger the fish, or a grown one sits in the
+    // middle of the frame with its own body across the view.
+    const ahead = 2 + r * 1.2;
+    camera.setTarget(
+      p.add(new B.Vector3(d.x * ahead, d.y * (ahead * 0.7), d.z * ahead)),
+    );
   } else {
     camera.position.set(Math.sin(time * 0.035) * 8, 13, -28);
     camera.setTarget(new B.Vector3(1, 11, 0));

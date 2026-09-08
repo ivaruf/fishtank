@@ -19,6 +19,10 @@ export function material(scene, name, color, emissive = 0) {
   return m;
 }
 const BITE_TIME = 0.6,
+  // Long enough to read as a swell and short enough to fire again on the next
+  // mouthful, since a good run of eating is several fish in a couple of
+  // seconds and the pops should stack up rather than queue.
+  GROW_TIME = 0.4,
   DEATH_TIME = 0.7;
 // Threat cue tints: food a touch brighter and warmer, threats darker and cooler.
 const NEUTRAL = new B.Color3(1, 1, 1),
@@ -166,14 +170,21 @@ export function createFish(
   color = 0,
   preview = false,
 ) {
-  // Server state drives root; bite and death animations play on pose.
+  // Three nodes, and the split matters. root carries the transform the
+  // simulation sent. pose plays the bite lunge and the death tumble. swell
+  // plays the growth pop and nothing else, which is the only reason it exists:
+  // the pop and the bite both want to scale the fish, they overlap by design
+  // (you grow the instant you bite), and two animations writing one scaling
+  // fight. A node each and they compose for free.
   const root = new B.TransformNode("fish", scene),
-    pose = new B.TransformNode("pose", scene);
+    pose = new B.TransformNode("pose", scene),
+    swell = new B.TransformNode("swell", scene);
   pose.parent = root;
+  swell.parent = pose;
   const model = modelsFor(scene).get(species);
   const body = model
-    ? instantiate(model, pose, preview)
-    : procedural(scene, pose, color);
+    ? instantiate(model, swell, preview)
+    : procedural(scene, swell, color);
   if (!npc) {
     if (!crests.has(scene))
       crests.set(scene, material(scene, "crest", "#e4ffc3", 0.7));
@@ -183,7 +194,7 @@ export function createFish(
       scene,
     );
     crest.position.set(0, 1.22, 0.05);
-    crest.parent = pose;
+    crest.parent = swell;
     crest.material = crests.get(scene);
   }
   // A dark cartoon maw that only shows while the fish chomps.
@@ -192,7 +203,7 @@ export function createFish(
     { segments: 6, diameter: 1 },
     scene,
   );
-  mouth.parent = pose;
+  mouth.parent = swell;
   const mouthY =
     model && species === "seahorse"
       ? 0.61
@@ -219,7 +230,7 @@ export function createFish(
       scene,
     );
     crown.position.set(0, 1.58, 0.05);
-    crown.parent = pose;
+    crown.parent = swell;
     crown.material = gold;
     for (let i = 0; i < 4; i++) {
       const point = B.MeshBuilder.CreateCylinder(
@@ -239,6 +250,8 @@ export function createFish(
   if (swim.isStarted)
     swim.goToFrame(swim.from + Math.random() * (swim.to - swim.from));
   let bite = -1,
+    grew = -1,
+    grewBy = 1,
     death = -1,
     deathLength = DEATH_TIME,
     jolting = false;
@@ -258,6 +271,16 @@ export function createFish(
       mouth.setEnabled(true);
       swim.speedRatio = 4;
     },
+    // A meal's worth of growth, made visible. The actual increment is far too
+    // small to see - one small fish is about 7% of your radius, and the follow
+    // camera eats a third of even that - so the growth a player feels has to
+    // be an event rather than a size. `gain` is the mass added, which sets how
+    // hard it pops: a snack is a nudge, a whole player is a lurch.
+    grow(gain = 1) {
+      if (death >= 0) return;
+      grew = 0;
+      grewBy = Math.min(1, 0.3 + gain / 10);
+    },
     // seconds stretches the swallow, used for the player's own death cam.
     die(predator = null, seconds = DEATH_TIME) {
       fish.eatenBy = predator;
@@ -266,12 +289,13 @@ export function createFish(
       bite = -1;
     },
     reset() {
-      bite = death = -1;
+      bite = death = grew = -1;
       fish.eatenBy = null;
       mouth.setEnabled(false);
       pose.position.setAll(0);
       pose.rotation.setAll(0);
       pose.scaling.setAll(1);
+      swell.scaling.setAll(1);
     },
     // Stunned by the zapper: twitch until it wears off.
     jolt(on) {
@@ -281,8 +305,25 @@ export function createFish(
       }
       jolting = on;
     },
-    // Advances bite and death animations; true while a death is still playing.
+    // Advances bite, growth and death animations; true while a death is still
+    // playing.
     update(dt) {
+      // The pop, on its own node, so it neither reads nor writes anything the
+      // bite and death animations below touch. It overshoots and settles
+      // rather than easing in: a fish that swells past its size and comes back
+      // reads as "that just grew", where a fish that eases up 7% reads as
+      // nothing at all.
+      if (grew >= 0) {
+        grew += dt;
+        const t = grew / GROW_TIME;
+        if (t >= 1) {
+          grew = -1;
+          swell.scaling.setAll(1);
+        } else {
+          const pop = 1 + Math.sin(Math.PI * t) * 0.22 * grewBy;
+          swell.scaling.set(pop, pop, 1 + (pop - 1) * 0.5);
+        }
+      }
       if (jolting && death < 0) {
         pose.rotation.z = (Math.random() - 0.5) * 0.4;
         pose.position.x = (Math.random() - 0.5) * 0.14;
