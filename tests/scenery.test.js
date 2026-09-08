@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { World } from "../shared/world.js";
 import {
+  HARD,
   OBSTACLES,
   ROCKS,
   SCENERY,
@@ -25,7 +26,7 @@ function clearHeight(x, z, mass, ceiling) {
 }
 const arch = SCENERY.find((s) => s.asset === "stone-arch");
 const wreck = SCENERY.find((s) => s.asset === "little-shipwreck");
-// The lintel's underside, and the top of the crown, in world units.
+// The underside of the crown stone, and the top of it, in world units.
 const UNDER_ARCH = 1.19 * arch.scale,
   OVER_ARCH = 1.83 * arch.scale;
 
@@ -39,7 +40,7 @@ test("a small fish ducks under the arch and a grown one has to go over", () => {
   assert.equal(
     clearHeight(arch.x, arch.z, 45, UNDER_ARCH),
     null,
-    "a mass-45 fish cannot get under the lintel",
+    "a mass-45 fish cannot get under the crown",
   );
   // Blocked from the shortcut, not from the tank: over the crown is open.
   assert.ok(
@@ -47,7 +48,8 @@ test("a small fish ducks under the arch and a grown one has to go over", () => {
     "a grown fish can still swim over the arch",
   );
   // Where the gate closes. Growth is 0.75 of what you eat, so this is four or
-  // five meals from a start of 8: if that beat moves, this number moves.
+  // five meals from a start of 8: if that beat moves, this number moves. It is
+  // also what pins the arch's scale - see the note in shared/scenery.js.
   let pass = 1,
     stop = 400;
   for (let i = 0; i < 44; i++) {
@@ -56,8 +58,8 @@ test("a small fish ducks under the arch and a grown one has to go over", () => {
     else stop = mid;
   }
   assert.ok(
-    Math.abs(pass - 32.7) < 1,
-    `arch closes at mass ${pass.toFixed(1)}, expected about 32.7`,
+    Math.abs(pass - 32.3) < 1,
+    `arch closes at mass ${pass.toFixed(1)}, expected about 32.3`,
   );
 });
 
@@ -212,7 +214,11 @@ test("the rock table is the one the client draws from", () => {
   // The client re-runs drawRocks on its own generator to keep the kelp where
   // it was, so the two draws have to agree exactly.
   assert.deepEqual(drawRocks(noise(29)), ROCKS);
-  assert.equal(OBSTACLES.length, ROCKS.length + 11);
+  // Every rock, plus every box of every hard placement, and nothing else.
+  // Counted from the tables rather than written down: this was a hardcoded 11
+  // and it went stale the moment the arch became a ring of stones.
+  const boxes = SCENERY.reduce((n, s) => n + (HARD[s.asset]?.length ?? 0), 0);
+  assert.equal(OBSTACLES.length, ROCKS.length + boxes);
   // Nothing anywhere may reach outside the glass.
   for (const o of OBSTACLES) {
     assert.ok(Math.abs(o.x) + o.reach < C.width / 2 + 4, "inside the tank");

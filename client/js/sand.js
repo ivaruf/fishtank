@@ -16,6 +16,13 @@ const B = window.BABYLON;
 // Both numbers are the Blender script's; change them together or not at all.
 const TILE = 8,
   ACROSS = 9;
+// How the sand takes its brightness, exported because world.js lights the flat
+// procedural plane the same way. The floor is white coral sand at every
+// quality setting; only the ripples and the grain are a top-tier luxury, and a
+// seabed that changed colour when you moved the slider would be a bug.
+// The arithmetic behind the two numbers is in standardize() below.
+export const SAND_LIT = 0.34,
+  SAND_GLOW = 0.42;
 export const sandTier = (quality) =>
   ({ sharp: "high", ultra: "ultra" })[quality] ?? null;
 export function createSandFloor(
@@ -112,9 +119,9 @@ function standardize(container, scene) {
       // a beach looks in daylight, because the hood lamp is blue-white and the
       // water is green. Raise emissiveColor to brighten the dark edges,
       // diffuseColor for the lit middle.
-      m.diffuseColor = new B.Color3(0.34, 0.34, 0.34);
+      m.diffuseColor = new B.Color3(SAND_LIT, SAND_LIT, SAND_LIT);
       m.emissiveTexture = pbr.albedoTexture;
-      m.emissiveColor = new B.Color3(0.42, 0.42, 0.42);
+      m.emissiveColor = new B.Color3(SAND_GLOW, SAND_GLOW, SAND_GLOW);
       // Roughness 0.94 in the export: wet sand, barely a highlight. Matches
       // the specular the procedural sand already used.
       m.specularColor = new B.Color3(0.05, 0.05, 0.04);

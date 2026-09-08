@@ -1,7 +1,7 @@
 import { material } from "./fish.js";
 import { createEnvironmentDetails } from "./environment.js";
 import { loadScenery } from "./scenery.js";
-import { createSandFloor } from "./sand.js";
+import { createSandFloor, SAND_GLOW, SAND_LIT } from "./sand.js";
 import { hardwareScaling } from "./rendering.js";
 import { PLANTS } from "../../shared/config.js";
 import { ROCKS, drawRocks, noise, rockBump } from "../../shared/scenery.js";
@@ -133,13 +133,28 @@ export function createAquarium(canvas) {
 // and the water surface.
 function buildTank(scene, glow) {
   const rnd = noise(29);
-  const sandMat = material(scene, "sand", "#9a8c66");
-  sandMat.diffuseTexture = speckles(scene, "sand grain", "#9a8c66", [
-    "#877852",
-    "#ad9f79",
-    "#6f6248",
+  // White coral sand, the same floor the authored tile lays down at the top
+  // two quality settings - a seabed that changed colour when you moved the
+  // quality slider would be a bug, so only the ripples and the grain are a
+  // luxury and the colour never is.
+  //
+  // This used to be a #9a8c66 tint over a #9a8c66 speckle texture, and that
+  // was the whole problem: StandardMaterial multiplies the two, so a pair of
+  // innocent khakis came out a dark saturated brown. The tint is now a plain
+  // grey share and the canvas carries all of the colour, lit the way sand.js
+  // lights the tile - a third from the lights, a little more as emissive,
+  // because the hood spot is a cone and its corners would otherwise be black.
+  const sandMat = material(scene, "sand", "#ffffff");
+  sandMat.diffuseTexture = speckles(scene, "sand grain", "#e2d6bf", [
+    "#d6c8ae",
+    "#efe6d5",
+    "#cbbca1",
+    "#dccfb6",
   ]);
   sandMat.diffuseTexture.uScale = sandMat.diffuseTexture.vScale = 6;
+  sandMat.diffuseColor = new B.Color3(SAND_LIT, SAND_LIT, SAND_LIT);
+  sandMat.emissiveTexture = sandMat.diffuseTexture;
+  sandMat.emissiveColor = new B.Color3(SAND_GLOW, SAND_GLOW, SAND_GLOW);
   sandMat.specularColor = new B.Color3(0.05, 0.05, 0.04);
   const floor = B.MeshBuilder.CreateGround(
     "sand",
