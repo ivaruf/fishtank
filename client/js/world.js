@@ -2,7 +2,7 @@ import { material } from "./fish.js";
 import { createEnvironmentDetails } from "./environment.js";
 import { loadScenery } from "./scenery.js";
 import { createSandFloor, SAND_GLOW, SAND_LIT } from "./sand.js";
-import { hardwareScaling } from "./rendering.js";
+import { hardwareScaling, quality } from "./quality.js";
 import { PLANTS } from "../../shared/config.js";
 import { ROCKS, drawRocks, noise, rockBump } from "../../shared/scenery.js";
 const B = window.BABYLON;
@@ -19,16 +19,15 @@ export function createAquarium(canvas) {
     preserveDrawingBuffer: false,
     stencil: true,
   });
-  const resolution = document.getElementById("resolution");
   // Multiplied into the chosen tier's scaling by the adaptive loop in main.js.
   let relief = 1;
   const resize = () => {
     engine.setHardwareScalingLevel(
-      hardwareScaling(resolution.value, window.devicePixelRatio) * relief,
+      hardwareScaling(quality.value, window.devicePixelRatio) * relief,
     );
     engine.resize();
   };
-  resolution.addEventListener("change", resize);
+  quality.addEventListener("change", resize);
   window.addEventListener("resize", resize);
   resize();
   const scene = new B.Scene(engine);
@@ -85,9 +84,23 @@ export function createAquarium(canvas) {
   const glow = new B.GlowLayer("glow", scene, { blurKernelSize: 48 });
   glow.intensity = 0.55;
   const tank = buildTank(scene, glow);
-  buildRoom(scene, glow);
-  createEnvironmentDetails(scene, resolution);
-  createSandFloor(scene, resolution, tank.floor);
+  const room = buildRoom(scene, glow);
+  createEnvironmentDetails(scene, quality);
+  createSandFloor(scene, quality, tank.floor);
+  // Potato: the tank as it was in the first week. A wireframe frame, a grid on
+  // the sand, flat colours, and no room at all beyond the glass - which is the
+  // real saving, since the office is a hundred and fifty little boxes that are
+  // only ever seen through a pane. Everything it turns off is decoration;
+  // nothing that stops a fish is ever hidden, or a player on an old tablet
+  // would be swimming into walls they cannot see.
+  const applyPotato = () => {
+    const potato = quality.value === "potato";
+    tank.setPotato(potato);
+    room.setEnabled(!potato);
+    glow.isEnabled = !potato;
+  };
+  quality.addEventListener("change", applyPotato);
+  applyPotato();
   const bubbleMat = material(scene, "bubble", "#a6e6d6", 0.3);
   bubbleMat.alpha = 0.22;
   const bubbles = [];
@@ -145,13 +158,14 @@ function buildTank(scene, glow) {
   // lights the tile - a third from the lights, a little more as emissive,
   // because the hood spot is a cone and its corners would otherwise be black.
   const sandMat = material(scene, "sand", "#ffffff");
-  sandMat.diffuseTexture = speckles(scene, "sand grain", "#e2d6bf", [
+  const sandTexture = speckles(scene, "sand grain", "#e2d6bf", [
     "#d6c8ae",
     "#efe6d5",
     "#cbbca1",
     "#dccfb6",
   ]);
-  sandMat.diffuseTexture.uScale = sandMat.diffuseTexture.vScale = 6;
+  sandTexture.uScale = sandTexture.vScale = 6;
+  sandMat.diffuseTexture = sandTexture;
   sandMat.diffuseColor = new B.Color3(SAND_LIT, SAND_LIT, SAND_LIT);
   sandMat.emissiveTexture = sandMat.diffuseTexture;
   sandMat.emissiveColor = new B.Color3(SAND_GLOW, SAND_GLOW, SAND_GLOW);
@@ -223,6 +237,9 @@ function buildTank(scene, glow) {
   // Frame: four posts and two rims of slim black bars, plus the light bar.
   const frameMat = material(scene, "tank frame", "#14191b");
   frameMat.specularColor = new B.Color3(0.3, 0.3, 0.3);
+  // Collected because potato swaps this whole frame - posts, rims, light bar
+  // and strip - for the twelve lines the early build drew instead.
+  const bars = [];
   const bar = (name, size, pos, mat = frameMat) => {
     const mesh = B.MeshBuilder.CreateBox(
       name,
@@ -232,6 +249,7 @@ function buildTank(scene, glow) {
     mesh.position.set(...pos);
     mesh.material = mat;
     mesh.freezeWorldMatrix();
+    bars.push(mesh);
     return mesh;
   };
   const t = 1.4;
@@ -251,7 +269,10 @@ function buildTank(scene, glow) {
     material(scene, "light strip", "#eaf6ff", 1),
   );
   glow.addIncludedOnlyMesh(strip);
-  // Glass: faintly tinted, mostly specular, seen from both sides.
+  // Glass: faintly tinted, mostly specular, seen from both sides. Four
+  // transparent panes and a rippling sheet are the two things in here that
+  // cost fill rate rather than geometry, so potato drops both.
+  const panes = [];
   const glass = material(scene, "glass", "#8fc9d8", 0.05);
   glass.alpha = 0.22;
   glass.specularColor = new B.Color3(0.9, 0.95, 1);
@@ -272,6 +293,7 @@ function buildTank(scene, glow) {
     pane.rotation.y = yaw;
     pane.material = glass;
     pane.freezeWorldMatrix();
+    panes.push(pane);
   }
   // Water surface: a translucent sheet that ripples slowly, seen from below.
   const surfaceMat = material(scene, "water surface", "#a9dfe8", 0.25);
@@ -294,11 +316,80 @@ function buildTank(scene, glow) {
   const positions = surface.getVerticesData(B.VertexBuffer.PositionKind),
     indices = surface.getIndices(),
     normals = new Float32Array(positions.length);
+  // The first-week look, built on demand and kept: a grid on the sand and the
+  // tank drawn as twelve lines. Two line systems, and they are the only things
+  // potato *adds* rather than takes away.
+  let wireframe = null;
+  const buildWireframe = () => {
+    const marks = [];
+    for (let i = -TANK.x; i <= TANK.x; i += 6) {
+      marks.push([
+        new B.Vector3(i, 0.03, -TANK.z),
+        new B.Vector3(i, 0.03, TANK.z),
+      ]);
+      marks.push([
+        new B.Vector3(-TANK.x, 0.03, i),
+        new B.Vector3(TANK.x, 0.03, i),
+      ]);
+    }
+    const grid = B.MeshBuilder.CreateLineSystem(
+      "floor grid",
+      { lines: marks },
+      scene,
+    );
+    grid.color = new B.Color3(0.37, 0.55, 0.49);
+    grid.alpha = 0.28;
+    grid.isPickable = false;
+    const edges = [];
+    for (const x of [-TANK.x, TANK.x])
+      for (const z of [-TANK.z, TANK.z])
+        edges.push([new B.Vector3(x, 0, z), new B.Vector3(x, TANK.y, z)]);
+    for (const y of [0, TANK.y])
+      edges.push([
+        new B.Vector3(-TANK.x, y, -TANK.z),
+        new B.Vector3(TANK.x, y, -TANK.z),
+        new B.Vector3(TANK.x, y, TANK.z),
+        new B.Vector3(-TANK.x, y, TANK.z),
+        new B.Vector3(-TANK.x, y, -TANK.z),
+      ]);
+    const frame = B.MeshBuilder.CreateLineSystem(
+      "tank frame",
+      { lines: edges },
+      scene,
+    );
+    frame.color = new B.Color3(0.43, 0.76, 0.7);
+    frame.alpha = 0.5;
+    frame.isPickable = false;
+    return [grid, frame];
+  };
+  let potato = false;
   return {
     // Handed out so sand.js can hide it: the authored tiles stand in the same
     // place and would fight this plane for every pixel.
     floor,
+    setPotato(on) {
+      potato = on;
+      // Textures off rather than materials swapped: the canvases are already
+      // drawn, and a null slot is what the early build had anyway.
+      sandMat.diffuseTexture = on ? null : sandTexture;
+      sandMat.emissiveTexture = on ? null : sandTexture;
+      sandMat.diffuseColor = on
+        ? new B.Color3(0.42, 0.4, 0.34)
+        : new B.Color3(SAND_LIT, SAND_LIT, SAND_LIT);
+      sandMat.emissiveColor = on
+        ? new B.Color3(0.1, 0.1, 0.09)
+        : new B.Color3(SAND_GLOW, SAND_GLOW, SAND_GLOW);
+      for (const m of rockMats) m.diffuseTexture = on ? null : stone;
+      for (const pane of panes) pane.setEnabled(!on);
+      surface.setEnabled(!on);
+      for (const bar of bars) bar.setEnabled(!on);
+      if (on && !wireframe) wireframe = buildWireframe();
+      for (const line of wireframe ?? []) line.setEnabled(on);
+      kelp.setFlat(on);
+    },
     animate(time) {
+      // Nothing to ripple with the sheet hidden, and the kelp holds still.
+      if (potato) return;
       for (let i = 0; i < positions.length; i += 3) {
         const x = positions[i],
           z = positions[i + 2];
@@ -394,6 +485,16 @@ function buildKelp(scene, rnd) {
     };
   });
   return {
+    // Potato stops the sway. The kelp itself stays, because it is cover and
+    // hiding has to look like hiding, but rewriting thousands of vertices
+    // twice a frame is the most expensive thing in here on a slow device.
+    // Putting the rest positions back leaves it standing straight rather than
+    // frozen mid-bend.
+    setFlat(on) {
+      if (!on) return;
+      for (const { merged, rest } of forests)
+        merged.updateVerticesData(B.VertexBuffer.PositionKind, rest);
+    },
     animate(time) {
       for (const { merged, rest, live, meta } of forests) {
         for (let v = 0, m = 0; v < rest.length; v += 3, m += 3) {
@@ -415,6 +516,13 @@ function buildKelp(scene, rnd) {
 // The evening office around the tank. Its materials ignore the water fog so
 // the room reads as air beyond the glass; the glass itself keeps a little haze.
 function buildRoom(scene, glow) {
+  // Everything hangs off one node so the whole office can be switched off in
+  // a line. It is a hundred and fifty small boxes seen only through glass, so
+  // it is also the largest single thing potato gets to stop drawing. The node
+  // sits at the origin with no transform, so parenting changes no position -
+  // and the parent is set inside the helpers below, before each mesh freezes
+  // its world matrix, which a later reparent would not update.
+  const shell = new B.TransformNode("room", scene);
   const solid = (name, color, emissive = 0) => {
     const m = material(scene, name, color, emissive);
     m.fogEnabled = false;
@@ -429,6 +537,7 @@ function buildRoom(scene, glow) {
     );
     mesh.position.set(...pos);
     if (rot) mesh.rotation.set(...rot);
+    mesh.parent = shell;
     mesh.material = mat;
     mesh.freezeWorldMatrix();
     return mesh;
@@ -441,6 +550,7 @@ function buildRoom(scene, glow) {
     );
     mesh.position.set(...pos);
     if (rot) mesh.rotation.set(...rot);
+    mesh.parent = shell;
     mesh.material = mat;
     mesh.freezeWorldMatrix();
     return mesh;
@@ -452,6 +562,7 @@ function buildRoom(scene, glow) {
       scene,
     );
     mesh.position.set(...pos);
+    mesh.parent = shell;
     mesh.material = mat;
     mesh.freezeWorldMatrix();
     return mesh;
@@ -473,6 +584,7 @@ function buildRoom(scene, glow) {
   );
   roomFloor.position.y = floor;
   roomFloor.material = planksMat;
+  roomFloor.parent = shell;
   roomFloor.freezeWorldMatrix();
   const wall = solid("wall", "#a39d90"),
     trim = solid("trim", "#c9c4b8"),
@@ -765,7 +877,9 @@ function buildRoom(scene, glow) {
     box("picture frame", [1, 26, 32], [ROOM.x - 0.5, 60, z], dark);
     box("picture", [0.6, 22, 28], [ROOM.x - 1.2, 60, z], solid("picture", col));
   }
+  return shell;
 }
+
 // Procedural textures: tiny canvases, tiled by uScale/vScale.
 function speckles(scene, name, base, tones) {
   const size = 256,

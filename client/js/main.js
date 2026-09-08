@@ -1,7 +1,7 @@
 import { setupFullscreen } from "./fullscreen.js";
 import { createAquarium } from "./world.js";
 import { createFish, loadFishModels } from "./fish.js";
-import { modelDetail, reliefStep } from "./rendering.js";
+import { mountQuality, quality, modelDetail, reliefStep } from "./quality.js";
 import { createPuffs, createSparks, createStream } from "./effects.js";
 import { createFilter } from "./filter.js";
 import { createAudio } from "./audio.js";
@@ -32,14 +32,6 @@ import {
 } from "../../shared/config.js";
 const B = window.BABYLON,
   $ = (id) => document.getElementById(id);
-// The quality choice survives reloads; restore it before the engine reads it.
-try {
-  const saved = localStorage.getItem("fishtank.quality");
-  if ([...$("resolution").options].some((o) => o.value === saved))
-    $("resolution").value = saved;
-} catch {
-  /* Storage unavailable: keep the default. */
-}
 let aquarium;
 try {
   aquarium = createAquarium($("game"));
@@ -83,7 +75,7 @@ audio.music("menu");
 let modelsLoading = Promise.resolve(),
   loadedDetail = null;
 function loadModels() {
-  const detail = modelDetail($("resolution").value);
+  const detail = modelDetail(quality.value);
   if (detail === loadedDetail) return;
   loadedDetail = detail;
   modelsLoading = modelsLoading
@@ -95,14 +87,12 @@ function loadModels() {
     });
 }
 loadModels();
-$("resolution").addEventListener("change", () => {
-  try {
-    localStorage.setItem("fishtank.quality", $("resolution").value);
-  } catch {
-    /* Not remembered this time. */
-  }
-  loadModels();
-});
+// quality.js owns the value and remembers it; this only reacts to it.
+quality.addEventListener("change", loadModels);
+// Two rows, one setting. The menu's sits in the header where it always did;
+// the one in the pause dialog is why the header's can disappear during play.
+for (const at of ["quality-menu", "quality-play"])
+  mountQuality($(at), () => audio.play("click"));
 let network = null,
   myId = null,
   state = null,

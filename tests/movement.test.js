@@ -4,9 +4,10 @@ import { movementVector, parseInput } from "../shared/movement.js";
 import {
   hardwareScaling,
   modelDetail,
+  TIERS,
   reliefStep,
   RELIEF,
-} from "../client/js/rendering.js";
+} from "../client/js/quality.js";
 
 test("camera-relative diagonals do not exceed speed and analogue magnitude survives", () => {
   for (const yaw of [0, 1, 2, 3])
@@ -48,10 +49,46 @@ test("high-DPI screens render above CSS resolution with bounded quality choices"
   assert.equal(hardwareScaling("ultra", 1), 1 / 1.5);
   assert.equal(hardwareScaling("ultra", 2), 1 / 3);
   assert.equal(hardwareScaling("ultra", 4), 1 / 3);
+  // Potato is the only tier that goes the other way: fewer render pixels than
+  // the page has, whatever the display is, because on the device this exists
+  // for the pixels are the problem.
+  assert.equal(hardwareScaling("potato", 1), 1.7);
+  assert.equal(hardwareScaling("potato", 3), 1.7);
+  assert.ok(
+    hardwareScaling("potato", 2) > hardwareScaling("battery", 2),
+    "potato draws fewer pixels than battery saver",
+  );
   assert.equal(modelDetail("ultra"), "hd");
   assert.equal(modelDetail("sharp"), "high");
   assert.equal(modelDetail("balanced"), "standard");
   assert.equal(modelDetail("battery"), "low");
+  assert.equal(modelDetail("potato"), "low");
+  // An unknown name must land somewhere playable rather than undefined.
+  assert.equal(modelDetail("nonsense"), "standard");
+  assert.equal(hardwareScaling("nonsense", 2), 1 / 1.5);
+});
+
+// The tier list is what both pickers draw and what the renderers switch on, so
+// it has to stay ordered and consistent with the two functions above.
+test("the tier list runs cheapest to dearest and every tier is handled", () => {
+  assert.deepEqual(
+    TIERS.map((t) => t.id),
+    ["potato", "battery", "balanced", "sharp", "ultra"],
+  );
+  for (const tier of TIERS) {
+    assert.ok(tier.label && tier.note, `${tier.id} has a label and a note`);
+    assert.ok(
+      ["low", "standard", "high", "hd"].includes(modelDetail(tier.id)),
+      `${tier.id} maps to a real model tier`,
+    );
+  }
+  // Cheaper tiers never draw more pixels than dearer ones.
+  const pixels = TIERS.map((t) => 1 / hardwareScaling(t.id, 2));
+  for (let i = 1; i < pixels.length; i++)
+    assert.ok(
+      pixels[i] >= pixels[i - 1],
+      `${TIERS[i].id} draws at least as many pixels as ${TIERS[i - 1].id}`,
+    );
 });
 
 // Adaptive resolution must converge, not oscillate: a frame rate parked inside

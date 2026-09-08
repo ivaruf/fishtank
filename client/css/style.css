@@ -824,12 +824,49 @@ header,
   align-items: flex-end;
   gap: 12px;
 }
-.resolution-label {
+/* The graphics picker: a row of the game's own buttons rather than an OS
+   dropdown, which is the one control that used to give away that this is a
+   web page. Pressed state is aria-pressed, so the thing a screen reader is
+   told and the thing that is lit are the same fact. */
+.tiers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
   margin: 0;
-  font-size: 9px;
-  letter-spacing: 1px;
   pointer-events: auto;
-  color: #b9ceca;
+}
+.tiers .tier {
+  padding: 9px 11px;
+  border: 1px solid #5b827a;
+  border-radius: 8px;
+  background: #153e40a8;
+  color: #b6d2c6;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  white-space: nowrap;
+  transition:
+    border-color 0.15s,
+    background 0.15s,
+    color 0.15s;
+}
+.tiers .tier:hover {
+  border-color: #8fb3a8;
+  filter: none;
+}
+.tiers .tier[aria-pressed="true"] {
+  border-color: #d1ed9e;
+  background: #1f5a52c0;
+  color: #edf8ef;
+  box-shadow: 0 0 0 1px #d1ed9e66;
+}
+.tiers .tier:focus-visible {
+  outline: 2px solid #d1ed9e;
+  outline-offset: 2px;
+}
+/* Only while the menu is up. The pause dialog carries the other copy. */
+body:not(:has(#menu:not([hidden]))) .menu-only {
+  display: none;
 }
 select {
   color: #edf8ef;
@@ -1165,9 +1202,6 @@ select {
   font-size: 12px;
 }
 @media (max-width: 650px), (max-height: 520px) {
-  .resolution-label > span {
-    display: none;
-  }
   .display-controls {
     gap: 4px;
   }
@@ -1315,26 +1349,10 @@ select {
   background: #072c32d9;
   box-shadow: 0 6px 24px #001c2426;
 }
-.resolution-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding-left: 9px;
-}
-.resolution-label > span {
-  font-size: 10px;
-  letter-spacing: 0.5px;
-}
-.resolution-label select {
-  height: 36px;
-  max-width: 135px;
-  margin: 0;
-  padding: 0 8px;
-  border: 0;
-  border-radius: 8px;
-  font-size: 12px;
-  letter-spacing: 0;
-  background: #24474a;
+/* Touch: the row wraps rather than scrolling off the header. */
+.tiers .tier {
+  padding: 10px 12px;
+  font-size: 11px;
 }
 .sound-toggle,
 .fullscreen-toggle {
@@ -1409,30 +1427,46 @@ select:focus-visible {
   background: #072c32ed;
   z-index: 20;
 }
+/* The pause panel is the same frosted glass as every other panel, and the
+   tank stays visible through it and through its backdrop. It used to be an
+   opaque box over a heavy blur, which is a modal dialog belonging to a web
+   page; the point of pausing here is that the aquarium keeps going, and being
+   able to watch it is what says so. */
 #leave-dialog {
-  width: min(420px, calc(100vw - 32px));
+  width: min(440px, calc(100vw - 32px));
   max-height: calc(100vh - 32px);
   max-height: calc(100dvh - 32px);
   margin: auto;
-  padding: 30px;
-  border: 1px solid #83afa35c;
-  border-radius: 22px;
-  background: #0b3036;
+  padding: 28px 30px;
+  border: 1px solid #6eaaa44a;
+  border-radius: 18px;
+  background: #092f36e0;
+  backdrop-filter: blur(14px);
   color: #edf8ef;
-  box-shadow: 0 24px 100px #0008;
+  box-shadow: 0 24px 100px #0009;
 }
 #leave-dialog::backdrop {
-  background: #00191db3;
-  backdrop-filter: blur(8px);
+  /* Enough to lift the panel off the water, not enough to hide it. */
+  background: #00191d66;
+  backdrop-filter: blur(3px);
 }
 #leave-dialog h2 {
-  margin: 14px 0 10px;
+  margin: 12px 0 8px;
   font-size: 28px;
   letter-spacing: -0.8px;
 }
 #leave-dialog p {
-  margin: 0 0 24px;
+  margin: 0 0 18px;
   font-size: 14px;
+}
+/* The label above the graphics row: the dialog is tight, so it does not get
+   the generous spacing the menu's own group labels have. */
+#leave-dialog .group-label {
+  margin: 0 0 8px;
+  color: #9bb5ae;
+}
+#leave-dialog .tiers {
+  margin-bottom: 22px;
 }
 .dialog-actions {
   display: grid;
@@ -1450,14 +1484,11 @@ select:focus-visible {
     gap: 7px;
     font-size: 24px;
   }
-  .resolution-label > span {
-    display: none;
-  }
-  .resolution-label {
-    padding-left: 0;
-  }
-  .resolution-label select {
-    max-width: 108px;
+  /* A small landscape phone has no room for five labels in the header. The
+     pause dialog is where a setting gets changed on a phone anyway. */
+  .menu-only .tier {
+    padding: 8px 9px;
+    font-size: 10px;
   }
   .display-controls {
     padding: 3px;
