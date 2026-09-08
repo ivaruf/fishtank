@@ -1,6 +1,6 @@
 # Fishtank 
 
-A tiny 3D aquarium game: swim, eat smaller fish, grow, and try not to become lunch. Babylon.js, vanilla JavaScript, Blender-made fish, and an authoritative Node/WebSocket server. No build step or external runtime CDN.
+A tiny 3D aquarium game: swim, eat smaller fish, grow, and try not to become lunch. Babylon.js, vanilla JavaScript, Blender-made fish, and an authoritative Node/WebSocket server. Nothing is bundled, compiled or minified; Babylon.js and PeerJS load from pinned CDN URLs, and `tools/build-static.mjs` assembles the GitHub Pages build.
 
 ## Run
 
@@ -81,11 +81,13 @@ The plants, rocks, glass and office are decoration without obstacle collision. N
 
 Music and effects are Sonic Pi pieces in `tools/sonic-pi/`: a calm menu theme ("Below the surface", 60 bpm, 32-beat loop), a gameplay loop ("Feeding time", 100 bpm, 64 beats), and one-shots for your bite, being eaten, a fish eaten nearby (fades with distance), respawning, a predator swimming close (at most every six seconds), the round ending, menu clicks, and the filter's arming chime, too-early buzz and lightning crack. `client/js/audio.js` plays them through Web Audio: loops crossfade between menu and game, effects share a bus, and the 🔊 button in the header mutes everything and remembers it. Audio starts on the first click or key press, as browsers require.
 
+The recorder itself, `render.rb`, is not in this repo: it is generic and shared by every game in the hub, so it lives one level up in `../tools/sonic-pi/`. The pieces and `encode.mjs` here are fishtank's own.
+
 Rendering needs Sonic Pi 5 installed (`/Applications/Sonic Pi.app`, override with `SONIC_PI_APP`), ffmpeg on the PATH, and the real audio device, so it cannot run in a sandbox and you will hear it render in real time:
 
 ```sh
 SP="/Applications/Sonic Pi.app/Contents/Resources/app/server/native/ruby/bin/ruby"
-"$SP" tools/sonic-pi/render.rb /tmp/fishtank-audio music-menu=70 music-game=83 chomp=2 eaten=3 nearby=1.5 respawn=2.5 round-end=4 click=1 danger=3 pad=1.5 buzz=1.5 zap=2.5
+SONIC_PI_PIECES=tools/sonic-pi "$SP" ../tools/sonic-pi/render.rb /tmp/fishtank-audio music-menu=70 music-game=83 chomp=2 eaten=3 nearby=1.5 respawn=2.5 round-end=4 click=1 danger=3 pad=1.5 buzz=1.5 zap=2.5
 node tools/sonic-pi/encode.mjs /tmp/fishtank-audio client/assets/audio
 ```
 
