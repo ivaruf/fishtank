@@ -12,6 +12,7 @@ import {
   onButton,
 } from "./config.js";
 import { movementVector, parseInput } from "./movement.js";
+import { pushOutOfScenery } from "./scenery.js";
 // Wire precision, applied only when encoding a snapshot. The simulation itself
 // keeps full doubles, so this can never feed back into movement or into who
 // outweighs whom. Positions land on 1 cm and angles on ~0.06 degrees, both
@@ -113,6 +114,9 @@ export class World {
       protection: fish.npc ? 0 : C.spawnProtection,
       respawn: 0,
     });
+    // Spawns are a random point in the water, and the water now has a wreck
+    // and an arch in it. Nobody starts inside one.
+    pushOutOfScenery(fish);
     if (!fish.npc) {
       fish.yaw = Math.atan2(-fish.x, -fish.z);
       fish.input = { forward: 0, strafe: 0, yaw: fish.yaw, pitch: 0 };
@@ -159,6 +163,21 @@ export class World {
     f.x = clamp(f.x + d.x * speed * dt, -C.width / 2 + r, C.width / 2 - r);
     f.y = clamp(f.y + d.y * speed * dt, r + 0.5, C.height - r);
     f.z = clamp(f.z + d.z * speed * dt, -C.depth / 2 + r, C.depth / 2 - r);
+    // Hard scenery last, and then the tank again: a rock can stand close
+    // enough to the glass that being shoved out of it would otherwise put a
+    // fish through the pane.
+    const push = pushOutOfScenery(f, r);
+    if (!push) return;
+    f.x = clamp(f.x, -C.width / 2 + r, C.width / 2 - r);
+    f.y = clamp(f.y, r + 0.5, C.height - r);
+    f.z = clamp(f.z, -C.depth / 2 + r, C.depth / 2 - r);
+    // A wild fish turns away from what it hit. Without this a hundred of them
+    // spend the round pressed into the wreck, and the tank looks broken from
+    // the outside even though the collision is working perfectly.
+    if (f.npc && Math.hypot(push.x, push.z) > 0.001) {
+      f.yaw = Math.atan2(push.x, push.z);
+      f.decision = 0.5 + this.random();
+    }
   }
   // Nearest player this wild fish could eat and is close enough to bother
   // with. Players tucked into the kelp are not hunted, though a fish that

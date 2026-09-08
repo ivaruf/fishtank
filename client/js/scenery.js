@@ -1,58 +1,18 @@
 // The Blender scenery pack: seven static assets in client/assets/scenery,
 // built by tools/blender/create_scenery.py and standing on the sand.
 //
-// Decoration only, and deliberately so. Nothing here is an obstacle and
-// nothing here is cover: the kelp clusters in shared/config.js are what the
-// server hides a fish inside, because both ends have to agree about that, and
-// they sway on their own in world.js. A wreck a player expects to hide behind
-// would be a lie the server never told, so the wreck sits where it cannot be
-// mistaken for shelter and the plants stand at the foot of real kelp instead.
+// This file only draws them. Where they stand is shared/scenery.js, because
+// the hard ones stop fish and the simulation has to agree with the picture -
+// see the boxes over there. What is *not* an obstacle is the three plants,
+// which are dressing, and cover is still only the kelp clusters in
+// shared/config.js: swimming behind the wreck hides you from nothing.
 //
-// The pack is authored small - a plant is 1.5 to 2.7 units against a two-unit
-// fish - so every placement carries the scale that makes it read at tank size,
-// and the tank looks the same on every machine because the layout is a table
-// rather than a random draw. If a load fails the tank simply does without that
-// asset: the sand, rocks and kelp it is dressing are already there.
+// If a load fails the tank simply does without that asset, and the collision
+// stays regardless: a player on a slow connection meets the same walls, they
+// just cannot see what they are.
 import { material } from "./fish.js";
-import { PLANTS } from "../../shared/config.js";
+import { SCENERY } from "../../shared/scenery.js";
 const B = window.BABYLON;
-// A plant tucked against the kelp cluster it belongs to, so the dressing
-// follows the cover if those cluster positions ever move.
-const foot = (cluster, dx, dz) => ({
-  x: PLANTS[cluster].x + dx,
-  z: PLANTS[cluster].z + dz,
-});
-// Every placement: which asset, where on the sand, which way it faces and how
-// far up from authoring scale. Origins sit at substrate level in the exports,
-// so y is 0 for all of them and the sand plane needs no per-asset offset.
-// Positions keep clear of the filter's corner (-31, 31) and of the nine loose
-// rocks world.js scatters inside the ring, which is why they read as odd
-// numbers rather than a tidy grid.
-export const SCENERY = Object.freeze(
-  [
-    // Landmarks. The wreck and the arch are big enough to navigate by; both
-    // face the middle of the tank, so a fish swimming in from open water meets
-    // the holed side of the hull and the mouth of the passage rather than a
-    // blank flank.
-    { asset: "little-shipwreck", x: -19, z: -13, yaw: 0.97, scale: 3 },
-    { asset: "stone-arch", x: 21, z: 16, yaw: 0.92, scale: 3 },
-    { asset: "branching-driftwood", x: -26, z: 5, yaw: 1.7, scale: 3 },
-    { asset: "branching-driftwood", x: 11, z: -26, yaw: -1.15, scale: 2.3 },
-    { asset: "weathered-amphora", x: 26, z: -8, yaw: 0.8, scale: 3 },
-    { asset: "weathered-amphora", x: -6, z: -28, yaw: -0.4, scale: 2.3 },
-    // Planting at the foot of eight of the thirteen kelp clusters. Not all
-    // thirteen: a tank where every cluster is dressed the same way looks
-    // stamped out, and the bare ones give the eye somewhere to rest.
-    { asset: "ribbon-grass", ...foot(0, 1.6, 1.4), yaw: 0.4, scale: 3 },
-    { asset: "ribbon-grass", ...foot(1, 1.6, -1.8), yaw: 2.2, scale: 2.6 },
-    { asset: "ribbon-grass", ...foot(3, -1.2, -1.5), yaw: -0.9, scale: 2.8 },
-    { asset: "broadleaf-plant", ...foot(2, -1.4, -1.6), yaw: 1.1, scale: 2.6 },
-    { asset: "broadleaf-plant", ...foot(4, 1.5, -1.3), yaw: -1.4, scale: 2.2 },
-    { asset: "broadleaf-plant", ...foot(8, 1.4, -1.3), yaw: 2.6, scale: 2.4 },
-    { asset: "red-stem-plant", ...foot(6, 1.3, -1.2), yaw: 0.2, scale: 3 },
-    { asset: "red-stem-plant", ...foot(5, -1.5, -1.3), yaw: -2, scale: 2.6 },
-  ].map(Object.freeze),
-);
 export const sceneryUrl = (asset) => `assets/scenery/${asset}.glb`;
 // Loads each distinct asset once and hands out GPU-instanced copies, the same
 // bargain fish.js strikes: fourteen placements cost seven geometries. What it

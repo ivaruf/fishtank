@@ -44,6 +44,7 @@ const SHELL = [
   "../shared/config.js",
   "../shared/movement.js",
   "../shared/world.js",
+  "../shared/scenery.js",
   "manifest.webmanifest",
 ];
 // Big, rarely-changing things: models, sounds, thumbnails, icons, and the

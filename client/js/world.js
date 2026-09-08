@@ -3,18 +3,17 @@ import { createEnvironmentDetails } from "./environment.js";
 import { loadScenery } from "./scenery.js";
 import { createSandFloor } from "./sand.js";
 import { hardwareScaling } from "./rendering.js";
-import { PLANTS, FILTER } from "../../shared/config.js";
+import { PLANTS } from "../../shared/config.js";
+import { ROCKS, drawRocks, noise } from "../../shared/scenery.js";
 const B = window.BABYLON;
 // The tank is 72 x 30 x 72 units with the sand at y = 0. It stands on a cabinet
 // in an evening office roughly 300 x 150 x 400 units; the camera never leaves
 // the water, so the room is only ever seen through glass.
 const TANK = { x: 36, y: 30, z: 36 },
   ROOM = { x: 150, z: 200, floor: -40, ceiling: 110 };
-// Deterministic noise so the room and rocks look the same on every machine.
-function noise(seed) {
-  let s = seed;
-  return () => (s = (s * 16807) % 2147483647) / 2147483647;
-}
+// noise() is the deterministic generator that keeps the room, the rocks and
+// the kelp the same on every machine. It lives in shared/scenery.js now,
+// beside the rock table drawn from it.
 export function createAquarium(canvas) {
   const engine = new B.Engine(canvas, true, {
     preserveDrawingBuffer: false,
@@ -163,27 +162,21 @@ function buildTank(scene, glow) {
     m.specularColor = new B.Color3(0.08, 0.08, 0.08);
     return m;
   });
-  const rockSpots = [];
-  for (let i = 0; i < 22; i++) {
-    const a = i * 2.39996 + 0.7;
-    rockSpots.push([
-      Math.sin(a) * (30 + rnd() * 3),
-      Math.cos(a) * (30 + rnd() * 3),
-    ]);
-  }
-  for (let i = 0; i < 9; i++)
-    rockSpots.push([(rnd() - 0.5) * 50, (rnd() - 0.5) * 50]);
-  // Keep the filter's corner clear of rubble.
-  const clear = ([x, z]) => Math.hypot(x - FILTER.x, z - FILTER.z) > 8;
-  rockSpots.filter(clear).forEach(([x, z], i) => {
+  // Where the rocks stand, how they are squashed and the seed that dents each
+  // one all come from shared/scenery.js now, because the simulation stops fish
+  // against these boulders and has to be stopping them against *these*
+  // boulders. Re-drawing the table here throws the copy away and is done for
+  // one reason: buildKelp shares this generator, and leaving the sequence
+  // exactly where it used to be means no kelp blade moved when the rocks left.
+  drawRocks(rnd);
+  ROCKS.forEach(({ x, y, z, sx, sy, sz, yaw, seed }, i) => {
     const rock = B.MeshBuilder.CreateSphere(
       "rock",
       { segments: 12, diameter: 2, updatable: true },
       scene,
     );
     const positions = rock.getVerticesData(B.VertexBuffer.PositionKind),
-      normals = new Float32Array(positions.length),
-      seed = rnd() * 20;
+      normals = new Float32Array(positions.length);
     for (let v = 0; v < positions.length; v += 3) {
       const px = positions[v],
         py = positions[v + 1],
@@ -200,14 +193,9 @@ function buildTank(scene, glow) {
     B.VertexData.ComputeNormals(positions, rock.getIndices(), normals);
     rock.updateVerticesData(B.VertexBuffer.PositionKind, positions);
     rock.updateVerticesData(B.VertexBuffer.NormalKind, normals);
-    const size = 0.9 + rnd() * 1.6;
-    rock.scaling.set(
-      size * (1 + rnd() * 0.8),
-      size * (0.55 + rnd() * 0.45),
-      size * (0.8 + rnd() * 0.6),
-    );
-    rock.position.set(x, rock.scaling.y * 0.55, z);
-    rock.rotation.y = rnd() * Math.PI;
+    rock.scaling.set(sx, sy, sz);
+    rock.position.set(x, y, z);
+    rock.rotation.y = yaw;
     rock.material = rockMats[i % rockMats.length];
     rock.refreshBoundingInfo();
     rock.freezeWorldMatrix();
