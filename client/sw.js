@@ -32,6 +32,7 @@ const SHELL = [
   "js/networking.js",
   "js/world.js",
   "js/fish.js",
+  "js/scenery.js",
   "js/controls.js",
   "js/effects.js",
   "js/filter.js",

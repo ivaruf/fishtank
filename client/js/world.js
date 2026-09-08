@@ -1,4 +1,5 @@
 import { material } from "./fish.js";
+import { loadScenery } from "./scenery.js";
 import { hardwareScaling } from "./rendering.js";
 import { PLANTS, FILTER } from "../../shared/config.js";
 const B = window.BABYLON;
@@ -208,6 +209,12 @@ function buildTank(scene, glow) {
     rock.freezeWorldMatrix();
   });
   const kelp = buildKelp(scene, rnd);
+  // The Blender scenery pack settles onto the sand a moment later. Nothing
+  // waits for it: the tank is finished without it, so a slow or failed load
+  // costs the dressing and never the game.
+  loadScenery(scene).catch((error) =>
+    console.warn("Scenery could not be placed; the tank does without", error),
+  );
   // Frame: four posts and two rims of slim black bars, plus the light bar.
   const frameMat = material(scene, "tank frame", "#14191b");
   frameMat.specularColor = new B.Color3(0.3, 0.3, 0.3);
