@@ -100,15 +100,21 @@ function standardize(container, scene) {
       // surface, and putting the base texture in that slot too means the lift
       // carries the grain instead of flattening it into a wash.
       //
-      //   centre  0.40 x 0.6 x 2.7 + 0.45 x 0.6 = 0.92, just short of clipping
-      //   corner  0.40 x 0.6 x 0.4 + 0.45 x 0.6 = 0.37, against 0.08 with no lift
+      // The texture is white coral sand, about 0.72 linear once sampled:
       //
-      // Grey rather than tinted, so the sand keeps the hue it was authored
-      // with. Raise emissiveColor to brighten the dark edges, diffuseColor to
-      // brighten the lit middle.
-      m.diffuseColor = new B.Color3(0.4, 0.4, 0.4);
+      //   centre  0.34 x 0.72 x 2.7 + 0.42 x 0.72 = 0.96, just short of clipping
+      //   corner  0.34 x 0.72 x 0.4 + 0.42 x 0.72 = 0.40, against 0.10 with no lift
+      //
+      // Both came down when the sand went from tan to white: the same shares
+      // over a brighter texture blew the middle of the floor out to flat white
+      // and took the grain with it. Grey rather than tinted, so the sand keeps
+      // the warm cast it was authored with - which is deliberately warmer than
+      // a beach looks in daylight, because the hood lamp is blue-white and the
+      // water is green. Raise emissiveColor to brighten the dark edges,
+      // diffuseColor for the lit middle.
+      m.diffuseColor = new B.Color3(0.34, 0.34, 0.34);
       m.emissiveTexture = pbr.albedoTexture;
-      m.emissiveColor = new B.Color3(0.45, 0.45, 0.45);
+      m.emissiveColor = new B.Color3(0.42, 0.42, 0.42);
       // Roughness 0.94 in the export: wet sand, barely a highlight. Matches
       // the specular the procedural sand already used.
       m.specularColor = new B.Color3(0.05, 0.05, 0.04);

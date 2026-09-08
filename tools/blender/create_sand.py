@@ -42,9 +42,17 @@ y,x=np.mgrid[0:N,0:N]/N
 grain=rng.random((N,N)).astype(np.float32)
 soft=sum(np.roll(np.roll(grain,i,0),j,1) for i,j in [(0,0),(1,0),(-1,0),(0,1),(0,-1)])/5
 cloud=.5+.18*np.sin(2*np.pi*x)*np.cos(2*np.pi*y)+.13*np.cos(4*np.pi*y+np.sin(2*np.pi*x))
-speck=np.where(grain>.986,-.22,np.where(grain<.024,.16,0))
-shade=.79+.12*cloud+.18*(soft-.5)+speck
-rgb=np.stack([shade*.77,shade*.62,shade*.40],axis=-1)
+# White tropical sand: near-white with a faint warm cast. The mottling is kept
+# shallow on purpose - contrast that reads as character on a brown seabed reads
+# as dirt on a white beach - and the dark flecks are shell grit rather than the
+# heavy speckle a warmer sand can carry. Values stay under 1.0 because these
+# are linear floats on their way to an 8-bit sRGB PNG, which would clip.
+# The cast is warmer than white sand looks in daylight, deliberately: the tank
+# lights it with a blue-white hood lamp through green water, which takes the
+# warmth straight back out again.
+speck=np.where(grain>.986,-.13,np.where(grain<.024,.09,0))
+shade=.72+.10*cloud+.14*(soft-.5)+speck
+rgb=np.stack([shade,shade*.94,shade*.83],axis=-1)
 height=.55*soft+.45*grain
 dx=(np.roll(height,-1,1)-np.roll(height,1,1))*.30
 dy=(np.roll(height,-1,0)-np.roll(height,1,0))*.30
@@ -56,7 +64,7 @@ def image(name,arr,linear=False):
  rgba=np.concatenate([arr,np.ones((N,N,1))],axis=-1).astype(np.float32);im.pixels.foreach_set(rgba.ravel());im.update();im.filepath_raw=str(SOURCE/(name+'.png'));im.file_format='PNG';im.save();im.pack();return im
 bpy.ops.wm.read_factory_settings(use_empty=True)
 color=image('sand-basecolor',rgb);norm=image('sand-normal',normal,True)
-m=bpy.data.materials.new('Warm quartz sand');m.use_nodes=True
+m=bpy.data.materials.new('White coral sand');m.use_nodes=True
 bs=m.node_tree.nodes.get('Principled BSDF');bs.inputs['Roughness'].default_value=.94
 tex=m.node_tree.nodes.new('ShaderNodeTexImage');tex.image=color;tex.extension='REPEAT';m.node_tree.links.new(tex.outputs['Color'],bs.inputs['Base Color'])
 texn=m.node_tree.nodes.new('ShaderNodeTexImage');texn.image=norm;texn.extension='REPEAT';n=m.node_tree.nodes.new('ShaderNodeNormalMap');n.inputs['Strength'].default_value=.65;m.node_tree.links.new(texn.outputs['Color'],n.inputs['Color']);m.node_tree.links.new(n.outputs['Normal'],bs.inputs['Normal'])

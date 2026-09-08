@@ -76,16 +76,27 @@ discard everything else, which for sand would discard the point of it. The
 normal map is forced back to non-color data on the way over, or its vectors are
 sampled as sRGB and the grain lights wrongly.
 
+The sand is white coral sand, and the base colour is authored warmer than a
+tropical beach looks in daylight on purpose: the tank lights it with a
+blue-white hood lamp through green water, which takes that warmth straight back
+out. Its mottling is shallow for the same reason the colour is bright — the
+contrast that reads as character on a brown seabed reads as dirt on a white one
+— and the dark flecks are shell grit rather than heavy speckle. All of that
+lives in the numpy block at the top of `create_sand.py`; the values stay under
+1.0 because they are linear floats on their way to an 8-bit sRGB PNG.
+
 Brightness is split between lighting and emissive, because the floor's problem
 is its range rather than its level. The hood spot is a cone from 36 units up:
 the middle of the sand gets about 2.7x and the corners fall outside the cone
 with only the 0.4 ambient, so a floor lit entirely by lights clips white in the
-centre and goes black at the edges. The material takes 0.40 of the texture from
-lighting and 0.45 as emissive, with the base texture in the emissive slot as
-well so the lift carries the grain rather than flattening it into a wash - the
-centre lands at 0.92 and the corners at 0.37, against 0.08 with no lift. Raise
-`emissiveColor` in `sand.js` to brighten the dark edges, `diffuseColor` for the
-lit middle. The procedural plane underneath is hidden rather than removed,
+centre and goes black at the edges. The material takes 0.34 of the texture from
+lighting and 0.42 as emissive, with the base texture in the emissive slot as
+well so the lift carries the grain rather than flattening it into a wash — the
+centre lands at 0.96 and the corners at 0.40, against 0.10 with no lift. Both
+shares came down when the sand went from tan to white, since the same ones over
+a brighter texture blew the middle of the floor out to flat white and took the
+grain with it. Raise `emissiveColor` in `sand.js` to brighten the dark edges,
+`diffuseColor` for the lit middle. The procedural plane underneath is hidden rather than removed,
 because the tile ripples about 5 cm either side of y = 0 and would fight a plane
 left at exactly 0.
 

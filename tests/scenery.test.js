@@ -8,6 +8,7 @@ import {
   drawRocks,
   noise,
   pushOutOfScenery,
+  rockBump,
 } from "../shared/scenery.js";
 import { CONFIG as C, FILTER, radius } from "../shared/config.js";
 // A fish is only ever a position and a mass to the collision code.
@@ -108,6 +109,42 @@ test("a rock pushes a fish out along the way it came in", () => {
     assert.ok(pushOutOfScenery(fish(r.x, r.y, r.z, 2)), "rock is solid");
     assert.ok(Math.max(r.sx, r.sy, r.sz) < 5, "rock is a rock, not a reef");
   }
+});
+
+// The bug this closes: the collision was a smooth ellipsoid at 0.86 of the
+// rock's scale while the mesh bulged to 1.4 of it, so a fish could swim
+// visibly into the stone. Both now read the same displacement, so a point on
+// the surface you can see is a point you cannot be at.
+test("a fish cannot sit half inside a boulder's visible surface", () => {
+  let checked = 0;
+  for (const rock of ROCKS) {
+    // Directions all over the sphere, off-axis so they land between vertices
+    // as well as on them.
+    for (let i = 0; i < 24; i++) {
+      const theta = i * 2.39996 + 0.31,
+        phi = Math.acos(1 - (2 * (i + 0.5)) / 24),
+        ux = Math.sin(phi) * Math.cos(theta),
+        uy = Math.cos(phi),
+        uz = Math.sin(phi) * Math.sin(theta);
+      // The mesh's own surface point: unit sphere, displaced, squashed by the
+      // rock's scaling, turned by its yaw, moved to where it stands.
+      const bump = rockBump(ux, uy, uz, rock.seed),
+        lx = ux * bump * rock.sx,
+        ly = uy * bump * rock.sy,
+        lz = uz * bump * rock.sz;
+      const x = rock.x + lx * Math.cos(rock.yaw) + lz * Math.sin(rock.yaw),
+        y = rock.y + ly,
+        z = rock.z + -lx * Math.sin(rock.yaw) + lz * Math.cos(rock.yaw);
+      // A fish centred on the stone's skin is half buried in it, whichever
+      // way round the rock that skin happens to be.
+      assert.ok(
+        pushOutOfScenery(fish(x, y, z, 2)),
+        `rock at ${rock.x.toFixed(1)},${rock.z.toFixed(1)} was swimmable at its own surface`,
+      );
+      checked++;
+    }
+  }
+  assert.equal(checked, ROCKS.length * 24);
 });
 
 test("swimming into a hull slides along it rather than sticking", () => {

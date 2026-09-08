@@ -4,7 +4,7 @@ import { loadScenery } from "./scenery.js";
 import { createSandFloor } from "./sand.js";
 import { hardwareScaling } from "./rendering.js";
 import { PLANTS } from "../../shared/config.js";
-import { ROCKS, drawRocks, noise } from "../../shared/scenery.js";
+import { ROCKS, drawRocks, noise, rockBump } from "../../shared/scenery.js";
 const B = window.BABYLON;
 // The tank is 72 x 30 x 72 units with the sand at y = 0. It stands on a cabinet
 // in an evening office roughly 300 x 150 x 400 units; the camera never leaves
@@ -181,11 +181,9 @@ function buildTank(scene, glow) {
       const px = positions[v],
         py = positions[v + 1],
         pz = positions[v + 2];
-      const bump =
-        1 +
-        0.16 * Math.sin(3.1 * px + seed) +
-        0.13 * Math.sin(2.6 * py + seed * 1.7 + px) +
-        0.11 * Math.sin(3.6 * pz + seed * 0.6 + py);
+      // rockBump is shared with the collision resolver, which evaluates this
+      // same surface: the dents you can see are the dents you cannot swim into.
+      const bump = rockBump(px, py, pz, seed);
       positions[v] = px * bump;
       positions[v + 1] = py * bump;
       positions[v + 2] = pz * bump;

@@ -111,6 +111,26 @@ export const HARD = Object.freeze({
 // The draw order is load-bearing. buildKelp shares this generator, so the
 // client re-runs drawRocks purely to leave the sequence where the kelp has
 // always found it; change the order of these calls and the kelp moves.
+// How far out a boulder's surface lies in one direction, as a multiple of its
+// nominal radius. Layered sines on a unit sphere: the client displaces its
+// twelve-segment sphere with exactly this, and the collision below evaluates
+// it along the ray it is pushing a fish out on, so the stone you can see and
+// the stone you cannot swim into are the same stone.
+//
+// It matters more than it looks. The range is 0.6 to 1.4, so a smooth
+// ellipsoid cut to the average would let a fish sink half a metre into every
+// bulge - which is exactly what it did.
+export function rockBump(x, y, z, seed) {
+  return (
+    1 +
+    0.16 * Math.sin(3.1 * x + seed) +
+    0.13 * Math.sin(2.6 * y + seed * 1.7 + x) +
+    0.11 * Math.sin(3.6 * z + seed * 0.6 + y)
+  );
+}
+// The most any of those three terms can add, so the cheap bounding-sphere
+// reject below cannot reject a bulge that really is in the way.
+const BUMPIEST = 1.4;
 export function drawRocks(rnd) {
   const spots = [];
   for (let i = 0; i < 22; i++) {
@@ -145,11 +165,11 @@ export function drawRocks(rnd) {
   });
 }
 export const ROCKS = Object.freeze(drawRocks(noise(29)));
-// One flat list of world-space volumes, built once at load. `blob` is an
-// ellipsoid and is only ever a rock: a boulder is a squashed sphere, and a box
-// around one either eats the space beside it or lets a fish sink into its
-// flank. `box` is everything authored. Each carries the yaw's sine and cosine
-// and a bounding radius, so the hot loop below is arithmetic and no lookups.
+// One flat list of world-space volumes, built once at load. `blob` is a rock:
+// a squashed sphere with rockBump's dents and bulges on it, which is the shape
+// the client draws, so it is the shape a fish is stopped by. `box` is
+// everything authored. Each carries the yaw's sine and cosine and a bounding
+// radius, so the hot loop below is arithmetic and no lookups.
 export const OBSTACLES = Object.freeze([
   ...ROCKS.map((r) =>
     Object.freeze({
@@ -157,12 +177,18 @@ export const OBSTACLES = Object.freeze([
       x: r.x,
       y: r.y,
       z: r.z,
-      // Inside the silhouette rather than around it: a fish should touch stone
-      // before it stops, never stop in open water short of it.
-      rx: r.sx * 0.86,
-      ry: r.sy * 0.86,
-      rz: r.sz * 0.86,
-      reach: Math.max(r.sx, r.sy, r.sz),
+      // The rock's full scaling. It used to be shrunk to 0.86 of it to keep
+      // the fish from stopping short in open water, which was the wrong fix
+      // for the right worry: the mesh bulges to 1.4 in places, so the shrunk
+      // ellipsoid let a fish swim visibly into the stone. rockBump in the
+      // resolver is the right fix.
+      rx: r.sx,
+      ry: r.sy,
+      rz: r.sz,
+      sin: Math.sin(r.yaw),
+      cos: Math.cos(r.yaw),
+      seed: r.seed,
+      reach: Math.max(r.sx, r.sy, r.sz) * BUMPIEST,
     }),
   ),
   ...SCENERY.flatMap((spot) =>
@@ -218,16 +244,20 @@ export function pushOutOfScenery(f, r = radius(f.mass)) {
     const far = o.reach + r;
     if (dx * dx + dy * dy + dz * dz > far * far) continue;
     if (o.blob) {
+      // Un-rotate first. Babylon scales and then rotates, so undoing it goes
+      // the other way about; a rock is squashed *and* turned, so skipping its
+      // yaw would squash the fish along the wrong axis.
+      const rx = dx * o.cos - dz * o.sin,
+        rz = dx * o.sin + dz * o.cos;
       // Into the unit-sphere space of the ellipsoid grown by the fish's own
-      // radius, where "inside" is one comparison.
+      // radius, where the stone's surface is one function call away.
       const ax = o.rx + r,
         ay = o.ry + r,
         az = o.rz + r,
-        ux = dx / ax,
+        ux = rx / ax,
         uy = dy / ay,
-        uz = dz / az,
+        uz = rz / az,
         length = Math.hypot(ux, uy, uz);
-      if (length >= 1 - TOUCHING) continue;
       if (length === 0) {
         // Dead centre, with no ray to leave along. Up: a boulder here is
         // wider than it is tall and sits on the sand, so up is both the
@@ -236,14 +266,23 @@ export function pushOutOfScenery(f, r = radius(f.mass)) {
         hit = true;
         continue;
       }
+      // Where the stone actually is in this direction, dents and bulges and
+      // all - the same displacement the client's mesh is built with, so what
+      // stops a fish is what the player can see. A plain ellipsoid here is
+      // what let one swim into the side of a rock.
+      const k = 1 / length;
+      const surface = rockBump(ux * k, uy * k, uz * k, o.seed);
+      if (length >= surface - TOUCHING) continue;
       // Out along the ray it came in on. On a squashed rock that is not the
       // shortest way out, but it is a stable one: it cannot leave the fish
       // inside, and it never flips direction between ticks the way a
       // nearest-face push does across a diagonal.
-      const k = 1 / length;
-      f.x = o.x + ux * ax * k;
-      f.y = o.y + uy * ay * k;
-      f.z = o.z + uz * az * k;
+      const out = surface * k;
+      const px = ux * ax * out,
+        pz = uz * az * out;
+      f.x = o.x + px * o.cos + pz * o.sin;
+      f.y = o.y + uy * ay * out;
+      f.z = o.z + -px * o.sin + pz * o.cos;
       hit = true;
       continue;
     }
