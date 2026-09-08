@@ -1,6 +1,6 @@
 // Snapshots, packed.
 //
-// The WebSocket build can lean on permessage-deflate and sends 1.8 KB a frame.
+// A WebSocket could lean on permessage-deflate and send 1.8 KB a frame.
 // Data channels do not compress, so peer to peer was sending the raw 17.2 KB —
 // 6.3 Mbit/s of host upload at three peers, measured 4.2 Mbit/s from a phone on
 // 5G with two iPads connected, which is roughly 1.9 GB an hour off somebody's

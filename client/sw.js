@@ -30,7 +30,6 @@ const SHELL = [
   "js/webrtc.js",
   "js/rendezvous.js",
   "js/host-worker.js",
-  "js/networking.js",
   "js/world.js",
   "js/environment.js",
   "js/fish.js",
@@ -46,6 +45,7 @@ const SHELL = [
   "../shared/movement.js",
   "../shared/world.js",
   "../shared/scenery.js",
+  "../shared/snapshot-codec.js",
   "manifest.webmanifest",
 ];
 // Big, rarely-changing things: models, sounds, thumbnails, icons, and the
@@ -134,14 +134,17 @@ self.addEventListener("fetch", (event) => {
   const { request } = event;
   if (request.method !== "GET") return;
   const url = new URL(request.url);
-  // Never cache the live build report or anything that is not http(s):
-  // /healthz is how the menu proves which build is running.
+  // Never cache the build report or anything that is not http(s):
+  // version.json is how the menu proves which build is running, and a cached
+  // copy of it would make the "you are running old code" warning the stalest
+  // thing on the page. It used to be /healthz, back when a server answered.
   // Suffix, not equality: under a project Pages site everything lives beneath
-  // /<repo>/, so these are not at the origin root.
-  if (url.pathname.endsWith("/healthz") || !url.protocol.startsWith("http"))
+  // /<repo>/, so this is not at the origin root.
+  if (
+    url.pathname.endsWith("/version.json") ||
+    !url.protocol.startsWith("http")
+  )
     return;
-  // WebSockets do not pass through here, but be explicit about intent.
-  if (url.pathname.endsWith("/ws")) return;
   if (url.origin !== self.location.origin && !isAsset(url)) return;
   event.respondWith(
     caches

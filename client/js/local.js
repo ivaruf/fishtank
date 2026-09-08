@@ -6,7 +6,7 @@ import { CONFIG as C, PROTOCOL, SPECIES } from "../../shared/config.js";
 // costs nothing to host, plays with no latency, and keeps working when the
 // network does not.
 //
-// Deliberately the same shape as connect() in networking.js, so main.js treats
+// Deliberately the same shape as the peer connection in peer.js, so main.js treats
 // a local game and a hosted one identically.
 export function playLocally({ join, onWelcome, onState, onError, onClose }) {
   const world = new World(Math.random);

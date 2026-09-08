@@ -1,8 +1,9 @@
 name: Pages
 
-# The static, serverless build: solo runs entirely in the browser and
-# multiplayer goes peer-to-peer, so GitHub Pages can host the whole game.
-# Deliberately not wired to main yet; this is the p2p experiment.
+# The static build, which is now the only build: solo runs entirely in the
+# browser and multiplayer goes peer-to-peer, so GitHub Pages hosts the whole
+# game. The Node server this branch replaced is gone, along with the Render
+# deploy that CI used to trigger.
 on:
   push:
     branches: [p2p_experiment]
@@ -31,6 +32,9 @@ jobs:
       # Babylon is copied into the output from node_modules, so the CDN stays a
       # fallback rather than becoming a hard dependency.
       - run: npm ci
+      # ci.yml used to own this, back when there was a server for it to smoke
+      # test as well. There is no server now, so this is the whole gate.
+      - run: npm run format:check
       - run: npm test
       - run: npm run build:static
         env:

@@ -16,10 +16,10 @@ import { pushOutOfScenery } from "./scenery.js";
 // Wire precision, applied only when encoding a snapshot. The simulation itself
 // keeps full doubles, so this can never feed back into movement or into who
 // outweighs whom. Positions land on 1 cm and angles on ~0.06 degrees, both
-// finer than the client draws, and short decimals compress far better than a
-// 17-digit float: together with permessage-deflate this is ~90% off the wire.
-// Mass stays at 2dp so the client's food-or-danger tint still matches the
-// server's own comparison for fish of nearly equal size.
+// finer than the client draws, and short decimals cost far less than a
+// 17-digit float once snapshot-codec.js packs them: ~90% off the wire. Mass
+// stays at 2dp so a guest's food-or-danger tint still matches the host's own
+// comparison for fish of nearly equal size.
 const wire = (n, places) => {
   if (typeof n !== "number" || !Number.isFinite(n)) return n;
   const scale = 10 ** places;

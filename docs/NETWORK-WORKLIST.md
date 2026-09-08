@@ -1,5 +1,13 @@
 # Network and caching worklist
 
+> **Historical.** This records work on the Node/WebSocket server and the assets
+> it served, both of which have since been deleted in favour of peer to peer on
+> a static host. The measurements were real and the reasoning still reads, but
+> nothing here describes the current build: snapshot packing now lives in
+> `shared/snapshot-codec.js` and is documented in `P2P.md`, and asset delivery
+> is GitHub Pages' business. Kept because deleting measurements is how they get
+> made twice.
+
 Created 2026-09-06, updated the same day after shipping A1, A2, B0, B1, B2 and
 B4. Two separate problems: the live WebSocket stream during a round, and asset
 delivery on load. Every number below was measured on this repo, not estimated.

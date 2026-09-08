@@ -21,33 +21,14 @@ export const CONFIG = Object.freeze({
   spawnProtection: 3,
   tickRate: 30,
   broadcastRate: 15,
-  // Nobody is steering in a lobby or on the results screen; only wild fish
-  // drift, and the client interpolates between snapshots. A connected socket
-  // used to cost the same 95 MB an hour whether or not anyone was playing.
-  idleBroadcastRate: 3,
-  // A socket that has sent nothing for this long is a locked tablet or a
-  // background tab, not a player: the client keeps a visible page alive with a
-  // keepalive, so silence means nobody is looking rather than nobody is moving.
-  idleTimeout: 90,
-  // How often a visible client says so. Comfortably inside idleTimeout.
-  keepAlive: 20,
-  // Was eight while a snapshot cost 26 KB on the wire and a full room used
-  // ~26 Mbit/s. Quantised floats plus permessage-deflate cut that to ~1.8 KB,
-  // so sixteen players now cost about 3.5 Mbit/s a room: a gameplay choice
-  // rather than a bandwidth ceiling. See docs/NETWORK-WORKLIST.md.
+  // What one device is willing to host. It is the host's own CPU and uplink
+  // that this protects, not a server's: sixteen fish at 15 Hz over a data
+  // channel costs it about 200 KB/s, which a laptop shrugs at and a phone
+  // does not. Snapshot packing is in docs/P2P.md.
   maxPlayers: 16,
 });
-// Separate shared games, each its own World. Three of them cap the host at
-// 24 players (~78 Mbit/s worst case) and keep the game list scannable.
-export const TANKS = Object.freeze(
-  Array.from({ length: 3 }, (_, i) => {
-    const number = String(i + 1).padStart(3, "0");
-    return Object.freeze({ id: `tank-${i + 1}`, name: `Aquarium ${number}` });
-  }),
-);
-export const isTank = (id) => TANKS.some((t) => t.id === id);
-// Bumped whenever snapshots or join messages change shape, so a client can
-// tell when it is talking to a server process started from older code.
+// Bumped whenever snapshots or join messages change shape, so a guest can tell
+// when it has connected to a host running older code than itself.
 export const PROTOCOL = 8;
 export const radius = (mass) => Math.cbrt(mass) * 0.48;
 export const outweighs = (predator, prey) =>

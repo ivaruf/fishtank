@@ -65,8 +65,9 @@ Safari to Chrome remains a genuine risk to check on real devices — but it has
 not been seen to fail here.
 
 What is certain is the bandwidth. A snapshot is 17.2 KB of JSON and data
-channels do not compress, so `permessage-deflate` is gone: the WebSocket build
-sends 1.8 KB a frame, this sends 17.2 KB.
+channels do not compress, `permessage-deflate` being a WebSocket feature: over
+a socket that frame would have gone out at 1.8 KB, here it is the full 17.2 KB.
+That is what made the binary codec below not optional.
 
 Measured, one frame of 104 fish:
 
@@ -128,7 +129,9 @@ redirect at the root. That is the whole trick: `../../shared/x.js` then
 resolves identically on disk and under `/<repo>/`, without relying on browsers
 clamping `..` at the origin root, which the old paths were quietly depending
 on. The build also copies Babylon out of `node_modules`, so the CDN stays a
-fallback, and writes a `version.json` standing in for `/healthz`.
+fallback, and writes a `version.json` for the menu's build line to read - it
+stood in for `/healthz` when there was a server to answer that, and is now the
+only build report there is.
 
 Verified by serving the output under a `/fishtank/` prefix and watching for
 anything that escaped it: the redirect lands, no crash banner, 14 of 14

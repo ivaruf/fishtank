@@ -491,71 +491,10 @@ header,
   letter-spacing: -1px;
   margin: 10px 0 18px;
 }
-.games ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-/* Each game is one button: the whole row is the target. */
-.game {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  width: 100%;
-  padding: 13px 15px;
-  text-align: left;
-  background: #153e40a8;
-  border: 1px solid #5b827a;
-  color: #edf8ef;
-  font-size: 13px;
-  font-weight: 500;
-}
-.game:not(:disabled):hover {
-  border-color: #d1ed9e;
-  filter: none;
-}
-.game:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.game .name {
-  flex: 1;
-  white-space: nowrap;
-}
-.game .status {
-  flex: none;
-  font-size: 9px;
-  letter-spacing: 1.6px;
-  color: #9bb5ae;
-  white-space: nowrap;
-}
-.game .status.live {
-  color: #d1ed9e;
-}
-/* One pip per seat, so occupancy reads without counting. Sized to fit a full
-   sixteen-seat tank between the name and the status. */
-.game .seats {
-  display: flex;
-  gap: 2px;
-  flex: none;
-}
-.game .seats i {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: #ffffff26;
-}
-.game .seats i.taken {
-  background: #d1ed9e;
-}
-/* The peer-to-peer half of the picker: no server involved once connected. */
+/* Hosting and joining. There is no list of games above it any more, so it
+   is the panel rather than the second half of one. */
 .peer {
-  margin-top: 18px;
-  padding-top: 16px;
-  border-top: 1px solid #6eaaa42b;
+  margin-top: 4px;
 }
 .peer .buttons {
   flex-wrap: wrap;

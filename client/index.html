@@ -222,18 +222,17 @@
       </button>
     </section>
     <section id="games" class="glass games" hidden>
-      <div class="eyebrow">PICK A GAME</div>
-      <h2 id="games-title">Three tanks, one foodchain</h2>
-      <ul id="games-list"></ul>
-      <p class="games-hint" id="games-hint">Looking for games…</p>
-      <div class="buttons">
-        <button id="quick-join" type="button">Quick join <span>→</span></button>
-        <button id="games-back" class="secondary" type="button">Back</button>
-      </div>
-      <!-- Peer to peer needs no game server: one player runs the tank and the
-           others connect straight to them. -->
+      <div class="eyebrow">PLAY WITH A FRIEND</div>
+      <h2>One tank, two devices</h2>
+      <p class="games-hint">
+        One of you hosts the tank and the other joins it, with nothing in
+        between: no server, no accounts, and nothing of ours in the middle. Host
+        one and share the three pictures, or tap in the three you were sent.
+      </p>
+      <!-- One player runs the simulation and the others connect straight to
+           them. This is the only kind of multiplayer a static site can offer,
+           and since the server went, the only kind there is. -->
       <div class="peer">
-        <div class="eyebrow">OR PLAY WITHOUT A SERVER</div>
         <div class="buttons">
           <button id="host-peer" class="secondary" type="button">
             Host a tank
@@ -249,10 +248,10 @@
           />
           <button id="join-peer" class="secondary" type="button">Join</button>
         </div>
-        <!-- The same code, tapped instead of typed. Four pictures is the whole
+        <!-- The same code, tapped instead of typed. Three pictures is the whole
              code, so this is not a second way in - it is the same one. -->
         <div class="dialpad">
-          <div class="dialpad-slots" id="dialpad-slots" aria-live="polite">
+          <div class="dialpad-slots" aria-live="polite">
             <span>TAP THE THREE PICTURES YOUR FRIEND SENT</span>
             <b id="dialpad-picked"></b>
           </div>
@@ -262,6 +261,9 @@
           </button>
         </div>
         <p class="games-hint" id="peer-hint"></p>
+      </div>
+      <div class="buttons">
+        <button id="games-back" class="secondary" type="button">Back</button>
       </div>
     </section>
     <section id="lobby" class="glass lobby" hidden>

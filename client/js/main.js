@@ -6,7 +6,6 @@ import { createPuffs, createSparks, createStream } from "./effects.js";
 import { createFilter } from "./filter.js";
 import { createAudio } from "./audio.js";
 import { createControls } from "./controls.js";
-import { connect, AWAY } from "./networking.js";
 import { playLocally } from "./local.js";
 import { hostGame, joinGame, createHostEngine } from "./peer.js";
 import { hostRendezvous, joinRendezvous } from "./rendezvous.js";
@@ -156,22 +155,18 @@ if ("serviceWorker" in navigator && window.isSecureContext)
       .catch((error) => console.info("Offline support unavailable:", error)),
   );
 // Which build is serving us, shown on the menu so a deploy can be confirmed
-// without guessing. Read from the server rather than baked into the page: it
-// is the server that gets replaced, and /healthz is never cached.
-// Relative, so it works under a project Pages subpath too. A static host has
-// no /healthz, so fall back to a version.json the deploy writes.
+// without guessing. Read from the site rather than baked into the page: BUILD
+// below is what this copy of the code was stamped with, and the point is to
+// catch the case where those two disagree. Relative, so it works under a
+// project Pages subpath too, and the service worker keeps it uncached.
 const ask = (url) =>
   fetch(url, { cache: "no-store" }).then((r) =>
     r.ok ? r.json() : Promise.reject(new Error(r.status)),
   );
-let hasServer = false;
-const serverProbe = ask("healthz")
-  .then((report) => {
-    hasServer = true;
-    return report;
-  })
-  .catch(() => ask("version.json"));
-serverProbe
+// tools/build-static.mjs writes version.json beside the page. Serving the
+// repo directly for development has no such file, which is why "build unknown"
+// below is a normal thing to see rather than a fault.
+ask("version.json")
   .then(({ version, started, protocol }) => {
     // `version` is the build being served; BUILD is the build this page is
     // made of. When they disagree, something between the two — the HTTP cache
@@ -504,16 +499,19 @@ function handlers(current, kind) {
       audio.music("game");
       $("connection").textContent = solo
         ? "● SOLO AQUARIUM · OFFLINE"
-        : `● ${(roomName ?? "shared tank").toUpperCase()}`;
+        : `● ${(roomName ?? "a friend's tank").toUpperCase()}`;
       // A host can still be joined mid-round, so keep the code on screen: the
       // menu that showed it is gone once the round starts.
       if (invite)
         $("connection").textContent += ` · CODE ${spellCode(invite.code)}`;
+      // Host and guest are two browsers with two copies of this code, so a
+      // mismatch means one of them has not reloaded. It is the guest that can
+      // see both numbers, so it is the guest that says so.
       if (protocol !== PROTOCOL) {
         console.warn(
-          `Server speaks protocol ${protocol}, this client expects ${PROTOCOL}. Restart the server (npm start).`,
+          `The host speaks protocol ${protocol}, this tank expects ${PROTOCOL}. One of you is on an older build; reload both.`,
         );
-        $("connection").textContent = "● SERVER IS AN OLDER BUILD · RESTART IT";
+        $("connection").textContent = "● DIFFERENT BUILDS · RELOAD BOTH";
       }
     },
     onState(next) {
@@ -594,135 +592,47 @@ function handlers(current, kind) {
     onError(message) {
       $("error").textContent = message;
     },
-    onClose(event) {
+    onClose() {
       if (network !== current()) return;
-      // Being dropped for going away is normal, not a fault: say which it was.
-      leave(
-        event?.code === AWAY
-          ? "Paused while the tab was in the background. Dive in again."
-          : event?.reason === "Idle"
-            ? "Left the tank after a while away. Dive in again."
-            : "Connection closed. Dive in again to reconnect.",
-      );
+      // The only thing that can close now is the peer link: the host closed
+      // its tab, or the connection died. Either way there is nothing to
+      // reconnect to, so send them back to the menu rather than imply there is.
+      leave("The tank closed. Host one, or join a friend again.");
     },
   };
 }
-function join(mode, room) {
+// Solo runs the same World in this tab: no socket, no traffic, no latency, and
+// it keeps working with the network gone. It is also the only way in that needs
+// nothing but this device.
+function diveInSolo() {
   if (joining || network) return;
   joining = true;
-  // Solo runs the same World in this tab: no socket, no traffic, no latency,
-  // and it keeps working with the network gone. Only shared tanks need a host.
-  const solo = mode === "single";
-  const open = solo ? playLocally : connect;
-  $("error").textContent = solo ? "" : "Connecting…";
-  const connection = open({
-    join: { name: $("name").value, mode, species: chosenSpecies, room },
-    ...handlers(() => connection, solo ? "solo" : "server"),
+  $("error").textContent = "";
+  const connection = playLocally({
+    join: { name: $("name").value, mode: "single", species: chosenSpecies },
+    ...handlers(() => connection, "solo"),
   });
   network = connection;
 }
-// Browsing keeps its own connection open purely to receive the GAMES list; it
-// is dropped the moment the player picks a tank, backs out, or dives in.
-let browser = null;
-function closeBrowser() {
-  browser?.close();
-  browser = null;
+// The friend panel. There is no server to ask what games exist, so there is
+// no list to draw: you either host a tank or you tap in the code for one.
+function closePanel() {
   $("games").hidden = true;
-}
-function renderGames(games) {
-  $("games-hint").textContent = games.some((g) => g.players < g.capacity)
-    ? "Games in progress accept new fish mid-round."
-    : "Every tank is full right now. One will free up when a round ends.";
-  $("games-list").replaceChildren(
-    ...games.map((g) => {
-      const full = g.players >= g.capacity,
-        item = document.createElement("li"),
-        button = document.createElement("button");
-      button.type = "button";
-      button.className = "game secondary";
-      button.disabled = full;
-      const name = document.createElement("span");
-      name.className = "name";
-      name.textContent = g.name;
-      const seats = document.createElement("span");
-      seats.className = "seats";
-      seats.append(
-        ...Array.from({ length: g.capacity }, (_, i) => {
-          const pip = document.createElement("i");
-          if (i < g.players) pip.className = "taken";
-          return pip;
-        }),
-      );
-      const status = document.createElement("span");
-      status.className = "status";
-      if (full) status.textContent = "FULL";
-      else if (g.phase === "playing") {
-        status.classList.add("live");
-        const m = Math.floor(g.remaining / 60),
-          s = String(g.remaining % 60).padStart(2, "0");
-        status.textContent = `ROUND ${g.round} · ${m}:${s}`;
-      } else if (g.phase === "results") status.textContent = "RESULTS";
-      else
-        status.textContent = g.players
-          ? `IN LOBBY · ${g.players}/${g.capacity}`
-          : "EMPTY";
-      button.append(name, seats, status);
-      button.onclick = () => {
-        audio.play("click");
-        closeBrowser();
-        join("multiplayer", g.id);
-      };
-      item.append(button);
-      return item;
-    }),
-  );
-}
-async function browseGames() {
-  if (browser || network) return;
-  $("games").hidden = false;
-  $("games-list").replaceChildren();
-  $("games-hint").textContent = "Looking for games…";
-  $("quick-join").hidden = false;
-  $("games-title").textContent = "Three tanks, one foodchain";
-  // Wait to learn whether a server exists before reaching for one. Hosted
-  // tanks need one; peer to peer does not, which is the only kind of
-  // multiplayer a static site can offer.
-  await serverProbe.catch(() => {});
-  if (!hasServer) {
-    $("games-title").textContent = "Play with a friend";
-    $("games-hint").textContent =
-      "No game server here, so there are no shared tanks. Host a tank below and send the code to a friend: their fish swims in yours, with nothing in between.";
-    $("quick-join").hidden = true;
-    return;
-  }
-  browser = connect({
-    onGames: renderGames,
-    onWelcome() {},
-    onState() {},
-    onError(message) {
-      $("error").textContent = message;
-    },
-    onClose() {
-      // Only surface a dropped browse; a deliberate close already cleaned up.
-      if (browser) {
-        closeBrowser();
-        $("error").textContent = "Lost the game list. Try again.";
-      }
-    },
-  });
 }
 $("solo").onclick = () => {
   audio.play("click");
-  closeBrowser();
-  join("single");
+  closePanel();
+  diveInSolo();
 };
 $("multi").onclick = () => {
   audio.play("click");
-  browseGames();
+  if (network) return;
+  $("games").hidden = false;
+  peerNote("");
 };
-// Peer to peer: no game server in the loop. One player hosts the simulation
-// and the others connect straight to them, which is what lets a static site
-// run multiplayer at all.
+// Peer to peer, which is now the only kind of multiplayer there is. One player
+// hosts the simulation and the others connect straight to them, which is what
+// lets a static site run multiplayer at all - and what let the server go.
 let signalling = null;
 // The code this device is hosting under, if it is hosting: the lobby and the
 // HUD both show it, because a host who cannot find their own code again has
@@ -894,12 +804,7 @@ $("copy-code").onclick = async () => {
 };
 $("games-back").onclick = () => {
   audio.play("click");
-  closeBrowser();
-};
-$("quick-join").onclick = () => {
-  audio.play("click");
-  closeBrowser();
-  join("multiplayer");
+  closePanel();
 };
 $("leave").onclick = openGameMenu;
 $("confirm-leave").onclick = () => {

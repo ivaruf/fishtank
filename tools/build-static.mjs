@@ -88,8 +88,9 @@ for (const [file, from, to] of [
     );
   await writeFile(target, source.replace(from, to));
 }
-// Stands in for /healthz, which a static host cannot answer, so the menu can
-// still show which build it is running.
+// How the menu knows which build it is running. There is no server to ask any
+// more, so this file is the answer, and client/sw.js keeps it out of the cache
+// so it cannot go stale.
 await writeFile(
   path.join(out, "client/version.json"),
   JSON.stringify(
