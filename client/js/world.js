@@ -1,6 +1,7 @@
 import { material } from "./fish.js";
 import { createEnvironmentDetails } from "./environment.js";
 import { loadScenery } from "./scenery.js";
+import { createSandFloor } from "./sand.js";
 import { hardwareScaling } from "./rendering.js";
 import { PLANTS, FILTER } from "../../shared/config.js";
 const B = window.BABYLON;
@@ -87,6 +88,7 @@ export function createAquarium(canvas) {
   const tank = buildTank(scene, glow);
   buildRoom(scene, glow);
   createEnvironmentDetails(scene, resolution);
+  createSandFloor(scene, resolution, tank.floor);
   const bubbleMat = material(scene, "bubble", "#a6e6d6", 0.3);
   bubbleMat.alpha = 0.22;
   const bubbles = [];
@@ -292,6 +294,9 @@ function buildTank(scene, glow) {
     indices = surface.getIndices(),
     normals = new Float32Array(positions.length);
   return {
+    // Handed out so sand.js can hide it: the authored tiles stand in the same
+    // place and would fight this plane for every pixel.
+    floor,
     animate(time) {
       for (let i = 0; i < positions.length; i += 3) {
         const x = positions[i],

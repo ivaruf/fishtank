@@ -34,6 +34,7 @@ const SHELL = [
   "js/environment.js",
   "js/fish.js",
   "js/scenery.js",
+  "js/sand.js",
   "js/controls.js",
   "js/effects.js",
   "js/filter.js",
