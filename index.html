@@ -1,0 +1,20 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Fishtank</title>
+<!--
+  The entry point, one level above the game. The app lives in client/ because
+  its modules import ../../shared/, so client/ and shared/ have to be siblings
+  and neither can be the root.
+
+  This file is committed rather than generated so that serving the repository
+  directly - npm run serve, then localhost:3000 - lands on the game exactly as
+  the deployed site does, instead of on a directory listing of the repo.
+  tools/build-static.mjs copies it into _site rather than writing its own, so
+  there is one of it.
+
+  The arcade follows a single meta-refresh or canonical hop when it resolves a
+  game's manifest, so this redirect is expected there and must stay one hop.
+-->
+<meta http-equiv="refresh" content="0; url=client/" />
+<link rel="canonical" href="client/" />
+<p><a href="client/">Enter the fishtank</a></p>

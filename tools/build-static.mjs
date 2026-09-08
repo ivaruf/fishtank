@@ -42,16 +42,11 @@ await cp(path.join(root, "client"), path.join(out, "client"), {
 await cp(path.join(root, "shared"), path.join(out, "shared"), {
   recursive: true,
 });
-// A tidy entry point, since the app itself lives one level down.
-await writeFile(
-  path.join(out, "index.html"),
-  `<!doctype html><meta charset="utf-8">
-<title>Fishtank</title>
-<meta http-equiv="refresh" content="0; url=client/">
-<link rel="canonical" href="client/">
-<p><a href="client/">Enter the fishtank</a></p>
-`,
-);
+// The entry point, since the app itself lives one level down. Copied rather
+// than written here: it is committed at the repository root so that serving
+// the repo directly for development lands on the game rather than on a
+// directory listing, and a generated second copy would be one to forget.
+await cp(path.join(root, "index.html"), path.join(out, "index.html"));
 // The Babylon fallback has no node_modules to read on a static host, so the
 // two files the page falls back to are copied in. Without this the CDN stops
 // being a fallback and becomes a hard dependency.

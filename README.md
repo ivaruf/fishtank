@@ -10,7 +10,9 @@ It is a static site, so anything that serves files will do. Node 22 is needed on
 npm run serve        # python3 -m http.server 3000, from the repo root
 ```
 
-Then open http://localhost:3000/client/ — the `client/` path matters, because the page imports `../../shared/` and needs to sit one level down, exactly as it does when deployed. Editing any file and reloading is the whole loop; there is nothing to restart and nothing to rebuild. `npm run build:static` assembles `_site`, which is what GitHub Pages publishes, and is worth running before a push if you have touched the layout it assembles.
+Then open http://localhost:3000. The root `index.html` hops to `client/`, where the app lives, because its modules import `../../shared/` and so `client/` and `shared/` have to be siblings with neither of them the root — the deployed site takes the same hop, and that file is committed rather than generated so both do it identically. Editing any file and reloading is the whole loop; there is nothing to restart and nothing to rebuild. `npm run build:static` assembles `_site`, which is what GitHub Pages publishes, and is worth running before a push if you have touched the layout it assembles.
+
+One caveat with serving the repository directly: everything in it is served, `.git/` and `node_modules/` included. That is fine on localhost and worth remembering before pointing another device on the wifi at it — for that, serve `_site` instead, which contains only what deploys.
 
 Type a name and pick which of the fourteen fish you want to be; the choice is remembered and the chosen fish swims large beside the menu. Then **Dive in solo** for a private aquarium, or **Play with friends** to host a tank or join one.
 
