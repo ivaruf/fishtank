@@ -6,7 +6,7 @@ name: Pages
 # deploy that CI used to trigger.
 on:
   push:
-    branches: [p2p_experiment]
+    branches: [main]
   workflow_dispatch:
 
 # Pages needs these, and only one deploy may be in flight at a time.
