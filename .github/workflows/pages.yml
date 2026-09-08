@@ -2,8 +2,9 @@ name: Pages
 
 # The static build, which is now the only build: solo runs entirely in the
 # browser and multiplayer goes peer-to-peer, so GitHub Pages hosts the whole
-# game. The Node server this branch replaced is gone, along with the Render
-# deploy that CI used to trigger.
+# game. Actions rather than Pages-from-main because _site has to be assembled
+# first; the Node server this replaced is deleted, along with the Render deploy
+# that ci.yml used to trigger.
 on:
   push:
     branches: [main]

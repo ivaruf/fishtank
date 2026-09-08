@@ -1,8 +1,13 @@
-# Peer-to-peer experiment
+# Peer to peer
 
-Branch `p2p_experiment`, started 2026-09-07. One player hosts the simulation
-and the others connect straight to them, so a static site with no game server
-can run multiplayer. Everything below was measured, not assumed.
+One player hosts the simulation and the others connect straight to them, so a
+static site with no game server can run multiplayer. Everything below was
+measured, not assumed.
+
+It started as an experiment on a `p2p_experiment` branch on 2026-09-07 and
+stopped being one on 2026-09-08, when the branch was force-pushed onto `main`
+and the Node server it had been competing with was deleted. This is how the
+game works now, not a proposal for how it might.
 
 ## What works
 
