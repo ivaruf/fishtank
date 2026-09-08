@@ -1,4 +1,5 @@
 import { material } from "./fish.js";
+import { createEnvironmentDetails } from "./environment.js";
 import { loadScenery } from "./scenery.js";
 import { hardwareScaling } from "./rendering.js";
 import { PLANTS, FILTER } from "../../shared/config.js";
@@ -85,6 +86,7 @@ export function createAquarium(canvas) {
   glow.intensity = 0.55;
   const tank = buildTank(scene, glow);
   buildRoom(scene, glow);
+  createEnvironmentDetails(scene, resolution);
   const bubbleMat = material(scene, "bubble", "#a6e6d6", 0.3);
   bubbleMat.alpha = 0.22;
   const bubbles = [];

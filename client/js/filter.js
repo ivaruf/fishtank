@@ -121,7 +121,7 @@ export function createFilter(scene, glow, sparks) {
   );
   button.scaling.z = 0.55;
   place(button, FILTER.button.x, FILTER.button.y, FILTER.button.z, red);
-  place(
+  const buttonRim = place(
     B.MeshBuilder.CreateCylinder(
       "filter button rim",
       { diameter: FILTER.buttonRadius * 1.6, height: 0.5, tessellation: 20 },
@@ -131,7 +131,10 @@ export function createFilter(scene, glow, sparks) {
     FILTER.button.y,
     z - 1.9,
     darker,
-  ).rotation.x = Math.PI / 2;
+  );
+  buttonRim.unfreezeWorldMatrix();
+  buttonRim.rotation.x = Math.PI / 2;
+  buttonRim.freezeWorldMatrix();
   const spout = new B.Vector3(x + 1.5, 26.5, z - 5),
     top = new B.Vector3(x, 25, z - 2);
   let bolt = null,

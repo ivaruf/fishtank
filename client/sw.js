@@ -31,6 +31,7 @@ const SHELL = [
   "js/host-worker.js",
   "js/networking.js",
   "js/world.js",
+  "js/environment.js",
   "js/fish.js",
   "js/scenery.js",
   "js/controls.js",

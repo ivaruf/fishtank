@@ -1,0 +1,18 @@
+[
+  {
+    "asset": "office-high",
+    "triangles": 15936
+  },
+  {
+    "asset": "zapper-high",
+    "triangles": 3360
+  },
+  {
+    "asset": "office-ultra",
+    "triangles": 37408
+  },
+  {
+    "asset": "zapper-ultra",
+    "triangles": 19276
+  }
+]
