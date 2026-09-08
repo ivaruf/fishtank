@@ -108,10 +108,10 @@ function open(picker, on) {
   picker.trigger.setAttribute("aria-expanded", String(on));
   if (on)
     // Start on the current tier, so an arrow key or a Return goes somewhere
-    // sensible rather than to the top of the list.
-    picker.list
-      .querySelector('[aria-checked="true"]')
-      ?.focus({ preventScroll: true });
+    // sensible rather than to the top of the list. Allowed to scroll: on a
+    // short screen the list sits in the pause panel's own flow and the panel
+    // scrolls, so the row that takes focus has to be brought into view.
+    picker.list.querySelector('[aria-checked="true"]')?.focus();
 }
 const closeAll = (except) => {
   for (const picker of pickers) if (picker !== except) open(picker, false);
@@ -178,7 +178,7 @@ export function mountQuality(container, onPick = () => {}) {
       onPick();
       quality.set(tier.id);
       open(picker, false);
-      trigger.focus({ preventScroll: true });
+      trigger.focus();
     };
     list.append(option);
   }
@@ -196,7 +196,7 @@ export function mountQuality(container, onPick = () => {}) {
       event.preventDefault();
       event.stopPropagation();
       open(picker, false);
-      trigger.focus({ preventScroll: true });
+      trigger.focus();
       return;
     }
     if (list.hidden || !["ArrowDown", "ArrowUp"].includes(event.key)) return;
@@ -205,7 +205,7 @@ export function mountQuality(container, onPick = () => {}) {
     const at = options.indexOf(document.activeElement);
     const step = event.key === "ArrowDown" ? 1 : -1;
     const next = (at + step + options.length) % options.length;
-    options[at < 0 ? 0 : next].focus({ preventScroll: true });
+    options[at < 0 ? 0 : next].focus();
   });
   root.append(trigger, list);
   container.replaceChildren(root);

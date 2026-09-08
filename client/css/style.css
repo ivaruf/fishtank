@@ -416,10 +416,18 @@ button span {
   z-index: 1;
   pointer-events: none;
 }
-/* HUD and header sit above the touch zones so their buttons stay tappable. */
-header,
+/* HUD panels sit above the touch zones so their buttons stay tappable. */
 #hud > * {
   z-index: 2;
+}
+/* The header sits above those, and above the menu and lobby panels, because
+   the graphics dropdown hangs out of it: header and the panels were both on 2
+   and the header comes first in the document, so on a short landscape screen -
+   where the menu panel reaches up near the header - the open list painted
+   behind the panel. It is chrome; it belongs on top. The turn-your-phone
+   overlay at 10 and the pause panel in the top layer still win. */
+header {
+  z-index: 4;
 }
 .touch-zone {
   position: absolute;
@@ -1593,8 +1601,38 @@ select:focus-visible {
     top: max(12px, env(safe-area-inset-top));
     right: max(15px, env(safe-area-inset-right));
   }
+  /* A landscape phone is shorter than this panel's content, so here the panel
+     has to scroll or Continue and Leave cannot be reached at all - which is
+     what removing its max-height cost. A dropdown hanging outside a scrolling
+     box would be clipped by that scroll, so on these screens the list drops
+     into flow instead and the panel scrolls down to it. Same control, laid out
+     for the room there is. */
   #leave-dialog {
-    padding: 22px;
+    padding: 20px;
+    max-height: calc(100vh - 16px);
+    max-height: calc(100dvh - 16px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  #leave-dialog h2 {
+    margin: 6px 0 6px;
+    font-size: 21px;
+  }
+  #leave-dialog p {
+    margin: 0 0 14px;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  #leave-dialog .quality-slot {
+    margin-bottom: 16px;
+  }
+  #leave-dialog .picker-list {
+    position: static;
+    width: auto;
+    max-width: none;
+    max-height: none;
+    margin-top: 6px;
+    box-shadow: none;
   }
 }
 
