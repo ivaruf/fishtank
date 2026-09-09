@@ -527,13 +527,15 @@ function handlers(current, kind) {
       // whose buttons they would otherwise be covering.
       controls.setTouchMode(touchMode);
       audio.music("game");
-      $("connection").textContent = solo
-        ? "● SOLO AQUARIUM · OFFLINE"
-        : `● ${(roomName ?? "a friend's tank").toUpperCase()}`;
-      // A host can still be joined mid-round, so keep the code on screen: the
-      // menu that showed it is gone once the round starts.
-      if (invite)
-        $("connection").textContent += ` · CODE ${spellCode(invite.code)}`;
+      // With a code to give out, the code is the whole line. A host can still
+      // be joined mid-round, so it stays on screen once the lobby is gone -
+      // and it is the thing someone reads out loud, which "YOUR TANK · CODE"
+      // in front of it did nothing for but wrap it onto two lines.
+      $("connection").textContent = invite
+        ? `Code: ${spellCode(invite.code)}`
+        : solo
+          ? "Solo aquarium"
+          : (roomName ?? "A friend's tank");
       // Host and guest are two browsers with two copies of this code, so a
       // mismatch means one of them has not reloaded. It is the guest that can
       // see both numbers, so it is the guest that says so.
@@ -541,7 +543,7 @@ function handlers(current, kind) {
         console.warn(
           `The host speaks protocol ${protocol}, this tank expects ${PROTOCOL}. One of you is on an older build; reload both.`,
         );
-        $("connection").textContent = "● DIFFERENT BUILDS · RELOAD BOTH";
+        $("connection").textContent = "Different builds — reload both";
       }
     },
     onState(next) {
