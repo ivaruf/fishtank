@@ -31,8 +31,11 @@ SOURCE = ROOT / 'assets/blender'       # editable sources, beside the fish sourc
 DOCS = ROOT / 'docs'                   # the review sheet
 for path in [GLB, SOURCE, DOCS]: path.mkdir(parents=True, exist_ok=True)
 # The whole pack, in the order the review sheet lays it out. create_scenery.py
-# builds the first six; the wreck is big enough to have its own script.
-SCENERY = ['ribbon-grass', 'broadleaf-plant', 'red-stem-plant', 'branching-driftwood', 'stone-arch', 'weathered-amphora', 'little-shipwreck']
+# builds the first five; the wreck is big enough to have its own script.
+# A stone arch was the sixth. It is gone, model and all: its collision was a
+# ring of stones and it read as an invisible wall at the height where the
+# opening looked widest, which shared/scenery.js explains at length.
+SCENERY = ['ribbon-grass', 'broadleaf-plant', 'red-stem-plant', 'branching-driftwood', 'weathered-amphora', 'little-shipwreck']
 # One seed for the pack, fixed at import. Pebbles, moss cushions and the dents
 # in every stone have to land in the same place on every rebuild, or the
 # committed .glb files churn without anything having actually changed.
@@ -67,8 +70,8 @@ def tube(name, points, radii, mat, sides=10):
     return mesh(name,v,f,mat)
 
 def stone(name, p, scale, mat):
-    """An ico-sphere with every vertex pushed in or out a little, so pebbles,
-    arch stones and moss cushions read as rough rather than moulded."""
+    """An ico-sphere with every vertex pushed in or out a little, so pebbles
+    and moss cushions read as rough rather than moulded."""
     bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=2,radius=1,location=p);o=bpy.context.object;o.name=name;o.scale=scale;o.data.materials.append(mat)
     for v in o.data.vertices:v.co*=random.uniform(.91,1.09)
     return o

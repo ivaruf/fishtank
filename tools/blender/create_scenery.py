@@ -1,6 +1,5 @@
-"""Build six of the seven aquarium scenery assets: three plants, driftwood, a
-stone arch and a weathered amphora. The seventh, the wreck, is big enough to
-have its own script.
+"""Build five of the six aquarium scenery assets: three plants, driftwood and a
+weathered amphora. The sixth, the wreck, is big enough to have its own script.
 
     blender --background --factory-startup --python tools/blender/create_scenery.py
 
@@ -12,7 +11,6 @@ client/assets/scenery/<name>.glb. Motifs, all solid geometry with plain colours:
   broadleaf-plant    ten ridged leaves on curved petioles, pale midribs
   red-stem-plant     five stems carrying paired copper and burgundy leaves
   branching-driftwood  a branching worn trunk with roots, grain and moss
-  stone-arch         an open passage of arch stones on two foundations
   weathered-amphora  a hollow pot with loop handles, bands and a hairline crack
 
 Sizes are authoring units: the plants stand 1-3 units tall, which is about a
@@ -87,14 +85,6 @@ def driftwood():
         a=i*1.6;tube('Spreading root',[(-.65,0,.28),(-.65+.35*math.cos(a),.35*math.sin(a),.12),(-.65+.65*math.cos(a),.65*math.sin(a),.045)],[.11,.07,.015],bark)
     for i in range(7):stone('Moss cushion',(-.8+i*.16,.03,.45+i*.018),(.14,.13,.075),moss)
 
-def arch():
-    for i in range(9):
-        a=math.pi*i/8;x=1.05*math.cos(a);z=.26+1.25*math.sin(a)
-        stone('Arch stone',(x,0,z),(.34,.38,.32),pebble if i%2 else rock)
-    for x in [-1.05,1.05]:stone('Foundation',(x,0,.12),(.48,.52,.16),rock)
-    for i in range(6):
-        a=.35+i*.4;stone('Algae patch',(1.05*math.cos(a),-.22,.42+1.25*math.sin(a)),(.16,.09,.07),moss)
-
 def amphora():
     # One profile taken up the outside, over the lip and back down the inside,
     # so the mouth is a real hollow a fish can nose into rather than a cap.
@@ -112,13 +102,13 @@ def amphora():
         pts=[(r*math.cos(i*math.tau/40),r*math.sin(i*math.tau/40),z) for i in range(41)];tube('Incised decorative band',pts,[.018]*41,copper,6)
     tube('Dark hairline crack',[(.06,-.27,1.46),(.04,-.26,1.25),(.13,-.37,1.10),(.12,-.49,.95)],[.009]*4,bark,5)
 
-builders={'ribbon-grass':ribbon,'broadleaf-plant':broadleaf,'red-stem-plant':redstem,'branching-driftwood':driftwood,'stone-arch':arch,'weathered-amphora':amphora}
+builders={'ribbon-grass':ribbon,'broadleaf-plant':broadleaf,'red-stem-plant':redstem,'branching-driftwood':driftwood,'weathered-amphora':amphora}
 assert list(builders) == SCENERY[:len(builders)], 'scenery_common.SCENERY and the builders here have drifted apart'
 for name,build in builders.items():
     clear()
     # Fresh materials per asset: each .blend is saved on its own, so sharing
     # one set across the loop would leave later files pointing at nothing.
-    green=material('Deep jade',(.055,.31,.16));lime=material('Leaf green',(.22,.49,.18));vein=material('Leaf vein',(.36,.55,.19));red=material('Wine red',(.40,.075,.11));copper=material('Warm copper',(.68,.23,.12));bark=material('Dark wood',(.16,.075,.035));wood=material('Wood grain',(.34,.19,.075));pebble=material('Warm slate',(.36,.40,.38));rock=material('Cool slate',(.23,.29,.30));moss=material('Moss',(.18,.30,.065));terracotta=material('Terracotta',(.55,.25,.14))
+    green=material('Deep jade',(.055,.31,.16));lime=material('Leaf green',(.22,.49,.18));vein=material('Leaf vein',(.36,.55,.19));red=material('Wine red',(.40,.075,.11));copper=material('Warm copper',(.68,.23,.12));bark=material('Dark wood',(.16,.075,.035));wood=material('Wood grain',(.34,.19,.075));pebble=material('Warm slate',(.36,.40,.38));moss=material('Moss',(.18,.30,.065));terracotta=material('Terracotta',(.55,.25,.14))
     build()
     publish(name)
 print('FISHTANK: scenery built. Now create_shipwreck.py, then render_scenery.py.')
