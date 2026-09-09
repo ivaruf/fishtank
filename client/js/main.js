@@ -970,7 +970,8 @@ function updateLobby(me) {
   const iAmHost = lobby.host === myId,
     ready = new Set(lobby.ready),
     allReady = state.players.every((p) => ready.has(p.id));
-  $("lobby-count").textContent = `· ${state.players.length} IN`;
+  // The roster's label, and the only count on this screen.
+  $("lobby-count").textContent = `${state.players.length} IN`;
   $("lobby-players").replaceChildren(
     ...state.players.map((p) => {
       const li = document.createElement("li"),
@@ -1030,11 +1031,17 @@ function updateLobby(me) {
   $("ready").setAttribute("aria-pressed", String(mine));
   $("start").hidden = !iAmHost;
   $("start").disabled = !allReady;
-  $("lobby-title").textContent = alone
-    ? "Your tank"
+  // Only when it has something to say. Alone in your own tank it had "Your
+  // tank", which is a label for the screen you are looking at rather than news
+  // about it - and the hint below already says what to do about being alone.
+  // Hidden rather than blank: an empty h2 still takes its line.
+  const title = alone
+    ? ""
     : allReady
       ? "Everyone is ready"
       : "Waiting for the shoal";
+  $("lobby-title").textContent = title;
+  $("lobby-title").hidden = !title;
   // The lobby already shows who is in, who is ready and the code to share, so
   // this line only says the thing the buttons cannot.
   $("lobby-hint").textContent = alone

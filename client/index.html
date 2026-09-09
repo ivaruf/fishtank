@@ -305,7 +305,12 @@
          is unchanged, so nothing moves on a big screen. -->
     <section id="lobby" class="glass lobby" hidden>
       <div class="lobby-col">
-        <div class="eyebrow">THE LOBBY <span id="lobby-count"></span></div>
+        <!-- No eyebrow naming the screen. "THE LOBBY" over a panel that is
+             plainly the lobby, above a title that said "Your tank" over your
+             own tank, was two labels for a thing nobody had asked about - and
+             the one piece of it that was worth reading, the number of fish in
+             here, belongs to the list of them. It is the roster's own label
+             now, and names it for a screen reader too. -->
         <h2 id="lobby-title">Waiting for the shoal</h2>
         <p class="lobby-invite" id="lobby-invite" hidden>
           <span>SHARE THIS CODE</span>
@@ -316,7 +321,8 @@
           </button>
           <small id="lobby-reach"></small>
         </p>
-        <ol id="lobby-players"></ol>
+        <div class="eyebrow roster-head" id="lobby-count"></div>
+        <ol id="lobby-players" aria-labelledby="lobby-count"></ol>
       </div>
       <div class="lobby-col">
         <label class="lobby-setting" for="lobby-slider"

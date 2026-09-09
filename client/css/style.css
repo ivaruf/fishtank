@@ -631,6 +631,12 @@ header {
   letter-spacing: -1px;
   margin: 10px 0 14px;
 }
+/* The roster's own label, holding the only count on this screen. It sits on
+   the list because that is what it counts - it used to be half of an eyebrow
+   naming the panel. */
+.roster-head {
+  margin-bottom: 5px;
+}
 .lobby ol {
   list-style: none;
   margin: 0;
@@ -869,6 +875,12 @@ header {
   .lobby li {
     padding: 3px 0;
     font-size: 10px;
+  }
+  /* Smaller than the names it labels, or the two read as one list. */
+  .roster-head {
+    margin-bottom: 3px;
+    font-size: 8px;
+    letter-spacing: 1.8px;
   }
   /* The roster scrolls instead of pushing the panel down the screen. Sixteen
      can be in a tank and each row is 21px, so the list was what decided how
