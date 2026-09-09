@@ -144,14 +144,17 @@
             </div>
           </div>
           <ol id="leaders" class="in-play"></ol>
-          <!-- Which tank, and the code to get into it, last: who is playing
-               is what you look at during a round, and the code is what you
-               read out once. -->
-          <div class="connection" id="connection"></div>
         </aside>
         <div id="fullscreen-status" role="status" hidden></div>
       </div>
     </header>
+    <!-- Which tank you are in, and the code to get into it. Bare text in the
+         bottom corner rather than a row in a panel: it is a line you read out
+         once, not a readout to watch, and it is empty on the menu - main.js
+         clears it, and CSS takes an empty one out of the layout. Outside the
+         HUD on purpose, because the lobby hides the HUD and the lobby is
+         exactly when someone is reading this out. -->
+    <div class="connection" id="connection"></div>
     <!-- The chosen fish, swimming large beside the menu. The hint's wording is
          set in main.js, because which gesture to name depends on the device. -->
     <div
@@ -174,13 +177,11 @@
           decoding="async"
         />
       </h1>
+      <!-- No placeholder here: main.js rolls a fishy one at startup, and it is
+           also what gets sent if the field is left alone. A static one would
+           be a name the game does not actually use. -->
       <label class="sr-only" for="name">Your name</label
-      ><input
-        id="name"
-        maxlength="18"
-        placeholder="Little fish"
-        autocomplete="nickname"
-      />
+      ><input id="name" maxlength="18" autocomplete="nickname" />
       <div class="group-label sr-only" id="species-label">Pick your fish</div>
       <div class="species-strip">
         <button
@@ -327,8 +328,10 @@
         </button>
       </div>
     </section>
-    <dialog id="leave-dialog" aria-label="Paused">
-      <div class="eyebrow">FISHTANK</div>
+    <dialog id="leave-dialog" aria-label="Game menu">
+      <!-- Says PAUSED only when the tank really has stopped, which is when you
+           are the only fish in it. main.js sets it. -->
+      <div class="eyebrow" id="pause-tag">FISHTANK</div>
       <div class="group-label">GRAPHICS</div>
       <div class="quality-slot" id="quality-play"></div>
       <div class="dialog-actions">

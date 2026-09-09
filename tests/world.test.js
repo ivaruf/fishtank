@@ -194,6 +194,30 @@ test("only the host sets difficulty, and it lands on the next round", () => {
   assert.equal(w.setDifficulty("a", 1), false);
   assert.equal(w.difficulty, DIFFICULTY.length);
 });
+test("alone in the tank the menu stops it; with company it cannot", () => {
+  const { w, p } = setup();
+  const z = p.z,
+    clock = w.remaining;
+  w.setInput(p.id, { forward: 1, strafe: 0, yaw: 0, pitch: 0 });
+  assert.equal(w.setPaused(p.id, true), true);
+  w.tick(1);
+  assert.equal(p.z, z, "the water is still");
+  assert.equal(w.remaining, clock, "and so is the round's clock");
+  assert.equal(w.setPaused(p.id, false), true);
+  w.tick(0.1);
+  assert.notEqual(p.z, z, "and moves again after");
+  // Somebody else in the water takes the pause away and cannot ask for one:
+  // freezing a tank for everyone because one player opened a menu is not a
+  // pause, and a guest arriving must never find still water it cannot start.
+  w.setPaused(p.id, true);
+  const two = w.addPlayer("two", "Two");
+  assert.equal(w.paused, false);
+  assert.equal(w.setPaused(p.id, true), false);
+  assert.equal(w.setPaused(two.id, true), false);
+  w.remaining = 50;
+  w.tick(1);
+  assert.ok(w.remaining < 50, "so the round runs on for both of them");
+});
 test("a meal is a mouthful: one fish cannot multiply you", () => {
   const { w, p } = setup();
   w.npcs = [];

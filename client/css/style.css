@@ -134,10 +134,21 @@ header {
 body:has(#menu:not([hidden])) .brand {
   visibility: hidden;
 }
+/* Bottom right, in the water rather than on a panel. The shadow is what makes
+   that safe: the vignette thins out to almost nothing over the sand while a
+   round is on, so bare text needs to carry its own contrast rather than trust
+   the tank behind it. Left selectable, unlike the rest of the chrome - the
+   whole purpose of the line is to be got out of the screen and into someone
+   else's device. */
 .connection {
+  position: absolute;
+  right: 42px;
+  bottom: 26px;
   font-size: 10px;
   letter-spacing: 1.6px;
-  color: #b6d2c6;
+  color: #cfe6dc;
+  text-shadow: 0 1px 7px #01191ed9;
+  pointer-events: auto;
 }
 .panel {
   position: absolute;
@@ -385,8 +396,8 @@ button span {
    leaderboard floating below it - two boxes, one subject. Living in the
    header's flow it needs no coordinates of its own: its top is the header's
    top, level with the wordmark across the screen, and its right edge is the
-   header's. Empty children take themselves out (`:empty` below, and .in-play
-   off the roster), so the gap only ever falls between rows that are there. */
+   header's. The roster's own rows take themselves out with .in-play, so the
+   gap only ever falls between rows that are there. */
 .roster {
   display: flex;
   flex-direction: column;
@@ -395,13 +406,11 @@ button span {
      around them the way the header's pill did. */
   padding: 5px;
 }
-/* As soon as it has a tank to name it is the session panel: full measure -
-   the stats panel's, across the screen - and roomy with it. Keyed on having
-   something to say rather than on the phase, so it does not resize when a
-   round starts or ends; the lobby and the round get the same panel. A long
-   name and code wraps to a second line inside it rather than setting the
-   width of everything below. */
-.roster:has(.connection:not(:empty)) {
+/* While a round is on screen it is the roster, and takes a measure of its
+   own. The tank's name and code used to live here too and set this - they are
+   bare text in the bottom corner now, so what decides it is simply whether
+   there is a roster to show. */
+body:has(#hud:not([hidden])) .roster {
   width: var(--roster-col);
   padding: 18px 20px;
 }
@@ -1092,6 +1101,8 @@ select {
     right: 22px;
   }
   .connection {
+    right: 22px;
+    bottom: 20px;
     font-size: 8px;
   }
   .panel {
@@ -1119,7 +1130,7 @@ select {
   .stats b {
     font-size: 21px;
   }
-  .roster:has(.connection:not(:empty)) {
+  body:has(#hud:not([hidden])) .roster {
     padding: 12px 13px;
   }
   .roster-head .eyebrow {
@@ -1387,9 +1398,15 @@ select {
   .roster {
     border-radius: 10px;
   }
-  .roster:has(.connection:not(:empty)) {
+  body:has(#hud:not([hidden])) .roster {
     padding: 8px 10px;
     gap: 6px;
+  }
+  /* Clear of the touch zones' own hints along the bottom edge, and inside the
+     notch on a landscape phone. */
+  .connection {
+    right: max(20px, env(safe-area-inset-right));
+    bottom: max(24px, env(safe-area-inset-bottom));
   }
   .roster-head .eyebrow {
     font-size: 7px;
@@ -1541,8 +1558,10 @@ body:has(#hud[hidden]) .exit {
 /* The pause panel is the same frosted glass as every other panel, and the
    tank stays visible through it and through its backdrop. It used to be an
    opaque box over a heavy blur, which is a modal dialog belonging to a web
-   page; the point of pausing here is that the aquarium keeps going, and being
-   able to watch it is what says so. */
+   page; this belongs to an aquarium, and seeing the water through it is what
+   says so. Whether that water is still moving now depends on who is in it -
+   alone, the panel really does stop the tank, and its own eyebrow says
+   PAUSED. With company it cannot, and does not claim to. */
 #leave-dialog {
   width: min(440px, calc(100vw - 32px));
   margin: auto;

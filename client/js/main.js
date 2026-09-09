@@ -9,6 +9,7 @@ import { createControls } from "./controls.js";
 import { hostGame, joinGame, createHostEngine } from "./peer.js";
 import { hostRendezvous, joinRendezvous } from "./rendezvous.js";
 import { BUILD } from "./build.js";
+import { fishName } from "./names.js";
 import {
   CODE_LENGTH,
   SYMBOLS,
@@ -180,6 +181,11 @@ const demos = Array.from({ length: 18 }, (_, i) => ({
   yaw: i,
   pitch: 0,
 }));
+// Rolled once a session and offered as the placeholder, so the field reads as
+// a suggestion rather than a demand. Typing replaces it, as a placeholder
+// does; not typing sends it, which is what `playerName` below is for.
+$("name").placeholder = fishName();
+const playerName = () => $("name").value.trim() || $("name").placeholder;
 // Species picker: one card per model, remembered between visits.
 let chosenSpecies = SPECIES[0];
 try {
@@ -437,10 +443,19 @@ function openGameMenu() {
   if (!myId || $("hud").hidden || leavePromptOpen) return;
   leavePromptOpen = true;
   controls.setActive(false);
+  // Alone in the tank, this really is a pause: the host stops the world. The
+  // host decides that, not this - World.setPaused refuses with anyone else in
+  // the water - so the request is sent either way and the panel says which of
+  // the two it got, because a panel labelled "paused" over a tank that is
+  // still hunting you is worse than one that never claimed to be.
+  const alone = state?.players.length === 1;
+  network?.request("PAUSE", { on: true });
+  $("pause-tag").textContent = alone ? "PAUSED" : "FISHTANK";
   $("leave-dialog").showModal();
 }
 function continueGame() {
   leavePromptOpen = false;
+  network?.request("PAUSE", { on: false });
   $("leave-dialog").close();
   syncControls(
     state?.players.find((p) => p.id === myId),
@@ -701,7 +716,7 @@ $("dive").onclick = async () => {
     lobby: true,
     // In a worker, so looking at another tab does not freeze everyone else.
     engine: createHostEngine,
-    join: { name: $("name").value, species: chosenSpecies },
+    join: { name: playerName(), species: chosenSpecies },
     ...handlers(() => host, "peer"),
   });
   network = host;
@@ -740,7 +755,7 @@ async function joinPeer(code) {
     joining = false;
     peerNote(`Joined ${spellCode(code)}.`);
     const guest = joinGame({
-      join: { name: $("name").value, species: chosenSpecies },
+      join: { name: playerName(), species: chosenSpecies },
       channel: found.channel,
       ...handlers(() => guest, "peer"),
     });

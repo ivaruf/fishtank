@@ -30,6 +30,7 @@ const SHELL = [
   "js/main.js",
   "js/build.js",
   "js/codes.js",
+  "js/names.js",
   "js/peer.js",
   "js/webrtc.js",
   "js/rendezvous.js",

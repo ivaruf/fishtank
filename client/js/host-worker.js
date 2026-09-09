@@ -11,15 +11,21 @@
 // client-side for solo in the first place, and lets it move again here.
 import { World } from "../../shared/world.js";
 import { CONFIG as C, SPECIES } from "../../shared/config.js";
+import { fishName } from "./names.js";
 
 let world = null,
   ticker = null,
   tick = 0;
 const per = Math.max(1, Math.round(C.tickRate / C.broadcastRate));
+// A name off the wire, and the last place "Little fish" could come from. The
+// menu now offers a rolled name as its placeholder and sends it when nobody
+// types, so an empty name means a client that did not - an old build, or one
+// written by hand. It gets a rolled name too, rather than the shared default
+// that made a tank of fish all called the same thing.
 const cleanName = (name) =>
   String(name ?? "")
     .trim()
-    .slice(0, 18) || "Little fish";
+    .slice(0, 18) || fishName();
 const cleanSpecies = (species) =>
   SPECIES.includes(species) ? species : undefined;
 
@@ -66,6 +72,7 @@ onmessage = ({ data }) => {
     case "REQUEST": {
       const { id, request, payload = {} } = data;
       if (request === "NEXT_ROUND") world.nextRound();
+      if (request === "PAUSE") world.setPaused(id, !!payload.on);
       if (request === "READY") world.setReady(id, !!payload.ready);
       if (request === "SETTINGS") {
         if (payload.duration !== undefined)

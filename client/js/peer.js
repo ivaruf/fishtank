@@ -1,6 +1,7 @@
 import { World } from "../../shared/world.js";
 import { CONFIG as C, PROTOCOL, SPECIES } from "../../shared/config.js";
 import { createPacker, createUnpacker } from "../../shared/snapshot-codec.js";
+import { fishName } from "./names.js";
 // Host-authoritative peer-to-peer, with no server in the game loop at all.
 //
 // One player runs the simulation - the same shared/world.js the Node server
@@ -45,6 +46,7 @@ function localEngine({ lobby, onState }) {
     input: (id, input) => world.setInput(id, input),
     request: (id, request, payload = {}) => {
       if (request === "NEXT_ROUND") world.nextRound();
+      if (request === "PAUSE") world.setPaused(id, !!payload.on);
       if (request === "READY") world.setReady(id, !!payload.ready);
       if (request === "SETTINGS") {
         if (payload.duration !== undefined)
@@ -114,10 +116,15 @@ export function createHostEngine(options) {
   return localEngine(options);
 }
 
+// A name off the wire, and the last place "Little fish" could come from. The
+// menu now offers a rolled name as its placeholder and sends it when nobody
+// types, so an empty name means a client that did not - an old build, or one
+// written by hand. It gets a rolled name too, rather than the shared default
+// that made a tank of fish all called the same thing.
 const cleanName = (name) =>
   String(name ?? "")
     .trim()
-    .slice(0, 18) || "Little fish";
+    .slice(0, 18) || fishName();
 const cleanSpecies = (species) =>
   SPECIES.includes(species) ? species : undefined;
 

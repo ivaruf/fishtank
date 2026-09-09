@@ -65,6 +65,8 @@ export class World {
       ? { duration: C.roundLength, difficulty: C.difficulty, ready: new Set() }
       : null;
     this.phase = lobby ? "lobby" : "playing";
+    // Only ever true for a tank with one fish in it - see setPaused.
+    this.paused = false;
     this.remaining = C.roundLength;
     this.round = 1;
     this.filter = { armed: false, cooldown: 0, on: [] };
@@ -89,6 +91,21 @@ export class World {
     if (!this.lobby || this.phase !== "lobby" || id !== this.host) return false;
     if (!Number.isFinite(seconds)) return false;
     this.lobby.duration = clamp(Math.round(seconds), 60, 300);
+    return true;
+  }
+  // A tank with one fish in it stops when that fish opens the menu, which is
+  // what "pause" has to mean when you are alone: the round's clock was running
+  // and the wild fish were still hunting while a solo player read the graphics
+  // settings, so the menu could get you eaten.
+  //
+  // Only ever alone. Freezing the tank because someone went to look at a
+  // setting is not a pause for the other fifteen players, and there is no vote
+  // to hold, so with anyone else in the water this refuses and the menu stays
+  // what it was: a panel over a tank that keeps swimming. addPlayer clears it
+  // for the same reason - a guest arriving must not find the water stopped.
+  setPaused(id, on) {
+    if (this.players.size !== 1 || !this.players.has(id)) return false;
+    this.paused = !!on;
     return true;
   }
   // Host only: which DIFFICULTY tier the next round is seeded from. Set in the
@@ -193,6 +210,10 @@ export class World {
     this.spawn(p);
     if (this.phase === "lobby") p.alive = false;
     this.players.set(id, p);
+    // Whoever was alone in here can no longer hold the tank still: a guest
+    // arriving to find the water stopped, with no way to start it, would have
+    // no idea why.
+    this.paused = false;
     return p;
   }
   setInput(id, message) {
@@ -378,7 +399,10 @@ export class World {
     if (f.y > 26) f.pitch = -0.35;
   }
   tick(dt) {
-    if (!this.players.size) return;
+    // An empty tank stops, and so does a tank whose only fish is reading the
+    // menu - see setPaused. Both stop everything: the clock, the wild fish and
+    // the filter, because a round that carries on without you is not paused.
+    if (!this.players.size || this.paused) return;
     if (this.phase === "lobby") {
       // The tank keeps living behind the lobby: wild fish swim, nothing eats.
       this.remaining = this.lobby.duration;
