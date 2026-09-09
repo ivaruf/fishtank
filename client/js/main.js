@@ -164,6 +164,9 @@ ask("version.json")
   });
 // How long the camera lingers on the predator before the banner appears.
 const DEATH_CAM_SECONDS = 2.2;
+// The radius at mass 200, past which the follow camera starts giving ground
+// faster - see the note where `back` is worked out.
+const BIG_FISH = radius(200);
 const demos = Array.from({ length: 18 }, (_, i) => ({
   id: `demo-${i}`,
   color: i % 5,
@@ -1290,7 +1293,15 @@ engine.runRenderLoop(() => {
     // The constant is chosen to hold the spawn framing exactly: at the spawn
     // radius of 0.96 this is 10.04 units back, which is what it has always
     // been. A player who never eats sees no change at all.
-    const back = 9.3 + r * 0.8;
+    //
+    // Past mass 200 the frame is more fish than tank, and flying something you
+    // cannot see around is not the reward for having grown - so from there the
+    // camera gives ground faster, 1.9 units for every unit of radius instead
+    // of 0.8. It is a change of slope and not a jump, because the extra term
+    // starts at zero, and the lerp below smooths even that. At the 900 cap the
+    // fish fills about 40% of the frame's height rather than 51%, and it is
+    // still visibly growing on the way there.
+    const back = 9.3 + r * 0.8 + Math.max(0, r - BIG_FISH) * 1.1;
     const desired = new B.Vector3(
       p.x - d.x * back,
       p.y + 2 + r * 0.4 - d.y * back,
