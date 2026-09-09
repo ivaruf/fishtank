@@ -75,20 +75,41 @@ header {
   align-items: center;
   pointer-events: none;
 }
+/* The top-left corner is one column, and --hud-col is its measure: the
+   wordmark and the stats panel below it are both exactly this wide, so the
+   corner reads as a single stack rather than two things that happen to share
+   an edge. The values are each tier's natural stats width - the three columns
+   at that tier's type size, plus its gaps and padding - so the panel looks
+   unchanged and simply stops breathing in and out as the score gains a digit
+   and the timer loses one. The wordmark's file is cropped tight to its ink by
+   tools/make-brand.py, so its box is its ink and a width lines it up exactly.
+   Legibility still sets the floor, it is just no longer what does the sizing:
+   the word reads down to about 40 px tall and is a smudge by 28, and every
+   tier here clears that - 146 px of width is 43 px of it, 256 px is 75. That
+   floor is also why the corner mark is the whole word rather than the little
+   fish: a mark this small has to be a shape, and the shape here is the word. */
+:root {
+  --hud-col: 256px;
+}
+@media (max-width: 650px) {
+  :root {
+    --hud-col: 200px;
+  }
+}
+@media (max-height: 520px) and (orientation: landscape) {
+  :root {
+    --hud-col: 146px;
+  }
+}
 .brand {
   display: block;
   line-height: 0;
   pointer-events: auto;
 }
-/* Sized by height, because it is a wordmark and its width follows. 46 px is
-   the smallest this reads at: the word is legible from about 40 and the tail
-   on the f survives, while 28 is a smudge. That is also why the corner logo
-   is the word and not the little fish - a mark that small has to be a shape,
-   and the shape here is the whole word. */
 .brand img {
   display: block;
-  height: 46px;
-  width: auto;
+  width: var(--hud-col);
+  height: auto;
 }
 .brand:hover img {
   filter: brightness(1.08);
@@ -318,11 +339,21 @@ button span {
 }
 .stats {
   position: absolute;
-  top: 110px;
+  top: 126px;
   left: 42px;
   display: flex;
+  /* The width is held, and the three readings spread themselves across it.
+     Sized to content the panel breathed in and out all round - every digit
+     the score gained pushed its right edge out - which is invisible until the
+     wordmark above shares that edge. So `gap` here is only a floor for the
+     case where the numbers grow enough to close the space up; what sets the
+     spacing normally is space-between. The generous padding is the safety
+     margin: even a capped 1800.0 mass beside a five-figure score reaches into
+     it rather than through the glass. */
+  width: var(--hud-col);
+  justify-content: space-between;
   padding: 20px 26px;
-  gap: 35px;
+  gap: 12px;
 }
 .stats small {
   display: block;
@@ -336,9 +367,11 @@ button span {
   margin-top: 8px;
   font-weight: 500;
 }
+/* Same top as the stats panel, and the same 42 px right edge as the header's
+   control row above it: the whole right side is one column too. */
 .leaderboard {
   position: absolute;
-  top: 110px;
+  top: 126px;
   right: 42px;
   width: 230px;
   padding: 22px;
@@ -365,13 +398,6 @@ button span {
   top: 50%;
   font-size: 30px;
   opacity: 0.5;
-}
-.exit {
-  position: absolute;
-  bottom: 75px;
-  right: 42px;
-  padding: 10px 15px;
-  font-size: 11px;
 }
 .overlay {
   position: absolute;
@@ -993,9 +1019,6 @@ select {
     max-width: 110px;
     text-align: right;
   }
-  .brand img {
-    height: 40px;
-  }
   .panel {
     left: 7%;
     top: 48%;
@@ -1009,18 +1032,21 @@ select {
     right: 22px;
     font-size: 8px;
   }
+  /* Both panels take the header's own margin here. They used to sit 7 px
+     further out than it, which is invisible until the logo above shares an
+     edge with the panel below and the pair is 7 px adrift. */
   .stats {
-    top: 85px;
-    left: 15px;
+    top: 93px;
+    left: 22px;
     padding: 13px 18px;
-    gap: 22px;
+    gap: 10px;
   }
   .stats b {
     font-size: 21px;
   }
   .leaderboard {
-    top: 85px;
-    right: 15px;
+    top: 93px;
+    right: 22px;
     width: 145px;
     padding: 13px;
   }
@@ -1030,10 +1056,6 @@ select {
   }
   .leaderboard li {
     font-size: 10px;
-  }
-  .exit {
-    right: 20px;
-    bottom: 75px;
   }
   .buttons button {
     padding: 14px 12px;
@@ -1061,13 +1083,11 @@ select {
 }
 
 @media (max-width: 420px) {
+  /* No room for the two panels side by side, so the leaderboard drops below
+     the stats. It keeps the same right edge as the controls above it. */
   .leaderboard {
     top: 180px;
     width: 145px;
-  }
-  .stats {
-    right: 15px;
-    justify-content: space-between;
   }
   .overlay {
     max-width: 92vw;
@@ -1080,11 +1100,6 @@ select {
   .playing .menu-instructions {
     display: none;
   }
-  .playing .exit {
-    right: 50%;
-    transform: translateX(50%);
-    bottom: max(16px, env(safe-area-inset-bottom));
-  }
 }
 @media (pointer: coarse) and (orientation: portrait) {
   .rotate {
@@ -1096,9 +1111,6 @@ select {
     top: 12px;
     left: max(20px, env(safe-area-inset-left));
     right: max(20px, env(safe-area-inset-right));
-  }
-  .brand img {
-    height: 36px;
   }
   .header-tools {
     gap: 6px;
@@ -1220,7 +1232,8 @@ select {
   }
 }
 .fullscreen-toggle,
-.sound-toggle {
+.sound-toggle,
+.exit {
   pointer-events: auto;
   width: 44px;
   height: 44px;
@@ -1283,12 +1296,14 @@ select {
   }
 }
 @media (max-height: 520px) and (orientation: landscape) {
-  /* Phone-sized HUD: tuck the panels under the header and keep them small. */
+  /* Phone-sized HUD: tuck the panels under the header and keep them small.
+     Both margins are the header's, so each panel stays under the chrome it
+     belongs with. */
   .stats {
-    top: 56px;
-    left: max(14px, env(safe-area-inset-left));
+    top: 66px;
+    left: max(20px, env(safe-area-inset-left));
     padding: 7px 12px;
-    gap: 16px;
+    gap: 8px;
     border-radius: 10px;
   }
   .stats small {
@@ -1300,8 +1315,8 @@ select {
     margin-top: 3px;
   }
   .leaderboard {
-    top: 56px;
-    right: max(14px, env(safe-area-inset-right));
+    top: 66px;
+    right: max(20px, env(safe-area-inset-right));
     width: 150px;
     padding: 8px 10px;
     border-radius: 10px;
@@ -1352,11 +1367,6 @@ select {
     font-size: 9px;
     padding: 1px 7px;
   }
-  .playing .exit {
-    padding: 8px 12px;
-    font-size: 10px;
-    bottom: max(10px, env(safe-area-inset-bottom));
-  }
   .zone-hint {
     bottom: max(8px, env(safe-area-inset-bottom));
     font-size: 8px;
@@ -1379,7 +1389,8 @@ select {
   padding: 11px 12px;
 }
 .sound-toggle,
-.fullscreen-toggle {
+.fullscreen-toggle,
+.exit {
   width: 36px;
   height: 36px;
   border: 0;
@@ -1435,21 +1446,28 @@ select:focus-visible {
 .secondary {
   border-color: #83afa35c;
 }
-.playing header {
-  padding-right: 56px;
+/* Mute and fullscreen change how the game looks; this one leaves it. A
+   hairline and a little air say so without making it a separate panel
+   floating on its own. */
+.exit {
+  margin-left: 3px;
+  border-left: 1px solid #badbcd2e;
+  border-radius: 0 8px 8px 0;
 }
-#leave.exit {
-  transform: none;
-  position: fixed;
-  top: 39px;
-  right: 42px;
-  bottom: auto;
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  border-radius: 12px;
-  background: #072c32ed;
-  z-index: 20;
+/* Every button in the pill sits on the pill's own glass with no background of
+   its own, so the global brightness hover has almost nothing to brighten. An
+   inset wash reads on a transparent button and on the lime of a pressed
+   fullscreen alike, which a background colour would have overwritten. */
+.sound-toggle:hover,
+.fullscreen-toggle:hover,
+.exit:hover {
+  box-shadow: inset 0 0 0 999px #eafcf11f;
+}
+/* The pause button is only meaningful while a round is on screen, and the
+   HUD's hidden attribute is already exactly that: it is set for the menu, the
+   join screen and the lobby, and cleared when the round starts. */
+body:has(#hud[hidden]) .exit {
+  display: none;
 }
 /* The pause panel is the same frosted glass as every other panel, and the
    tank stays visible through it and through its backdrop. It used to be an
@@ -1510,11 +1528,6 @@ select:focus-visible {
   border-radius: 10px;
 }
 @media (max-width: 650px), (max-height: 520px) {
-  /* A landscape phone: small enough to leave the header room, large enough
-     that the word is still a word. */
-  .brand img {
-    height: 34px;
-  }
   /* A small landscape phone has room for the trigger but not for a label
      beside it; the list it opens is unaffected. */
   .picker-eyebrow {
@@ -1524,12 +1537,8 @@ select:focus-visible {
     padding: 3px;
     gap: 2px;
   }
-  .playing header {
-    padding-right: 48px;
-  }
-  #leave.exit {
-    top: max(12px, env(safe-area-inset-top));
-    right: max(15px, env(safe-area-inset-right));
+  .exit {
+    margin-left: 2px;
   }
   /* A landscape phone is shorter than this panel's content, so here the panel
      has to scroll or Continue and Leave cannot be reached at all - which is

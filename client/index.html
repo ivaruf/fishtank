@@ -118,6 +118,25 @@
               <path d="M9 3H3v6m12-6h6v6M3 15v6h6m12-6v6h-6" />
             </svg>
           </button>
+          <!-- The pause button belongs to this row, not to a corner of its
+               own. It used to be fixed at top/right 42px while the row it
+               should line up with sat in the header's flow, so the two could
+               never agree - a wrapped connection line moved one and not the
+               other. In the row, the browser aligns them. It only makes sense
+               while a round is on screen, and the HUD's own hidden attribute
+               is already that truth, so the CSS reads it rather than keeping
+               a second copy. -->
+          <button
+            id="leave"
+            class="exit secondary"
+            type="button"
+            aria-label="Open game menu"
+            title="Game menu (Esc)"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m6 6 12 12M18 6 6 18" />
+            </svg>
+          </button>
         </div>
         <div id="fullscreen-status" role="status" hidden></div>
       </div>
@@ -206,17 +225,6 @@
       <div class="aim">·</div>
       <div id="labels" class="labels"></div>
       <div id="toast" aria-live="polite"></div>
-      <button
-        id="leave"
-        class="exit secondary"
-        type="button"
-        aria-label="Open game menu"
-        title="Game menu (Esc)"
-      >
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="m6 6 12 12M18 6 6 18" />
-        </svg>
-      </button>
     </section>
     <!-- Joining, and nothing else. Hosting moved to Dive in, which lands in
          the lobby; this screen exists to get three pictures out of a player
