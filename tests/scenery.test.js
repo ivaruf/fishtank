@@ -24,48 +24,13 @@ function clearHeight(x, z, mass, ceiling) {
     if (free(x, y, z, mass)) return y;
   return null;
 }
-const arch = SCENERY.find((s) => s.asset === "stone-arch");
 const wreck = SCENERY.find((s) => s.asset === "little-shipwreck");
-// The underside of the crown stone, and the top of it, in world units.
-const UNDER_ARCH = 1.19 * arch.scale,
-  OVER_ARCH = 1.83 * arch.scale;
-
-// The whole point of the work: the arch is a gate that closes as you grow, and
-// nothing in the code says so - it falls out of the fish's radius.
-test("a small fish ducks under the arch and a grown one has to go over", () => {
-  assert.ok(
-    clearHeight(arch.x, arch.z, C.startMass, UNDER_ARCH),
-    "a fresh fish fits through the arch",
-  );
-  assert.equal(
-    clearHeight(arch.x, arch.z, 45, UNDER_ARCH),
-    null,
-    "a mass-45 fish cannot get under the crown",
-  );
-  // Blocked from the shortcut, not from the tank: over the crown is open.
-  assert.ok(
-    free(arch.x, OVER_ARCH + radius(45) + 0.5, arch.z, 45),
-    "a grown fish can still swim over the arch",
-  );
-  // Where the gate closes: about twenty meals from a start of 8, a third of
-  // the way into a round. It was 32.3 while radius() used a cube root; the
-  // steeper exponent that made growing visible on screen also brings this beat
-  // forward, and the arch itself has not moved. This number is what pins the
-  // arch's scale - see the note in shared/scenery.js - so if radius(), growth
-  // or the arch's placement changes, it changes here.
-  let pass = 1,
-    stop = 400;
-  for (let i = 0; i < 44; i++) {
-    const mid = (pass + stop) / 2;
-    if (clearHeight(arch.x, arch.z, mid, UNDER_ARCH)) pass = mid;
-    else stop = mid;
-  }
-  assert.ok(
-    Math.abs(pass - 22.5) < 1,
-    `arch closes at mass ${pass.toFixed(1)}, expected about 22.5`,
-  );
-});
-
+// The stone arch was here, with a test pinning the mass at which its opening
+// closed. It is gone, and so is that test - see the note in
+// shared/scenery.js. The gate-that-closes-as-you-grow beat it was for now
+// rests entirely on the wreck below, which is the honest version of it: a
+// hole in a hull reads as a hole, where an arch's curve does not read as the
+// curve the collision actually is.
 test("the wreck is a shell: a small fish gets inside, a big one cannot", () => {
   const inside = (mass) => {
     // Sweep the hull's own footprint rather than guessing a point in it.

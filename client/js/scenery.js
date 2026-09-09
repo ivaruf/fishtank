@@ -1,5 +1,7 @@
-// The Blender scenery pack: seven static assets in client/assets/scenery,
-// built by tools/blender/create_scenery.py and standing on the sand.
+// The Blender scenery pack: static assets in client/assets/scenery, built by
+// tools/blender/create_scenery.py and standing on the sand. Six of the seven
+// in the pack are placed - the stone arch is not, and shared/scenery.js says
+// why - and only what a placement names is ever fetched.
 //
 // This file only draws them. Where they stand is shared/scenery.js, because
 // the hard ones stop fish and the simulation has to agree with the picture -

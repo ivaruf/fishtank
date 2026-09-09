@@ -1,33 +1,29 @@
 // Where the hard scenery stands, and what a fish is allowed to swim through.
 //
-// This has to be shared. The client draws the wreck and the server decides
-// whether you fit under the arch, and if those two ever disagree the game lies
-// to the player about a wall. So the placement table lives here, the client
-// reads it to put meshes in the tank, and the simulation reads it to stop
-// fish - one table, two readers, no chance of drift.
+// This has to be shared. The client draws the wreck and the simulation decides
+// whether you fit inside it, and if those two ever disagree the game lies to
+// the player about a wall. So the placement table lives here, the client reads
+// it to put meshes in the tank, and the simulation reads it to stop fish - one
+// table, two readers, no chance of drift.
 //
 // The whole physics of it: every solid thing is a box or a squashed blob, and
-// a fish is a sphere of radius(mass). That is all, and it is enough to make an
-// arch behave the way an arch should. Nothing anywhere says "small fish may
-// pass"; a small fish fits between the legs and under the lintel and a big one
-// does not, because that is what its radius does. The crossover for the arch
-// as placed is mass 22.5, and it is the crown rather than the legs that
-// closes: a fish needs room between the sand and the stone overhead, and its
-// centre cannot go below r + 0.5. Fish start at mass 8, so the arch stops
-// being a shortcut about twenty meals in - a third of the way through a
-// two-minute round - and has to be gone over instead.
+// a fish is a sphere of radius(mass). Nothing anywhere says "small fish may
+// pass" - a small fish fits through the wreck's staved-in flank and a big one
+// does not, because that is what its radius does.
 //
-// It was mass 32.3 until radius() took a steeper exponent to make growing
-// visible; the arch has not moved. In meals the beat barely shifted, because
-// the wild population got a longer tail in the same change, and outgrowing
-// this arch is the plainest thing in the game that tells a player they are
-// bigger than they were. A test asserts the crossover, so moving the arch or
-// changing radius() or growth will say so - and it is why the arch is placed
-// at 3.8 rather than 3. Modelling the collision
-// as the real ring of stones instead of a flat lintel lowered the ceiling
-// toward the legs, which closed the gate at mass 16 and made the passage a
-// thing you lose after one meal; scaling the arch up gave the beat back and
-// widened the opening to 5.4 units, which is what makes it swimmable.
+// There was a stone arch here, and it is worth knowing why there is not.
+// It was meant as a gate that closes as you grow, and as a growth cue it was
+// the plainest thing in the game. But an arch's opening is a curve, and a
+// sphere flying at a curve is stopped by the stone nearest it rather than by
+// the gap you are looking through - so at the height where the opening looks
+// widest, the ceiling has already come down toward the legs. It read as an
+// invisible wall exactly when it looked most passable, which is the worst
+// possible moment for one. Two rounds of tuning had already gone into it -
+// three collision boxes became a real ring of stones, and the whole arch was
+// scaled from 3 to 3.8 to widen the gap - and it still played wrong. The
+// honest fix for a mechanism that needs a third round of tuning to stop lying
+// is to delete it. The wreck already gives the same beat and gives it
+// honestly: a hole in a hull reads as a hole.
 //
 // Not the real meshes. Those are hundreds of triangles apiece and the server
 // has no business loading a GLB to find out where a plank is. The boxes are
@@ -53,19 +49,15 @@ const foot = (cluster, dx, dz) => ({
 // rocks below, which is why they read as odd numbers rather than a tidy grid.
 export const SCENERY = Object.freeze(
   [
-    // Landmarks, and all six moved inward once they started stopping fish.
+    // Landmarks, and all of them moved inward once they started stopping fish.
     // They were first placed to dodge the nine loose rocks in the middle of
     // the tank, which forgot the twenty-two ringing it at a radius of 30 to
-    // 33 - harmless while this was all decoration, and five of the six
-    // overlapped one. An overlap is not a near miss here: it is a lump of
-    // solid nothing beside a rock, and the arch sat in a pocket of five of
-    // them. So the ring is the rock garden now and the landmarks live inside
-    // it, each with at least four units of clear water round its own
-    // footprint and the arch with seven, chosen by searching for it rather
-    // than by eye. The arch faces the longest straight run at it from both
-    // sides, since a passage you cannot line up on is just a wall.
+    // 33 - harmless while this was all decoration, and five of the six then
+    // here overlapped one. An overlap is not a near miss: it is a lump of
+    // solid nothing beside a rock. So the ring is the rock garden now and the
+    // landmarks live inside it, each with at least four units of clear water
+    // round its own footprint, found by searching rather than by eye.
     { asset: "little-shipwreck", x: -8, z: -9.5, yaw: 0.97, scale: 3 },
-    { asset: "stone-arch", x: 10.5, z: -7, yaw: 1.57, scale: 3.8 },
     { asset: "branching-driftwood", x: -20.5, z: -2.5, yaw: 1.7, scale: 3 },
     { asset: "branching-driftwood", x: 3, z: -19.5, yaw: -1.15, scale: 2.3 },
     { asset: "weathered-amphora", x: 7.5, z: 16.5, yaw: 0.8, scale: 3 },
@@ -91,11 +83,9 @@ export const SCENERY = Object.freeze(
 // The gaps are as deliberate as the boxes. The wreck is a shell, not a solid:
 // its far flank and both ends stop a fish, but the holed near side is only
 // blocked by the bottom strake it kept, so a fish clears that low sill or
-// drops in over the open top - which is the wreck's whole appeal. The arch is
-// its real ring of stones, so its opening is the curve you can see rather than
-// a rectangle drawn round it. Thin things - twigs, the amphora's handles, the
-// wreck's ribs and rope - are left out; a fish brushing a twig should not stop
-// dead.
+// drops in over the open top - which is the wreck's whole appeal. Thin things
+// - twigs, the amphora's handles, the wreck's ribs and rope - are left out; a
+// fish brushing a twig should not stop dead.
 export const HARD = Object.freeze({
   "little-shipwreck": Object.freeze(
     [
@@ -105,39 +95,6 @@ export const HARD = Object.freeze({
       { x: -1.47, y: 0.45, z: 0, hx: 0.23, hy: 0.45, hz: 0.5 }, // stern
       // All that is left of the near flank where the hull staved in.
       { x: 0.1, y: 0.3, z: 0.48, hx: 0.9, hy: 0.1, hz: 0.13 },
-    ].map(Object.freeze),
-  ),
-  // The arch is a ring of stones, so its collision is a ring of stones, from
-  // the same formula create_scenery.py builds it with rather than measured off
-  // the result. It was three boxes - two legs and a lintel across the whole
-  // span - and that lintel was a bad lie: at the outer edge of the arch the
-  // stone is down by the sand, not up at the crown, so the box filled both
-  // upper corners of the opening with solid nothing and fish swimming past at
-  // crown height hit a wall they could not see.
-  "stone-arch": Object.freeze(
-    [
-      ...Array.from({ length: 9 }, (_, i) => {
-        const a = (Math.PI * i) / 8;
-        return {
-          x: 1.05 * Math.cos(a),
-          y: 0.26 + 1.25 * Math.sin(a),
-          z: 0,
-          // The ico-sphere's own scaling, Blender's (0.34, 0.38, 0.32) with
-          // its Y and Z swapped on the way out to glTF. Neighbouring stones
-          // overlap all the way round, so there is no gap to squeeze through.
-          hx: 0.34,
-          hy: 0.32,
-          hz: 0.38,
-        };
-      }),
-      ...[-1.05, 1.05].map((x) => ({
-        x,
-        y: 0.12,
-        z: 0,
-        hx: 0.48,
-        hy: 0.16,
-        hz: 0.52,
-      })),
     ].map(Object.freeze),
   ),
   // The trunk and its thick roots. The branch reaching for the surface is a
