@@ -84,12 +84,13 @@
       </a>
       <div class="header-tools">
         <!-- The same three buttons on every screen: sound, fullscreen, and the
-             way out. Nothing here belongs to a round, so nothing here comes
-             and goes with one. -->
+             gear. Nothing here belongs to a round, so nothing here comes and
+             goes with one - and nothing here is a setting, either. The graphics
+             picker used to sit in front of them on the menu; it lives in the
+             panel the gear opens now, which is on every screen too, so the
+             setting is in one place instead of two and the pill is three
+             buttons wide wherever you are. -->
         <div class="display-controls">
-          <!-- Menu only: during play the same picker lives in the pause
-               dialog, so the HUD is not carrying a settings row. -->
-          <div class="quality-slot menu-only" id="quality-menu"></div>
           <button
             id="mute"
             class="secondary sound-toggle"
@@ -122,16 +123,27 @@
           </button>
           <!-- On every screen, not only during a round: the corner means the
                same thing on the menu, in the lobby and mid-round, and the
-               panel it opens relabels its two buttons to match. -->
+               panel it opens relabels its two buttons to match.
+               A gear, not an X. An X says "close this", which is what it meant
+               back when it only appeared mid-round and only led out; now it
+               opens a panel that holds the graphics setting as well as the way
+               out, on a screen where there may be nothing yet to close. -->
           <button
-            id="leave"
-            class="exit secondary"
+            id="game-menu"
+            class="game-menu secondary"
             type="button"
             aria-label="Open game menu"
             title="Game menu (Esc)"
           >
+            <!-- Drawn here rather than pulled from an icon set: eight teeth on
+                 the rim at 45° apart, a hub, and the same stroke as its two
+                 neighbours in the pill. -->
             <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="m6 6 12 12M18 6 6 18" />
+              <circle cx="12" cy="12" r="6.2" />
+              <circle cx="12" cy="12" r="2.4" />
+              <path
+                d="M18.2 12 L20.8 12M12 5.8 L12 3.2M5.8 12 L3.2 12M12 18.2 L12 20.8M16.38 7.62 L18.22 5.78M7.62 7.62 L5.78 5.78M7.62 16.38 L5.78 18.22M16.38 16.38 L18.22 18.22"
+              />
             </svg>
           </button>
         </div>
@@ -175,11 +187,30 @@
           decoding="async"
         />
       </h1>
-      <!-- No placeholder here: main.js rolls a fishy one at startup, and it is
-           also what gets sent if the field is left alone. A static one would
-           be a name the game does not actually use. -->
-      <label class="sr-only" for="name">Your name</label
-      ><input id="name" maxlength="18" autocomplete="nickname" />
+      <!-- No placeholder in the markup: main.js rolls a fishy one at startup,
+           and it is also what gets sent if the field is left alone. A static
+           one would be a name the game does not actually use.
+           The die beside the field rolls another. It writes into the field
+           rather than into the placeholder, because a name you asked for is a
+           name you chose, and grey suggestion text would say otherwise. -->
+      <label class="sr-only" for="name">Your name</label>
+      <div class="name-row">
+        <input id="name" maxlength="18" autocomplete="nickname" />
+        <button
+          id="reroll-name"
+          class="reroll secondary"
+          type="button"
+          aria-label="Roll a new name"
+          title="Roll another fishy name"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="4" y="4" width="16" height="16" rx="4.5" />
+            <circle class="pip" cx="9" cy="9" r="1.4" />
+            <circle class="pip" cx="12" cy="12" r="1.4" />
+            <circle class="pip" cx="15" cy="15" r="1.4" />
+          </svg>
+        </button>
+      </div>
       <div class="group-label sr-only" id="species-label">Pick your fish</div>
       <div class="species-strip">
         <button
@@ -256,56 +287,68 @@
         ><button id="games-back" class="secondary" type="button">Back</button>
       </div>
     </section>
+    <!-- Two groups, and on a desktop you cannot tell they are there: the
+         wrappers are `display: contents` until a landscape phone turns them
+         into two columns, which is the only way this screen fits one without
+         scrolling. Who is here and the code they need go on the left, the
+         two dials and the way in or out on the right. The order down the page
+         is unchanged, so nothing moves on a big screen. -->
     <section id="lobby" class="glass lobby" hidden>
-      <div class="eyebrow">THE LOBBY <span id="lobby-count"></span></div>
-      <h2 id="lobby-title">Waiting for the shoal</h2>
-      <p class="lobby-invite" id="lobby-invite" hidden>
-        <span>SHARE THIS CODE</span>
-        <b id="lobby-icons" class="lobby-icons"></b>
-        <b id="lobby-code"></b>
-        <button id="copy-code" class="secondary" type="button">
-          Copy the code
-        </button>
-        <small id="lobby-reach"></small>
-      </p>
-      <ol id="lobby-players"></ol>
-      <label class="lobby-setting" for="lobby-slider"
-        ><span>MATCH LENGTH · <b id="lobby-minutes">2 min</b></span>
-        <input
-          id="lobby-slider"
-          type="range"
-          min="1"
-          max="5"
-          step="1"
-          value="2"
-          aria-label="Match length in minutes"
-        />
-      </label>
-      <!-- How many wild fish there are and how big the biggest get, and
-           nothing else. `max` and the tier names come from shared/config.js so
-           the slider cannot drift from the table it is choosing from, and
-           aria-valuetext carries the name because "3 of 5" is not the thing a
-           player is picking. -->
-      <label class="lobby-setting" for="lobby-difficulty"
-        ><span>DIFFICULTY · <b id="lobby-level">Open water</b></span>
-        <input
-          id="lobby-difficulty"
-          type="range"
-          min="1"
-          max="5"
-          step="1"
-          value="3"
-          aria-label="Difficulty"
-        />
-        <small id="lobby-level-note"></small>
-      </label>
-      <p class="lobby-hint" id="lobby-hint"></p>
-      <div class="buttons">
-        <button id="ready" class="secondary" type="button">I'm ready</button>
-        <button id="start" type="button" hidden>
-          Start the game <span>→</span>
-        </button>
-        <button id="lobby-leave" class="secondary" type="button">Leave</button>
+      <div class="lobby-col">
+        <div class="eyebrow">THE LOBBY <span id="lobby-count"></span></div>
+        <h2 id="lobby-title">Waiting for the shoal</h2>
+        <p class="lobby-invite" id="lobby-invite" hidden>
+          <span>SHARE THIS CODE</span>
+          <b id="lobby-icons" class="lobby-icons"></b>
+          <b id="lobby-code"></b>
+          <button id="copy-code" class="secondary" type="button">
+            Copy the code
+          </button>
+          <small id="lobby-reach"></small>
+        </p>
+        <ol id="lobby-players"></ol>
+      </div>
+      <div class="lobby-col">
+        <label class="lobby-setting" for="lobby-slider"
+          ><span>MATCH LENGTH · <b id="lobby-minutes">2 min</b></span>
+          <input
+            id="lobby-slider"
+            type="range"
+            min="1"
+            max="5"
+            step="1"
+            value="2"
+            aria-label="Match length in minutes"
+          />
+        </label>
+        <!-- How many wild fish there are and how big the biggest get, and
+             nothing else. `max` and the tier names come from shared/config.js
+             so the slider cannot drift from the table it is choosing from, and
+             aria-valuetext carries the name because "3 of 5" is not the thing
+             a player is picking. -->
+        <label class="lobby-setting" for="lobby-difficulty"
+          ><span>DIFFICULTY · <b id="lobby-level">Open water</b></span>
+          <input
+            id="lobby-difficulty"
+            type="range"
+            min="1"
+            max="5"
+            step="1"
+            value="3"
+            aria-label="Difficulty"
+          />
+          <small id="lobby-level-note"></small>
+        </label>
+        <p class="lobby-hint" id="lobby-hint"></p>
+        <div class="buttons">
+          <button id="ready" class="secondary" type="button">I'm ready</button>
+          <button id="start" type="button" hidden>
+            Start the game <span>→</span>
+          </button>
+          <button id="lobby-leave" class="secondary" type="button">
+            Leave
+          </button>
+        </div>
       </div>
     </section>
     <!-- Shown between rounds and while you are waiting to respawn. The two

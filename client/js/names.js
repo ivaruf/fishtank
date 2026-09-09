@@ -55,7 +55,16 @@ const SECOND = Object.freeze([
 // Unseeded on purpose: nothing has to reproduce this, and a fish called the
 // same thing every time you open the game is not a surprise twice.
 const pick = (list) => list[Math.floor(Math.random() * list.length)];
-export const fishName = () => `${pick(FIRST)} ${pick(SECOND)}`;
+const pair = () => `${pick(FIRST)} ${pick(SECOND)}`;
+// `avoid` is the name already on screen, for the die on the menu: one pairing
+// in 324 is the one you are looking at, and rolling it again reads as a button
+// that did nothing. A handful of retries is cheaper than any bookkeeping, and
+// bounded, so an impossible list - one word in each - still returns a name.
+export const fishName = (avoid = "") => {
+  let name = pair();
+  for (let tries = 0; tries < 8 && name === avoid; tries++) name = pair();
+  return name;
+};
 // The longest name either list can produce, so a caller can check its field
 // has room without hard-coding a number that would go stale.
 export const longestFishName = () =>

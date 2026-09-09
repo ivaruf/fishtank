@@ -91,12 +91,12 @@ function loadModels() {
 loadModels();
 // quality.js owns the value and remembers it; this only reacts to it.
 quality.addEventListener("change", loadModels);
-// Two copies, one setting. The menu's sits in the header where it always did
-// and keeps its dropdown; the one in the pause dialog is why the header's can
-// disappear during play, and it is flat - five rows outright, because a popup
-// inside a panel that scrolls on a phone was clipped however it was laid out.
-mountQuality($("quality-menu"), () => audio.play("click"));
-mountQuality($("quality-play"), () => audio.play("click"), { flat: true });
+// One copy, in the panel the gear opens - which is every screen, so there is
+// nowhere left that needs a second one. The header's dropdown went with it: it
+// was a settings control living permanently in the chrome, in front of the two
+// buttons that are not settings, and it was the widest thing in the pill on
+// the one screen where the pill has least room.
+mountQuality($("quality-play"), () => audio.play("click"));
 let network = null,
   myId = null,
   state = null,
@@ -188,6 +188,14 @@ const demos = Array.from({ length: 18 }, (_, i) => ({
 // does; not typing sends it, which is what `playerName` below is for.
 $("name").placeholder = fishName();
 const playerName = () => $("name").value.trim() || $("name").placeholder;
+// The die. It fills the field rather than rolling a new placeholder, because
+// once you have asked for a name it is yours, and grey suggestion text would
+// say the opposite. It also gets told what is on screen, so a roll never lands
+// on the name that is already there and reads as a button that did nothing.
+$("reroll-name").onclick = () => {
+  audio.play("click");
+  $("name").value = fishName(playerName());
+};
 // Species picker: one card per model, remembered between visits.
 let chosenSpecies = SPECIES[0];
 try {
@@ -889,7 +897,7 @@ $("games-back").onclick = () => {
   audio.play("click");
   closePanel();
 };
-$("leave").onclick = openGameMenu;
+$("game-menu").onclick = openGameMenu;
 $("confirm-leave").onclick = () => {
   audio.play("click");
   // One step out of wherever you are: out of the round or the lobby and back

@@ -4,14 +4,15 @@
 // It is an EventTarget with a `value`, and that shape is deliberate. world.js,
 // sand.js and environment.js were each handed the `<select>` itself and
 // listened to it for "change", so presenting the same two things means none of
-// them had to learn that the dropdown became a row of buttons - or that there
-// is now more than one row of them.
+// them had to learn that the dropdown became a row of buttons - or that the
+// dropdown is gone.
 //
-// More than one, because the setting is wanted in two places that are never on
-// screen together: on the menu before diving in, and behind the pause dialog
-// during play, where it does not sit on top of the game the rest of the time.
-// Two views of one value rather than two values: every mounted row re-renders
-// from here, so they cannot disagree.
+// Gone because there is one place to draw this now: the panel the gear opens,
+// which is on every screen. There used to be two, never on screen together - a
+// dropdown in the header for the menu, and these same five rows behind the
+// pause panel during play - so the header carried a settings control at all
+// times and the setting had two looks. Mounting it more than once is still
+// safe: every mounted group redraws from here, so views cannot disagree.
 // Ordered cheapest first, which is the order they are drawn in.
 export const TIERS = Object.freeze(
   [
@@ -74,7 +75,7 @@ class Quality extends EventTarget {
     } catch {
       /* Not remembered this time, which is not worth telling anyone about. */
     }
-    for (const picker of pickers) draw(picker);
+    for (const list of lists) draw(list);
     // "change" rather than a callback list: the listeners predate this module
     // and were written against a DOM element.
     this.dispatchEvent(new Event("change"));
@@ -89,108 +90,46 @@ class Quality extends EventTarget {
   }
 }
 export const quality = new Quality();
-// One entry per mounted picker: the list of rows, and - for the header's
-// dropdown but not the pause panel's flat one - the trigger that opens it and
-// the label inside that. Every one of them redraws whenever the value changes,
-// so two pickers on two screens cannot drift apart. A null trigger is what
-// says "flat" to everything below.
-const pickers = new Set();
-function draw(picker) {
-  const tier = TIERS.find((t) => t.id === quality.value);
-  if (picker.trigger) {
-    picker.label.textContent = tier.label;
-    picker.trigger.title = tier.long;
-  }
-  for (const option of picker.list.children)
+// Every mounted row group, so all of them redraw when the value changes and
+// two views cannot drift apart.
+const lists = new Set();
+function draw(list) {
+  for (const option of list.children)
     option.setAttribute(
       "aria-checked",
       String(option.dataset.tier === quality.value),
     );
 }
-// A flat picker has no popup to open or close, so every one of these is a
-// no-op for it: `open` is what the trigger, the outside-tap watcher and Escape
-// all go through.
-function open(picker, on) {
-  if (!picker.trigger) return;
-  picker.list.hidden = !on;
-  picker.trigger.setAttribute("aria-expanded", String(on));
-  if (on)
-    // Start on the current tier, so an arrow key or a Return goes somewhere
-    // sensible rather than to the top of the list.
-    picker.list.querySelector('[aria-checked="true"]')?.focus();
-}
-const closeAll = (except) => {
-  for (const picker of pickers) if (picker !== except) open(picker, false);
-};
-// One document listener for every picker: a tap anywhere else closes them.
-// Pointerdown rather than click, so it fires before the trigger's own click
-// and a second tap on the trigger still toggles rather than reopening.
+// Five rows outright, which a `<select>` could not give us either way: its
+// popup is drawn by the operating system and is the one part of a form that no
+// amount of CSS reaches, and a native option cannot carry a line of
+// explanation. So these are real buttons in a radio group - keyboard, focus
+// ring and screen reader all still work.
 //
-// Attached on the first mount rather than at import. hardwareScaling and
-// modelDetail below are pure and are imported by tests that have no DOM at
-// all, and a `document` reference out here made this whole module refuse to
-// load for them - which is exactly how it was found.
-let watching = false;
-function watchForOutsideTaps() {
-  if (watching) return;
-  watching = true;
-  document.addEventListener("pointerdown", (event) => {
-    for (const picker of pickers)
-      if (!picker.root.contains(event.target)) open(picker, false);
-  });
-}
-// A dropdown that matches the game, which a `<select>` cannot: its popup is
-// drawn by the operating system and is the one part of a form that no amount
-// of CSS reaches. So this is a disclosure button and a list of real buttons -
-// keyboard, focus ring and screen reader all still work, and it can carry a
-// line of explanation per row, which a native option cannot.
-//
-// `flat` drops the disclosure and shows the five rows outright, which is what
-// the pause panel gets. A popup inside a panel that has to scroll on a short
-// screen had been laid out three separate ways and was clipped or unreachable
-// in each: absolutely positioned it is cut off by the panel's own scroll box,
-// and dropped into that scroll it made the panel taller than the phone. There
-// is no fourth arrangement worth trying - a control with five choices that is
-// set once does not need to be a dropdown at all. games/CLAUDE.md says as
-// much: "if a control is only ever set once, a row of buttons beats a dropdown
-// anyway". The header keeps the disclosure, because up there it has the room
-// and nothing is clipping it.
-export function mountQuality(container, onPick = () => {}, { flat } = {}) {
-  const root = document.createElement("div");
-  root.className = flat ? "picker picker-flat" : "picker";
-  let trigger = null,
-    label = null;
-  if (!flat) {
-    trigger = document.createElement("button");
-    trigger.type = "button";
-    trigger.className = "picker-open";
-    trigger.setAttribute("aria-haspopup", "true");
-    trigger.setAttribute("aria-expanded", "false");
-    const eyebrow = document.createElement("span");
-    eyebrow.className = "picker-eyebrow";
-    eyebrow.textContent = "QUALITY";
-    label = document.createElement("span");
-    label.className = "picker-value";
-    const caret = document.createElement("span");
-    caret.className = "picker-caret";
-    caret.setAttribute("aria-hidden", "true");
-    caret.textContent = "▾";
-    trigger.append(eyebrow, label, caret);
-  }
+// Outright rather than behind a disclosure, because there is no longer a
+// screen where the room exists for one. The pause panel's copy was clipped or
+// unreachable in three separate arrangements - absolutely positioned it was
+// cut off by the panel's own scroll box, in the scroll it made the panel
+// taller than the phone - and games/CLAUDE.md had the answer to why none of
+// them worked: "if a control is only ever set once, a row of buttons beats a
+// dropdown anyway". Five choices, set once. Nothing here opens, so nothing
+// here can be clipped, and Escape belongs to the panel: there it means "back
+// to the game".
+export function mountQuality(container, onPick = () => {}) {
+  // No wrapper element: it existed to be the positioning context a popup hung
+  // off, and there is no popup.
   const list = document.createElement("div");
   list.className = "picker-list";
-  // Five rows always on screen are a radio group, not a menu: nothing opens,
-  // and the reader should say "2 of 5" rather than announce a popup.
-  list.setAttribute("role", flat ? "radiogroup" : "menu");
+  // A radio group, not a menu: the reader should say "2 of 5" rather than
+  // announce a popup that does not exist.
+  list.setAttribute("role", "radiogroup");
   list.setAttribute("aria-label", "Graphics quality");
-  list.hidden = !flat;
-  const picker = { root, trigger, label, list };
   for (const tier of TIERS) {
     const option = document.createElement("button");
     option.type = "button";
     option.className = "picker-option";
     option.dataset.tier = tier.id;
-    option.setAttribute("role", flat ? "radio" : "menuitemradio");
+    option.setAttribute("role", "radio");
     option.title = tier.long;
     const name = document.createElement("b");
     name.textContent = tier.label;
@@ -200,34 +139,16 @@ export function mountQuality(container, onPick = () => {}, { flat } = {}) {
     option.onclick = () => {
       onPick();
       quality.set(tier.id);
-      open(picker, false);
-      // Flat, the row that was tapped keeps the focus; there is no trigger to
-      // give it back to.
-      (trigger ?? option).focus();
+      // The row that was tapped keeps the focus; there is nothing to hand it
+      // back to.
+      option.focus();
     };
     list.append(option);
   }
-  if (trigger)
-    trigger.onclick = () => {
-      const wasOpen = trigger.getAttribute("aria-expanded") === "true";
-      closeAll(picker);
-      onPick();
-      open(picker, !wasOpen);
-    };
-  // Escape closes the list. preventDefault matters in the pause dialog:
-  // closing a `<dialog>` is the default action of Escape, so without it one
-  // key would dismiss both the list and the panel behind it. A flat picker has
-  // nothing to close, so Escape falls through to the panel, which is right -
-  // there Escape means "back to the game".
-  root.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && trigger && !list.hidden) {
-      event.preventDefault();
-      event.stopPropagation();
-      open(picker, false);
-      trigger.focus();
-      return;
-    }
-    if (list.hidden || !["ArrowDown", "ArrowUp"].includes(event.key)) return;
+  // Arrow keys walk the group and wrap, which is what a radio group owes a
+  // keyboard. Bound to the list, where the rows' own keys bubble to.
+  list.addEventListener("keydown", (event) => {
+    if (!["ArrowDown", "ArrowUp"].includes(event.key)) return;
     event.preventDefault();
     const options = [...list.children];
     const at = options.indexOf(document.activeElement);
@@ -235,12 +156,10 @@ export function mountQuality(container, onPick = () => {}, { flat } = {}) {
     const next = (at + step + options.length) % options.length;
     options[at < 0 ? 0 : next].focus();
   });
-  root.append(...(trigger ? [trigger, list] : [list]));
-  container.replaceChildren(root);
-  pickers.add(picker);
-  watchForOutsideTaps();
-  draw(picker);
-  return root;
+  container.replaceChildren(list);
+  lists.add(list);
+  draw(list);
+  return list;
 }
 // Babylon scaling is inverse: 0.5 draws two pixels per CSS pixel. Ultra
 // supersamples 1.5x beyond the display's own density, capped at 3x; potato

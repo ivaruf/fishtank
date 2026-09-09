@@ -283,6 +283,40 @@ input {
 input:focus {
   border-color: #d1ed9e;
 }
+/* The name, and the die that rolls another one, side by side. The row owns the
+   width the field used to own, so the field itself is unchanged and the die
+   sits beside it rather than inside it - nothing overlaps the text, and a
+   thumb aiming for the die cannot land in the field. `stretch` means the
+   button is exactly as tall as whatever the field is on this screen, which is
+   two different numbers on a phone and a desktop and neither of them written
+   here twice. */
+.name-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  max-width: 432px;
+}
+.name-row input {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: none;
+}
+.reroll {
+  flex: 0 0 auto;
+  width: 52px;
+  padding: 0;
+  border-radius: 12px;
+  color: #cfe6dc;
+}
+.reroll:hover {
+  color: #edf8ef;
+}
+/* Every other icon in the game is a stroke; a die's spots are the exception,
+   because a ring of five outlines at 20px is a smudge. */
+.reroll .pip {
+  fill: currentColor;
+  stroke: none;
+}
 .buttons {
   display: flex;
   gap: 10px;
@@ -488,12 +522,14 @@ body:has(#hud[hidden]) .in-play {
 #hud > * {
   z-index: 2;
 }
-/* The header sits above those, and above the menu and lobby panels, because
-   the graphics dropdown hangs out of it: header and the panels were both on 2
-   and the header comes first in the document, so on a short landscape screen -
-   where the menu panel reaches up near the header - the open list painted
-   behind the panel. It is chrome; it belongs on top. The turn-your-phone
-   overlay at 10 and the pause panel in the top layer still win. */
+/* The header sits above those, and above the menu and lobby panels. It was
+   first set for the graphics dropdown that used to hang out of it - header and
+   panels were both on 2, the header comes first in the document, so on a short
+   landscape screen the open list painted behind the panel - and it stays for
+   the plainer version of the same reason: on a phone the menu panel is the
+   whole screen and the pill has to be pressable through it. It is chrome; it
+   belongs on top. The turn-your-phone overlay at 10 and the pause panel in the
+   top layer still win. */
 header {
   z-index: 4;
 }
@@ -576,6 +612,13 @@ header {
   overflow-y: auto;
   padding: 26px 30px;
   z-index: 2;
+}
+/* The two halves the markup groups the lobby into. On anything but a landscape
+   phone they are not there at all: `display: contents` leaves their children in
+   the panel's own column, in document order, exactly as before the grouping
+   existed. The phone turns them into two columns. */
+.lobby-col {
+  display: contents;
 }
 .lobby h2 {
   font-size: 28px;
@@ -787,18 +830,58 @@ header {
   opacity: 0.45;
   cursor: not-allowed;
 }
+/* The lobby on a phone: two columns, and nothing to scroll to.
+   Stacked in one column it came to something like 460px of content on a 390px
+   screen, and the half you had to scroll for was the half you came here to use
+   - the match length, the difficulty, and the button that starts the game. Who
+   is in the tank and the code to get into it go on the left, the two dials and
+   the way in or out on the right, and both halves are on screen at once.
+   Each half is its own flex column rather than rows placed in one shared grid,
+   because a shared row track is as tall as the taller of the two things in it:
+   the invite block is 140px of code and the slider beside it would inherit
+   that. Two independent stacks cannot open gaps like that. */
 @media (max-height: 520px) and (orientation: landscape) {
   .lobby {
     padding: 14px 18px;
-    width: 420px;
+    width: min(660px, 94vw);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: 18px;
+    align-items: start;
+  }
+  .lobby-col {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
   }
   .lobby h2 {
-    font-size: 18px;
-    margin: 6px 0 8px;
+    font-size: 16px;
+    margin: 4px 0 6px;
   }
   .lobby li {
-    padding: 4px 0;
+    padding: 3px 0;
+    font-size: 10px;
+  }
+  /* The code stays the biggest thing on the screen - it is being read out
+     loud - but it does not need to be the size it is on a monitor. */
+  .lobby-invite {
+    margin-bottom: 10px;
+    padding: 8px 10px;
+  }
+  .lobby-icons {
+    font-size: 30px;
+    letter-spacing: 4px;
+  }
+  .lobby-invite #lobby-code {
+    font-size: 15px;
+  }
+  .lobby-invite button {
+    margin: 2px 0 6px;
+    padding: 6px 12px;
     font-size: 11px;
+  }
+  .lobby-invite small {
+    font-size: 10px;
   }
   .lobby-setting {
     margin-top: 10px;
@@ -901,77 +984,17 @@ header {
   align-items: flex-end;
   gap: 12px;
 }
-/* The graphics dropdown. A `<select>` cannot be this: its popup is drawn by
-   the operating system and is the one part of a form CSS never reaches, which
-   is exactly what gave away that this is a web page. So it is a disclosure
-   button and a list of real buttons, in the game's own glass and lime. */
-.picker {
-  position: relative;
-  margin: 0;
-  pointer-events: auto;
-}
-.picker-open {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  padding: 8px 12px;
-  border: 1px solid #5b827a;
-  border-radius: 9px;
-  background: #153e40a8;
-  color: #edf8ef;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.4px;
-  white-space: nowrap;
-}
-.picker-open:hover {
-  border-color: #8fb3a8;
-  filter: none;
-}
-.picker-open[aria-expanded="true"] {
-  border-color: #d1ed9e;
-  background: #1f5a52c0;
-}
-.picker-eyebrow {
-  font-size: 9px;
-  letter-spacing: 1.6px;
-  color: #9bb5ae;
-  font-weight: 700;
-}
-.picker-caret {
-  margin-left: auto;
-  font-size: 10px;
-  color: #b5d9b0;
-}
-.picker-open[aria-expanded="true"] .picker-caret {
-  color: #d1ed9e;
-}
-/* The header's copy, which opens downward from a trigger at the top of the
-   screen. The z-index clears the HUD panels, which are 2. The pause panel's
-   copy is flat and overrides all of this below. */
+/* The graphics picker: five rows in the game's own glass and lime, in the flow
+   of the panel the gear opens. A `<select>` could not have been this - its
+   popup is drawn by the operating system and is the one part of a form CSS
+   never reaches, which is exactly what gave away that this was a web page -
+   and it is not a dropdown of ours either any more. Nothing opens, nothing
+   floats, so nothing here can be clipped: the trigger, the caret, the second
+   layer of glass, the absolute position, the z-index and the list's own scroll
+   were all in service of a popup, and went with it. */
 .picker-list {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  z-index: 6;
   display: grid;
   gap: 2px;
-  width: max-content;
-  min-width: 100%;
-  max-width: min(320px, 80vw);
-  /* If a screen really is too short for five rows, the list scrolls - never
-     the header it hangs off. Capped under half the viewport: it only ever
-     opens downward, from a trigger at the top of the screen, so that is the
-     room it has. The pause panel's copy is flat and never scrolls. */
-  max-height: min(46vh, 320px);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding: 6px;
-  border: 1px solid #6eaaa44a;
-  border-radius: 12px;
-  background: #092f36f2;
-  backdrop-filter: blur(14px);
-  box-shadow: 0 18px 50px #00131799;
 }
 .picker-option {
   display: grid;
@@ -1013,19 +1036,6 @@ header {
   outline: 2px solid #d1ed9e;
   outline-offset: -2px;
 }
-/* Only while the menu is up. The pause dialog carries the other copy. */
-body:not(:has(#menu:not([hidden]))) .menu-only {
-  display: none;
-}
-select {
-  color: #edf8ef;
-  background: #123b40;
-  border: 1px solid #60837a;
-  border-radius: 5px;
-  padding: 5px;
-  font: inherit;
-  margin-left: 5px;
-}
 .playing .vignette {
   background: linear-gradient(0deg, #01202744, transparent 25%);
 }
@@ -1065,6 +1075,14 @@ select {
   pointer-events: none;
 }
 [hidden] {
+  display: none !important;
+}
+/* The same floor for the one element whose closed state is not an attribute of
+   ours. A closed `<dialog>` is `dialog:not([open])` in the UA sheet, so the
+   rule above never covered it, and any author `display` - the pause panel's
+   phone layout gave it a grid - outranks the UA sheet and paints a panel
+   nobody opened over the whole game. It shipped exactly once. */
+dialog:not([open]) {
   display: none !important;
 }
 @media (max-width: 650px) {
@@ -1172,40 +1190,70 @@ select {
   .header-tools {
     gap: 6px;
   }
-  /* Two columns: copy on the left, the whole form including the fish picker on
-     the right. The panel scrolls if a phone is shorter still. */
+  /* The panel is the whole screen here, and the form stands in the middle of
+     it: title art top left, the fish below that, name and picker and buttons
+     centred on the right.
+     It used to start 56px down and run from there, which put the name field
+     immediately under the control pill in the same corner - a 44px target and
+     a text field a few pixels apart - while 130px of screen went unused below
+     the form. Centring the rows in the full height moves the whole form clear
+     of the header without shrinking anything.
+     The art comes out of that flow: it belongs at the top of the left column,
+     above the fish preview, and as a row spanning the form it would drag the
+     centred group down over the fish. Absolute inside the panel, which is the
+     box it wants to be measured against anyway. */
   .panel {
-    top: 56px;
+    top: 0;
     transform: none;
     left: 6%;
     width: 88%;
     max-width: none;
-    max-height: calc(100vh - 60px);
-    max-height: calc(100dvh - 60px);
-    overflow-y: auto;
-    overflow-x: hidden;
+    height: 100vh;
+    height: 100dvh;
+    max-height: none;
+    /* No scroll container: the panel is transparent to the pointer (below), so
+       a drag on it reaches the fish rather than scrolling anything, and a
+       scrollbar nobody can move is worse than none. body is overflow:hidden. */
+    overflow: visible;
     display: grid;
     /* minmax(0, …) keeps a wide carousel from stretching its column. */
     grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
     column-gap: 20px;
+    align-content: center;
+    /* And if a phone really is too short for the form, `safe` flushes it to
+       the top instead of centring its first row under the header. */
+    align-content: safe center;
   }
-  /* Copy on the left, form on the right; the labels are screen-reader only, so
-     they take no grid rows. */
   .panel h1 {
-    grid-column: 1;
-    grid-row: 1 / span 4;
+    position: absolute;
+    top: 56px;
+    left: 0;
+    width: 38%;
+    margin: 0;
     font-size: 40px;
-    margin: 6px 0 0;
     letter-spacing: -2px;
   }
-  /* Narrow and landscape: the art shares a row with the form, so it is the
-     column width that constrains it rather than a type size. */
+  /* Narrow and landscape: the art is bounded by the column it sits over rather
+     than by a type size. */
   .panel .title img {
     max-width: 100%;
   }
-  .panel > input {
+  /* The form's own width, so it sits in from the right edge rather than
+     running under the corner the pill is in. The instruction line below it is
+     left out on purpose: it is one long line of grey text and the column's
+     full width is fewer wraps. */
+  .panel > .name-row,
+  .panel .species-strip,
+  .panel .buttons,
+  .panel .error {
+    max-width: 340px;
+    margin-inline: auto;
+  }
+  .panel > .name-row {
     grid-column: 2;
     grid-row: 1;
+  }
+  .panel > .name-row input {
     padding: 9px 12px;
     font-size: 14px;
   }
@@ -1269,7 +1317,12 @@ select {
   .panel .error {
     grid-column: 2;
     grid-row: 4;
-    margin: 4px 0 0;
+    /* `auto` on the sides, not 0: this row is centred with the rest of the
+       form above it. */
+    margin: 4px auto 0;
+  }
+  .reroll {
+    width: 40px;
   }
 }
 
@@ -1290,7 +1343,7 @@ select {
 }
 .fullscreen-toggle,
 .sound-toggle,
-.exit {
+.game-menu {
   pointer-events: auto;
   width: 44px;
   height: 44px;
@@ -1443,16 +1496,13 @@ select {
   background: #072c32d9;
   box-shadow: 0 6px 24px #001c2426;
 }
-/* Touch: a comfortable target without widening the header. */
-.picker-open {
-  padding: 9px 12px;
-}
+/* A comfortable target for a finger, in a panel that has the room for it. */
 .picker-option {
   padding: 11px 12px;
 }
 .sound-toggle,
 .fullscreen-toggle,
-.exit {
+.game-menu {
   width: 36px;
   height: 36px;
   border: 0;
@@ -1482,8 +1532,7 @@ button svg {
   color: #a3bcb7;
 }
 button:focus-visible,
-a:focus-visible,
-select:focus-visible {
+a:focus-visible {
   outline: 2px solid #d1ed9e;
   outline-offset: 4px;
 }
@@ -1508,10 +1557,10 @@ select:focus-visible {
 .secondary {
   border-color: #83afa35c;
 }
-/* Mute and fullscreen change how the game looks; this one leaves it. A
-   hairline and a little air say so without making it a separate panel
-   floating on its own. */
-.exit {
+/* Mute and fullscreen flip a switch where they stand; this one opens a panel
+   over the tank, which is a different kind of thing to press. A hairline and a
+   little air say so without making it a separate pill floating on its own. */
+.game-menu {
   margin-left: 3px;
   border-left: 1px solid #badbcd2e;
   border-radius: 0 8px 8px 0;
@@ -1522,7 +1571,7 @@ select:focus-visible {
    fullscreen alike, which a background colour would have overwritten. */
 .sound-toggle:hover,
 .fullscreen-toggle:hover,
-.exit:hover {
+.game-menu:hover {
   box-shadow: inset 0 0 0 999px #eafcf11f;
 }
 /* The pause panel is the same frosted glass as every other panel, and the
@@ -1565,29 +1614,9 @@ select:focus-visible {
 #leave-dialog .quality-slot {
   margin-bottom: 22px;
 }
-/* The flat picker: five rows in the panel's own flow, no popup, nothing that
-   can be clipped by a scroll box or hang off the edge of a phone. It keeps the
-   rows' own styling and drops everything the dropdown needed to float - the
-   position, the z-index, its own scroll, the shadow and the second layer of
-   glass, which was only ever there to lift it off the panel it now sits in. */
-.picker-flat .picker-list {
-  position: static;
-  width: auto;
-  min-width: 0;
-  max-width: none;
-  max-height: none;
-  overflow: visible;
-  z-index: auto;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: none;
-  backdrop-filter: none;
-  box-shadow: none;
-}
-/* Compact enough that all five fit a landscape phone without the panel
+/* Compact enough that all five rows fit a landscape phone without the panel
    needing to scroll at all, which is the whole point of the exercise. */
-.picker-flat .picker-option {
+#leave-dialog .picker-option {
   padding: 8px 10px;
   border-radius: 9px;
 }
@@ -1608,16 +1637,11 @@ select:focus-visible {
   border-radius: 10px;
 }
 @media (max-width: 650px), (max-height: 520px) {
-  /* A small landscape phone has room for the trigger but not for a label
-     beside it; the list it opens is unaffected. */
-  .picker-eyebrow {
-    display: none;
-  }
   .display-controls {
     padding: 3px;
     gap: 2px;
   }
-  .exit {
+  .game-menu {
     margin-left: 2px;
   }
 }
@@ -1680,7 +1704,7 @@ select:focus-visible {
   }
   /* The rows have the room for their notes here, where the stacked layout
      did not. */
-  .picker-flat .picker-option {
+  #leave-dialog .picker-option {
     padding: 6px 10px;
   }
 }
@@ -1717,10 +1741,14 @@ select:focus-visible {
     height: calc(100vh - 180px);
     height: calc(100dvh - 180px);
   }
+  /* The panel covers the screen here, and the fish preview is underneath it:
+     everything but the controls themselves is transparent to the pointer, so a
+     drag on the water turns the fish. The name row is one of them - it carries
+     the die now, which is a button and has to be pressable. */
   .panel {
     pointer-events: none;
   }
-  .panel input,
+  .panel .name-row,
   .panel .species-strip,
   .panel .buttons {
     pointer-events: auto;
