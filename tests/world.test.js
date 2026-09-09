@@ -122,11 +122,11 @@ test("NPCs move and empty rooms pause", () => {
 test("the wild population keeps something above the player all round", () => {
   const w = new World(Math.random);
   const above = (mass) => w.npcs.filter((n) => n.mass >= mass).length;
-  // Floors with room under the real counts - about 20, 12 and 4 - so tuning
-  // the tail's shape does not have to come here, but emptying it does.
-  assert.ok(above(C.startMass) >= 15, `only ${above(C.startMass)} above spawn`);
-  assert.ok(above(30) >= 8, `only ${above(30)} above mass 30`);
-  assert.ok(above(200) >= 2, `only ${above(200)} above mass 200`);
+  // Floors with room under the real counts - about 13, 7 and 3 - so tuning the
+  // tail's shape does not have to come here, but emptying it does.
+  assert.ok(above(C.startMass) >= 8, `only ${above(C.startMass)} above spawn`);
+  assert.ok(above(30) >= 4, `only ${above(30)} above mass 30`);
+  assert.ok(above(100) >= 2, `only ${above(100)} above mass 100`);
   // And plenty to eat at spawn, or the climb never starts.
   const prey = w.npcs.filter((n) => n.mass < C.startMass).length;
   assert.ok(prey > 50, `only ${prey} edible at a spawn`);
@@ -136,8 +136,8 @@ test("the wild population keeps something above the player all round", () => {
   // count to within one rather than exactly: the boundary percentile can
   // still land either side of any particular mass.
   const again = new World(Math.random);
-  const there = again.npcs.filter((n) => n.mass >= 200).length;
-  assert.ok(Math.abs(there - above(200)) <= 1, `${above(200)} then ${there}`);
+  const there = again.npcs.filter((n) => n.mass >= 100).length;
+  assert.ok(Math.abs(there - above(100)) <= 1, `${above(100)} then ${there}`);
   // The heavy end looks the part: a sixteen-unit clownfish would undercut it.
   for (const n of w.npcs)
     if (n.mass > 60) assert.ok(PREDATORS.includes(n.species), n.species);

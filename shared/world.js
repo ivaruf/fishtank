@@ -134,7 +134,7 @@ export class World {
       // being fixed - and free draws leave that to luck: they miss the top of
       // the tail outright about one round in five hundred, and vary the number
       // of big fish every round for no reason anyone would enjoy. Stratifying
-      // holds it to about four fish above mass 200 and one above 400 - within
+      // holds it to about three fish above mass 100 and one above 200 - within
       // one either way, since the boundary percentile can still land either
       // side of a given mass - rather than to none at all. It also keeps the
       // population honest under a constant RNG, which is how the tests seed a
@@ -208,7 +208,7 @@ export class World {
   // blunders into them still eats them.
   huntTarget(npc) {
     let best = null,
-      reach = C.npcHuntRange + radius(npc.mass);
+      reach = C.npcHuntRange + radius(npc.mass) * 0.5;
     for (const p of this.players.values()) {
       if (!p.alive || p.protection > 0 || !outweighs(npc, p) || inCover(p))
         continue;

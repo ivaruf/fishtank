@@ -34,20 +34,32 @@ export const CONFIG = Object.freeze({
   // nothing a player could do. That, not the arithmetic of size, is why
   // growing never meant anything.
   //
-  // This shape leaves 80 of the 100 edible at spawn, a dozen still above you
-  // at mass 30, and four above you at 200. Only nine fish are big enough to be
-  // drawn as predators and one of those is a monster, which is the point: the
-  // tail is there to be climbed, not to crowd the tank. wildTail was 3 to
-  // begin with, and nine big fish were fourteen - too many to look at.
-  wildHeaviest: 600,
-  wildTail: 5,
+  // This shape leaves 87 of the 100 edible at spawn, about seven still above
+  // you at mass 30, and three above you at 100. Five fish are big enough to be
+  // drawn as predators, the heaviest around 230.
+  //
+  // The tail is there to be climbed, not to crowd the tank, and it took two
+  // passes to believe that: 600 with a tail of 3 put fourteen big fish in the
+  // water and 600 with 5 put nine, both of which played as an aquarium full of
+  // sharks. Five reads as "there are a few things in here that will eat you",
+  // which is the whole job. Note the spawn is now *safer* than the two flat
+  // bands this replaced - thirteen fish outweigh a fresh player where twenty
+  // two used to - so what makes the tank feel dangerous is that the few big
+  // ones are genuinely big, not that there are many of them.
+  wildHeaviest: 250,
+  wildTail: 7,
   // Where growing stops. The fish is 16 units long here and move() has kept it
   // off the glass, which leaves a 13-unit band of water to swim in: past this
   // the tank stops being a tank. It was 1800, which was never reachable and so
   // never a decision.
   massCap: 900,
   // Wild fish large enough to eat a player drift toward one this close (plus
-  // their own radius) and swim a little faster while doing so.
+  // half their own radius) and swim a little faster while doing so. The radius
+  // term is there so a big fish does not have to bump its nose on you before
+  // it notices - but it was the whole radius, and once radius() took a steeper
+  // exponent that quietly turned into a 15-unit aggravation range for the
+  // heaviest fish in a tank 72 across. Half of a bigger number is the range
+  // this was tuned at.
   npcHuntRange: 9,
   npcHuntSpeed: 1.3,
   roundLength: 120,
