@@ -503,6 +503,7 @@ function leave(message = "") {
   controls.setTouchMode(false);
   touchMode = false;
   leaderId = null;
+  wasBiggest = false;
   document.body.classList.remove("playing");
   network?.close();
   network = null;
@@ -992,6 +993,23 @@ function updateLobby(me) {
         ? `Waiting for ${state.players.find((p) => p.id === lobby.host)?.name ?? "the host"}.`
         : "Mark yourself ready.";
 }
+// Alone in the tank is the one case with a goal of its own, because "you win"
+// is true whatever you did: be the biggest thing in the water when the clock
+// stops. Everything below is that rule, read off the snapshot - the host sends
+// every wild fish's mass already, so nothing new goes over the wire for it.
+const solo = (s) => s.players.length === 1;
+// The heaviest wild fish, counted whether or not it happens to be alive right
+// now: an eaten one respawns at the same mass, so it is still what is in the
+// tank and still what you have to beat.
+const biggestWild = (s) =>
+  s.npcs?.length
+    ? s.npcs.reduce((big, n) => (n.mass > big.mass ? n : big))
+    : { mass: 0, species: "fish" };
+// Whether the top spot was held on the previous snapshot, so taking it is
+// announced once rather than every frame. It can be lost again - the filter
+// shrinks the biggest fish, and dying resets you - and taking it back says so
+// again, which is the point of tracking the transition rather than a flag.
+let wasBiggest = false;
 function updateUI() {
   const me = state.players.find((p) => p.id === myId);
   if (!me) return;
@@ -1021,16 +1039,44 @@ function updateUI() {
       return li;
     }),
   );
+  // Taking the top spot is worth saying out loud: the goal is invisible
+  // otherwise, since the only sign of it is wild fish stopping being a threat.
+  const onTop =
+    solo(state) &&
+    state.phase === "playing" &&
+    me.alive &&
+    me.mass >= biggestWild(state).mass;
+  if (onTop && !wasBiggest) {
+    toast("Biggest fish in the tank — now hold it to the clock.", 3200);
+    audio.play("pad");
+  }
+  wasBiggest = onTop;
   $("overlay").hidden =
     state.phase === "lobby" ||
     (me.alive && state.phase === "playing") ||
     !!(deathCam && !deathCam.done);
   if (state.phase === "results") {
     $("overlay-tag").textContent = `ROUND ${state.round} COMPLETE`;
-    $("overlay-title").textContent = `${ranked[0]?.name || "Nobody"} wins!`;
-    const largest = [...state.players].sort((a, b) => b.mass - a.mass)[0];
-    $("overlay-text").textContent =
-      `Largest fish: ${largest.name} · ${largest.mass.toFixed(1)} mass\nYour score: ${me.score}`;
+    if (solo(state)) {
+      // Alone, "you win" was true whatever you did, which is not a result.
+      // The tank sets the bar instead: be the biggest thing in it when the
+      // clock runs out.
+      const rival = biggestWild(state);
+      const won = me.mass >= rival.mass;
+      $("overlay-title").textContent = won
+        ? "You are the biggest fish!"
+        : "Out-grown.";
+      $("overlay-text").textContent = won
+        ? `Nothing left in the tank could take you.\n` +
+          `${me.mass.toFixed(1)} mass · score ${me.score}`
+        : `A ${speciesLabel(rival.species)} finished bigger, at ${rival.mass.toFixed(1)} mass.\n` +
+          `You reached ${me.mass.toFixed(1)} · score ${me.score}`;
+    } else {
+      $("overlay-title").textContent = `${ranked[0]?.name || "Nobody"} wins!`;
+      const largest = [...state.players].sort((a, b) => b.mass - a.mass)[0];
+      $("overlay-text").textContent =
+        `Largest fish: ${largest.name} · ${largest.mass.toFixed(1)} mass\nYour score: ${me.score}`;
+    }
     $("overlay-actions").hidden = false;
   } else if (!me.alive) {
     // Being eaten is not the end of anything: the respawn counter is already

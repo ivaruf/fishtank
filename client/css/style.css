@@ -460,13 +460,6 @@ body:has(#hud:not([hidden])) .roster {
 body:has(#hud[hidden]) .in-play {
   display: none;
 }
-.aim {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  font-size: 30px;
-  opacity: 0.5;
-}
 .overlay {
   position: absolute;
   top: 50%;
@@ -1053,9 +1046,6 @@ select {
 .playing .vignette {
   background: linear-gradient(0deg, #01202744, transparent 25%);
 }
-.playing .aim {
-  pointer-events: none;
-}
 .labels {
   position: absolute;
   inset: 0;
@@ -1159,9 +1149,6 @@ select {
   .menu-instructions > div:after {
     content: "LEFT: STEER · RIGHT: DIVE OR RISE · YOU ALWAYS SWIM";
     font-size: 9px;
-  }
-  .aim {
-    display: none;
   }
 }
 
