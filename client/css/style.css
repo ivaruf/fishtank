@@ -1525,12 +1525,6 @@ select:focus-visible {
 .exit:hover {
   box-shadow: inset 0 0 0 999px #eafcf11f;
 }
-/* The pause button is only meaningful while a round is on screen, and the
-   HUD's hidden attribute is already exactly that: it is set for the menu, the
-   join screen and the lobby, and cleared when the round starts. */
-body:has(#hud[hidden]) .exit {
-  display: none;
-}
 /* The pause panel is the same frosted glass as every other panel, and the
    tank stays visible through it and through its backdrop. It used to be an
    opaque box over a heavy blur, which is a modal dialog belonging to a web
@@ -1641,7 +1635,14 @@ body:has(#hud[hidden]) .exit {
    the label and the rows take the left column, and the actions take the right
    for both of its rows. */
 @media (max-height: 520px) and (orientation: landscape) {
-  #leave-dialog {
+  /* `[open]` is load-bearing. This is the only place in the file that gives
+     the dialog a `display` of its own, and any author `display` outranks the
+     UA sheet's `dialog:not([open]) { display: none }` - so unscoped, the
+     full-bleed panel painted over the tank from the moment the page loaded,
+     on every phone, landscape being the only orientation this game plays in.
+     Continue could not dismiss it either: close() on a dialog that was never
+     open does nothing. Anything here that sets `display` must say `[open]`. */
+  #leave-dialog[open] {
     inset: 0;
     width: 100%;
     max-width: none;
