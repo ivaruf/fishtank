@@ -970,9 +970,9 @@ header {
 .picker-open[aria-expanded="true"] .picker-caret {
   color: #d1ed9e;
 }
-/* Opens downward in both places it is mounted: the header is at the top of
-   the screen and the pause panel's own scroll can take it if it is short of
-   room. The z-index clears the HUD panels, which are 2. */
+/* The header's copy, which opens downward from a trigger at the top of the
+   screen. The z-index clears the HUD panels, which are 2. The pause panel's
+   copy is flat and overrides all of this below. */
 .picker-list {
   position: absolute;
   top: calc(100% + 6px);
@@ -1595,18 +1595,31 @@ body:has(#hud[hidden]) .exit {
 #leave-dialog .quality-slot {
   margin-bottom: 22px;
 }
-/* In the panel the dropdown is the full width of it, its list lines up with
-   the left edge rather than the right, and it opens upward: the trigger sits
-   low in the panel, so downward would cover the Continue and Leave buttons -
-   and upward is where the room is on a short screen. */
-#leave-dialog .picker-open {
-  width: 100%;
+/* The flat picker: five rows in the panel's own flow, no popup, nothing that
+   can be clipped by a scroll box or hang off the edge of a phone. It keeps the
+   rows' own styling and drops everything the dropdown needed to float - the
+   position, the z-index, its own scroll, the shadow and the second layer of
+   glass, which was only ever there to lift it off the panel it now sits in. */
+.picker-flat .picker-list {
+  position: static;
+  width: auto;
+  min-width: 0;
+  max-width: none;
+  max-height: none;
+  overflow: visible;
+  z-index: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  backdrop-filter: none;
+  box-shadow: none;
 }
-#leave-dialog .picker-list {
-  top: auto;
-  bottom: calc(100% + 6px);
-  right: auto;
-  left: 0;
+/* Compact enough that all five fit a landscape phone without the panel
+   needing to scroll at all, which is the whole point of the exercise. */
+.picker-flat .picker-option {
+  padding: 8px 10px;
+  border-radius: 9px;
 }
 .dialog-actions {
   display: grid;
@@ -1631,29 +1644,31 @@ body:has(#hud[hidden]) .exit {
   .roster {
     padding: 3px;
   }
-  /* A landscape phone is shorter than this panel's content, so here the panel
-     has to scroll or Continue and Leave cannot be reached at all - which is
-     what removing its max-height cost. A dropdown hanging outside a scrolling
-     box would be clipped by that scroll, so on these screens the list drops
-     into flow instead and the panel scrolls down to it. Same control, laid out
-     for the room there is. */
+  /* The panel is meant to fit a landscape phone outright now that its picker
+     is five flat rows rather than a popup, and it does. The cap and the scroll
+     stay as a floor under that arithmetic: a phone shorter than any I measured,
+     or a browser with a larger minimum font, must still be able to reach
+     Continue and Leave. Nothing inside is absolutely positioned any more, so
+     there is nothing left for the scroll box to clip. */
   #leave-dialog {
     padding: 20px;
     max-height: calc(100vh - 16px);
     max-height: calc(100dvh - 16px);
     overflow-y: auto;
     overscroll-behavior: contain;
+    /* Momentum scrolling on iOS, and a scroll that starts from a touch that
+       lands on a row rather than only from the gap beside them. */
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
   }
   #leave-dialog .quality-slot {
     margin-bottom: 16px;
   }
-  #leave-dialog .picker-list {
-    position: static;
-    width: auto;
-    max-width: none;
-    max-height: none;
-    margin-top: 6px;
-    box-shadow: none;
+  .picker-flat .picker-option {
+    padding: 7px 10px;
+  }
+  .picker-flat .picker-option small {
+    display: none;
   }
 }
 

@@ -89,28 +89,34 @@ class Quality extends EventTarget {
   }
 }
 export const quality = new Quality();
-// One entry per mounted dropdown: its trigger, the label inside it, and the
-// list it opens. Every one of them redraws whenever the value changes, so two
-// pickers on two screens cannot drift apart.
+// One entry per mounted picker: the list of rows, and - for the header's
+// dropdown but not the pause panel's flat one - the trigger that opens it and
+// the label inside that. Every one of them redraws whenever the value changes,
+// so two pickers on two screens cannot drift apart. A null trigger is what
+// says "flat" to everything below.
 const pickers = new Set();
 function draw(picker) {
   const tier = TIERS.find((t) => t.id === quality.value);
-  picker.label.textContent = tier.label;
-  picker.trigger.title = tier.long;
+  if (picker.trigger) {
+    picker.label.textContent = tier.label;
+    picker.trigger.title = tier.long;
+  }
   for (const option of picker.list.children)
     option.setAttribute(
       "aria-checked",
       String(option.dataset.tier === quality.value),
     );
 }
+// A flat picker has no popup to open or close, so every one of these is a
+// no-op for it: `open` is what the trigger, the outside-tap watcher and Escape
+// all go through.
 function open(picker, on) {
+  if (!picker.trigger) return;
   picker.list.hidden = !on;
   picker.trigger.setAttribute("aria-expanded", String(on));
   if (on)
     // Start on the current tier, so an arrow key or a Return goes somewhere
-    // sensible rather than to the top of the list. Allowed to scroll: on a
-    // short screen the list sits in the pause panel's own flow and the panel
-    // scrolls, so the row that takes focus has to be brought into view.
+    // sensible rather than to the top of the list.
     picker.list.querySelector('[aria-checked="true"]')?.focus();
 }
 const closeAll = (except) => {
@@ -138,36 +144,53 @@ function watchForOutsideTaps() {
 // of CSS reaches. So this is a disclosure button and a list of real buttons -
 // keyboard, focus ring and screen reader all still work, and it can carry a
 // line of explanation per row, which a native option cannot.
-export function mountQuality(container, onPick = () => {}) {
+//
+// `flat` drops the disclosure and shows the five rows outright, which is what
+// the pause panel gets. A popup inside a panel that has to scroll on a short
+// screen had been laid out three separate ways and was clipped or unreachable
+// in each: absolutely positioned it is cut off by the panel's own scroll box,
+// and dropped into that scroll it made the panel taller than the phone. There
+// is no fourth arrangement worth trying - a control with five choices that is
+// set once does not need to be a dropdown at all. games/CLAUDE.md says as
+// much: "if a control is only ever set once, a row of buttons beats a dropdown
+// anyway". The header keeps the disclosure, because up there it has the room
+// and nothing is clipping it.
+export function mountQuality(container, onPick = () => {}, { flat } = {}) {
   const root = document.createElement("div");
-  root.className = "picker";
-  const trigger = document.createElement("button");
-  trigger.type = "button";
-  trigger.className = "picker-open";
-  trigger.setAttribute("aria-haspopup", "true");
-  trigger.setAttribute("aria-expanded", "false");
-  const eyebrow = document.createElement("span");
-  eyebrow.className = "picker-eyebrow";
-  eyebrow.textContent = "QUALITY";
-  const label = document.createElement("span");
-  label.className = "picker-value";
-  const caret = document.createElement("span");
-  caret.className = "picker-caret";
-  caret.setAttribute("aria-hidden", "true");
-  caret.textContent = "▾";
-  trigger.append(eyebrow, label, caret);
+  root.className = flat ? "picker picker-flat" : "picker";
+  let trigger = null,
+    label = null;
+  if (!flat) {
+    trigger = document.createElement("button");
+    trigger.type = "button";
+    trigger.className = "picker-open";
+    trigger.setAttribute("aria-haspopup", "true");
+    trigger.setAttribute("aria-expanded", "false");
+    const eyebrow = document.createElement("span");
+    eyebrow.className = "picker-eyebrow";
+    eyebrow.textContent = "QUALITY";
+    label = document.createElement("span");
+    label.className = "picker-value";
+    const caret = document.createElement("span");
+    caret.className = "picker-caret";
+    caret.setAttribute("aria-hidden", "true");
+    caret.textContent = "▾";
+    trigger.append(eyebrow, label, caret);
+  }
   const list = document.createElement("div");
   list.className = "picker-list";
-  list.setAttribute("role", "menu");
+  // Five rows always on screen are a radio group, not a menu: nothing opens,
+  // and the reader should say "2 of 5" rather than announce a popup.
+  list.setAttribute("role", flat ? "radiogroup" : "menu");
   list.setAttribute("aria-label", "Graphics quality");
-  list.hidden = true;
+  list.hidden = !flat;
   const picker = { root, trigger, label, list };
   for (const tier of TIERS) {
     const option = document.createElement("button");
     option.type = "button";
     option.className = "picker-option";
     option.dataset.tier = tier.id;
-    option.setAttribute("role", "menuitemradio");
+    option.setAttribute("role", flat ? "radio" : "menuitemradio");
     option.title = tier.long;
     const name = document.createElement("b");
     name.textContent = tier.label;
@@ -178,21 +201,26 @@ export function mountQuality(container, onPick = () => {}) {
       onPick();
       quality.set(tier.id);
       open(picker, false);
-      trigger.focus();
+      // Flat, the row that was tapped keeps the focus; there is no trigger to
+      // give it back to.
+      (trigger ?? option).focus();
     };
     list.append(option);
   }
-  trigger.onclick = () => {
-    const wasOpen = trigger.getAttribute("aria-expanded") === "true";
-    closeAll(picker);
-    onPick();
-    open(picker, !wasOpen);
-  };
+  if (trigger)
+    trigger.onclick = () => {
+      const wasOpen = trigger.getAttribute("aria-expanded") === "true";
+      closeAll(picker);
+      onPick();
+      open(picker, !wasOpen);
+    };
   // Escape closes the list. preventDefault matters in the pause dialog:
   // closing a `<dialog>` is the default action of Escape, so without it one
-  // key would dismiss both the list and the panel behind it.
+  // key would dismiss both the list and the panel behind it. A flat picker has
+  // nothing to close, so Escape falls through to the panel, which is right -
+  // there Escape means "back to the game".
   root.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && !list.hidden) {
+    if (event.key === "Escape" && trigger && !list.hidden) {
       event.preventDefault();
       event.stopPropagation();
       open(picker, false);
@@ -207,7 +235,7 @@ export function mountQuality(container, onPick = () => {}) {
     const next = (at + step + options.length) % options.length;
     options[at < 0 ? 0 : next].focus();
   });
-  root.append(trigger, list);
+  root.append(...(trigger ? [trigger, list] : [list]));
   container.replaceChildren(root);
   pickers.add(picker);
   watchForOutsideTaps();

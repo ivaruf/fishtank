@@ -91,10 +91,12 @@ function loadModels() {
 loadModels();
 // quality.js owns the value and remembers it; this only reacts to it.
 quality.addEventListener("change", loadModels);
-// Two rows, one setting. The menu's sits in the header where it always did;
-// the one in the pause dialog is why the header's can disappear during play.
-for (const at of ["quality-menu", "quality-play"])
-  mountQuality($(at), () => audio.play("click"));
+// Two copies, one setting. The menu's sits in the header where it always did
+// and keeps its dropdown; the one in the pause dialog is why the header's can
+// disappear during play, and it is flat - five rows outright, because a popup
+// inside a panel that scrolls on a phone was clipped however it was laid out.
+mountQuality($("quality-menu"), () => audio.play("click"));
+mountQuality($("quality-play"), () => audio.play("click"), { flat: true });
 let network = null,
   myId = null,
   state = null,
