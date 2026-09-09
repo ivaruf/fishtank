@@ -14,7 +14,7 @@ import { createPacker, createUnpacker } from "../../shared/snapshot-codec.js";
 // RTCDataChannel, over BroadcastChannel between two tabs, or over a fake pair
 // in a unit test.
 //
-// Deliberately the same shape as connect() and playLocally(), so main.js
+// Deliberately one shape for hosting and joining alike, so main.js
 // treats all three transports identically.
 
 // Guests address the host as this; the host's own player id is its peer id.

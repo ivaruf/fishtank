@@ -1,6 +1,6 @@
-// Makes the tank installable and playable with no network. Solo already runs
-// entirely in the tab (client/js/local.js), so the only thing standing between
-// a cold start and offline play was fetching the files.
+// Makes the tank installable and playable with no network. A tank you host
+// runs entirely in your own tab whether or not anyone joins it, so the only
+// thing standing between a cold start and offline play was fetching the files.
 //
 // Two strategies, chosen so that going offline never costs freshness:
 //
@@ -30,7 +30,6 @@ const SHELL = [
   "js/main.js",
   "js/build.js",
   "js/codes.js",
-  "js/local.js",
   "js/peer.js",
   "js/webrtc.js",
   "js/rendezvous.js",

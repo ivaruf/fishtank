@@ -6,7 +6,6 @@ import { createPuffs, createSparks, createStream } from "./effects.js";
 import { createFilter } from "./filter.js";
 import { createAudio } from "./audio.js";
 import { createControls } from "./controls.js";
-import { playLocally } from "./local.js";
 import { hostGame, joinGame, createHostEngine } from "./peer.js";
 import { hostRendezvous, joinRendezvous } from "./rendezvous.js";
 import { BUILD } from "./build.js";
@@ -627,34 +626,15 @@ function handlers(current, kind) {
     },
   };
 }
-// Solo runs the same World in this tab: no socket, no traffic, no latency, and
-// it keeps working with the network gone. It is also the only way in that needs
-// nothing but this device.
-function diveInSolo() {
-  if (joining || network) return;
-  joining = true;
-  $("error").textContent = "";
-  const connection = playLocally({
-    join: { name: $("name").value, mode: "single", species: chosenSpecies },
-    ...handlers(() => connection, "solo"),
-  });
-  network = connection;
-}
-// The friend panel. There is no server to ask what games exist, so there is
-// no list to draw: you either host a tank or you tap in the code for one.
 function closePanel() {
   $("games").hidden = true;
 }
-$("solo").onclick = () => {
-  audio.play("click");
-  closePanel();
-  diveInSolo();
-};
-$("multi").onclick = () => {
+$("join").onclick = () => {
   audio.play("click");
   if (network) return;
   $("games").hidden = false;
   peerNote("");
+  drawPicked();
 };
 // Peer to peer, which is now the only kind of multiplayer there is. One player
 // hosts the simulation and the others connect straight to them, which is what
@@ -693,12 +673,17 @@ function stopSignalling() {
 function peerNote(text) {
   $("peer-hint").textContent = text;
 }
-$("host-peer").onclick = async () => {
+// Dive in: host a tank and wait in the lobby. There is no separate solo path
+// any more, and there does not need to be - a tank with nobody in it is a solo
+// run, and one that a friend joins is not, which is the same tank either way.
+// It also means a friend can still arrive after you have started, which the
+// old local-only solo game could never allow.
+$("dive").onclick = async () => {
   audio.play("click");
   if (network || joining) return;
+  closePanel();
   const code = newCode();
   invite = { code, mode: "opening", detail: "" };
-  peerNote(`Setting up ${spellCode(code)}…`);
   const host = hostGame({
     // A tank you host is a tank you are inviting people to, so it waits in the
     // lobby like a server tank rather than dropping you into a round alone —
@@ -709,7 +694,6 @@ $("host-peer").onclick = async () => {
     engine: createHostEngine,
     join: { name: $("name").value, species: chosenSpecies },
     ...handlers(() => host, "peer"),
-    onPeers: (n) => peerNote(`Code ${spellCode(code)} · ${n} fish in the tank`),
   });
   network = host;
   try {
@@ -730,15 +714,10 @@ $("host-peer").onclick = async () => {
       if (state) updateUI();
     });
     keepAwake();
-    peerNote(
-      signalling.mode === "tabs"
-        ? `Code ${spellCode(code)}, but this only reaches other tabs here: ${signalling.detail}`
-        : `Code ${spellCode(code)} · tell a friend (${signalling.detail})`,
-    );
     if (state) updateUI();
   } catch (error) {
+    // The lobby's own reach line says this, and says it where the code is.
     invite = { code, mode: "failed", detail: error.message, note: "" };
-    peerNote(error.message);
     if (state) updateUI();
   }
 };
@@ -750,9 +729,7 @@ async function joinPeer(code) {
     const found = await joinRendezvous(code);
     signalling = found;
     joining = false;
-    peerNote(
-      `Playing in ${spellCode(code)}. The tank runs on your friend's device.`,
-    );
+    peerNote(`Joined ${spellCode(code)}.`);
     const guest = joinGame({
       join: { name: $("name").value, species: chosenSpecies },
       channel: found.channel,
@@ -763,33 +740,36 @@ async function joinPeer(code) {
     joining = false;
     stopSignalling();
     peerNote(error.message);
-    // A wrong code has to be cheap to recover from, so leave the pad empty and
-    // ready rather than making them undo every tap.
-    picked.length = 0;
+    // A wrong code has to be cheap to recover from, so clear it and leave the
+    // pad ready rather than making them undo every tap.
+    field.value = "";
     drawPicked();
   }
 }
-$("join-peer").onclick = () => {
-  audio.play("click");
-  if (network || joining) return;
-  const code = parseCode($("peer-code").value);
-  if (!code)
-    return peerNote(
-      "That is not a code. Tap the three pictures, or type them as words.",
-    );
-  joinPeer(code);
-};
-// The dialpad. Tapping the fourth picture joins on the spot: this is here for
-// a player who finds typing hard, and "now press Join" is exactly the extra
-// step that was worth removing. A mistake costs one tap of Undo, or nothing at
-// all once the attempt fails and the pad clears itself.
-const picked = [];
-function drawPicked() {
-  $("dialpad-picked").textContent =
-    picked.map((s) => s.icon).join("") +
-    "·".repeat(CODE_LENGTH - picked.length);
-  $("dialpad-back").disabled = !picked.length;
+// The field is the code, and the only place it is kept. The keys write words
+// into it, the slots draw whatever it currently says, and Undo takes a word
+// off the end - so tapping and typing are one value rather than two that have
+// to be kept in step. Whichever way it was entered, Join reads the field.
+const field = $("peer-code");
+// Tapping the last picture no longer joins by itself. It saved a press, and it
+// spent it on joining a room the player had not finished choosing: a mistyped
+// third picture became a failed connection instead of a tap of Undo.
+function words() {
+  return field.value
+    .toLowerCase()
+    .split(/[^a-z]+/)
+    .filter(Boolean);
 }
+function drawPicked() {
+  const symbols = symbolsOf(field.value).slice(0, CODE_LENGTH);
+  $("dialpad-picked").textContent =
+    symbols.map((s) => s?.icon ?? "?").join("") +
+    "·".repeat(Math.max(0, CODE_LENGTH - symbols.length));
+  const full = symbols.length >= CODE_LENGTH;
+  $("dialpad-back").disabled = !symbols.length;
+  for (const key of $("dialpad-keys").children) key.disabled = full;
+}
+field.addEventListener("input", drawPicked);
 for (const symbol of SYMBOLS) {
   const key = document.createElement("button");
   key.type = "button";
@@ -799,19 +779,26 @@ for (const symbol of SYMBOLS) {
   key.setAttribute("aria-label", symbol.name);
   key.title = symbol.name;
   key.onclick = () => {
-    if (network || joining || picked.length >= CODE_LENGTH) return;
+    if (network || joining) return;
+    const so_far = words();
+    if (so_far.length >= CODE_LENGTH) return;
     audio.play("click");
-    picked.push(symbol);
+    field.value = [...so_far, symbol.name].join("-");
     drawPicked();
-    if (picked.length === CODE_LENGTH)
-      joinPeer(picked.map((s) => s.name).join("-"));
   };
   $("dialpad-keys").append(key);
 }
 $("dialpad-back").onclick = () => {
   audio.play("click");
-  picked.pop();
+  field.value = words().slice(0, -1).join("-");
   drawPicked();
+};
+$("join-peer").onclick = () => {
+  audio.play("click");
+  if (network || joining) return;
+  const code = parseCode(field.value);
+  if (!code) return peerNote("Three pictures, or their words.");
+  joinPeer(code);
 };
 drawPicked();
 $("copy-code").onclick = async () => {
@@ -906,27 +893,41 @@ function updateLobby(me) {
           ? `⚠ ${invite.detail} Nobody can join with this code.`
           : invite.mode === "opening"
             ? "Opening the tank…"
-            : "They can tap the three pictures, or type the words, in “Play with a friend” on any device.";
+            : "They tap these three under Join game.";
   }
   const minutes = Math.round(lobby.duration / 60);
   if (!dragging) $("lobby-slider").value = String(minutes);
   $("lobby-slider").disabled = !iAmHost;
   $("lobby-minutes").textContent = `${minutes} min`;
   const mine = ready.has(myId);
+  // Alone in a tank you are hosting, there is nobody to be ready for: readying
+  // yourself is a press that can only ever have one answer, so it answers
+  // itself and Start is the only thing left. Sent from here rather than at
+  // join time because the player has to exist in the simulation first, and
+  // this runs on the snapshot that proves it does.
+  const alone = state.players.length === 1 && iAmHost;
+  if (alone && !mine) network?.request("READY", { ready: true });
+  $("ready").hidden = alone;
   $("ready").textContent = mine ? "Ready ✓" : "I'm ready";
   $("ready").setAttribute("aria-pressed", String(mine));
   $("start").hidden = !iAmHost;
   $("start").disabled = !allReady;
-  $("lobby-title").textContent = allReady
-    ? "Everyone is ready"
-    : "Waiting for the shoal";
-  $("lobby-hint").textContent = iAmHost
-    ? allReady
-      ? "You are the host. Hit start when you like."
-      : "You are the host: set the match length, then start once everyone is ready."
+  $("lobby-title").textContent = alone
+    ? "Your tank"
     : allReady
-      ? `Waiting for ${state.players.find((p) => p.id === lobby.host)?.name ?? "the host"} to start the game.`
-      : "Mark yourself ready. The host starts the game once everyone is.";
+      ? "Everyone is ready"
+      : "Waiting for the shoal";
+  // The lobby already shows who is in, who is ready and the code to share, so
+  // this line only says the thing the buttons cannot.
+  $("lobby-hint").textContent = alone
+    ? "Start now, or share the code and wait."
+    : iAmHost
+      ? allReady
+        ? ""
+        : "Start once everyone is ready."
+      : allReady
+        ? `Waiting for ${state.players.find((p) => p.id === lobby.host)?.name ?? "the host"}.`
+        : "Mark yourself ready.";
 }
 function updateUI() {
   const me = state.players.find((p) => p.id === myId);
