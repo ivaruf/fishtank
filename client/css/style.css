@@ -72,11 +72,11 @@ header {
   right: 42px;
   display: flex;
   justify-content: space-between;
-  /* flex-start, not center: the roster on the right grows with the number of
-     players, and centred that growth pushed the wordmark down the screen into
-     the stats panel below it - which sits at a fixed offset and knows nothing
-     about it. Both columns start at the header's top instead, which is also
-     the alignment the corner was built for. */
+  /* flex-start, not center. The header once held the roster, which grows with
+     the player count, and centred that growth pushed the wordmark down the
+     screen into the stats panel below - which sits at a fixed offset and knows
+     nothing about it. The roster lives in the bottom corner now, but the
+     wordmark and the control pill still want to start at the same line. */
   align-items: flex-start;
   pointer-events: none;
 }
@@ -93,11 +93,10 @@ header {
    tier here clears that - 146 px of width is 43 px of it, 256 px is 75. That
    floor is also why the corner mark is the whole word rather than the little
    fish: a mark this small has to be a shape, and the shape here is the word. */
-/* The roster keeps its own measure rather than borrowing the left column's.
-   Its title and its three buttons have to share one line, and the buttons are
-   36 px whatever the screen is: at 146 px the row left five pixels for the
-   word PLAYERS, which wrapped it onto two lines with the count under it. What
-   the two columns share is their top edge, not their width. */
+/* Two measures, one per corner. --hud-col is the top left column's: the
+   wordmark and the stats panel are both exactly this wide. --roster-col is the
+   bottom right panel's, and is its own number because a list of names has
+   nothing to line up with. */
 :root {
   --hud-col: 256px;
   --roster-col: 264px;
@@ -134,18 +133,16 @@ header {
 body:has(#menu:not([hidden])) .brand {
   visibility: hidden;
 }
-/* Bottom right, in the water rather than on a panel. The shadow is what makes
-   that safe: the vignette thins out to almost nothing over the sand while a
-   round is on, so bare text needs to carry its own contrast rather than trust
-   the tank behind it. Left selectable, unlike the rest of the chrome - the
-   whole purpose of the line is to be got out of the screen and into someone
-   else's device. */
+/* In the water rather than on a panel, at the foot of the corner column. The
+   shadow is what makes that safe: the vignette thins out to almost nothing
+   over the sand while a round is on, so bare text has to carry its own
+   contrast rather than trust the tank behind it. Left selectable, unlike the
+   rest of the chrome - the whole purpose of the line is to be got out of the
+   screen and into someone else's device. */
 .connection {
-  position: absolute;
-  right: 42px;
-  bottom: 26px;
   font-size: 10px;
   letter-spacing: 1.6px;
+  text-align: right;
   color: #cfe6dc;
   text-shadow: 0 1px 7px #01191ed9;
   pointer-events: auto;
@@ -391,49 +388,35 @@ button span {
   margin-top: 8px;
   font-weight: 500;
 }
-/* The right column is one panel: which tank you are in, who is in it, and the
-   buttons for the whole session. It was a pill in the header with a separate
-   leaderboard floating below it - two boxes, one subject. Living in the
-   header's flow it needs no coordinates of its own: its top is the header's
-   top, level with the wordmark across the screen, and its right edge is the
-   header's. The roster's own rows take themselves out with .in-play, so the
-   gap only ever falls between rows that are there. */
-.roster {
+/* The bottom right corner, as one column: the roster, then the code under it.
+   One set of coordinates for the pair, so the code cannot drift away from the
+   panel above it when either changes height - the roster grows with the player
+   count and the code wraps to two lines on a narrow screen. The top left
+   corner is laid out the same way and for the same reason.
+   Bottom left is the touch joystick's and stays empty. */
+.tank-corner {
+  position: absolute;
+  right: 42px;
+  bottom: 26px;
   display: flex;
   flex-direction: column;
+  align-items: flex-end;
   gap: 10px;
-  /* Off the roster the panel holds nothing but the buttons, so it closes up
-     around them the way the header's pill did. */
-  padding: 5px;
+  /* Transparent to the pointer, like the header it used to live in. A panel
+     this size over the tank would otherwise eat the click that takes pointer
+     lock, and the only thing in here worth clicking is the code, which asks
+     for the pointer back itself. */
+  pointer-events: none;
 }
-/* While a round is on screen it is the roster, and takes a measure of its
-   own. The tank's name and code used to live here too and set this - they are
-   bare text in the bottom corner now, so what decides it is simply whether
-   there is a roster to show. */
-body:has(#hud:not([hidden])) .roster {
+.roster {
   width: var(--roster-col);
-  padding: 18px 20px;
+  padding: 16px 18px;
 }
-/* Title on the left, buttons hard right in the panel's corner, on one line
-   whether or not the title is there: `margin-right: auto` does the pushing,
-   so nothing moves when the roster's own rows come and go. */
-.roster-head {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-}
-.roster-head .eyebrow {
-  margin-right: auto;
-  min-width: 0;
+.roster .eyebrow {
   font-size: 9px;
   letter-spacing: 1.8px;
-  /* One line: the count belongs beside the word, not under it. If a full
-     lobby's count ever needs more room than the buttons leave, this gives up
-     its tail rather than wrapping or shoving them off the panel. */
+  /* One line: the count belongs beside the word, not under it. */
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .roster ol {
   margin: 0;
@@ -453,10 +436,10 @@ body:has(#hud:not([hidden])) .roster {
 .connection:empty {
   display: none;
 }
-/* The roster's own rows, and the pause button: all three mean nothing outside
-   a round, and the HUD's hidden attribute is already exactly that truth - set
-   for the menu, the join screen and the lobby, cleared when the round starts.
-   The CSS reads it rather than keeping a second copy. */
+/* Anything that means nothing outside a round. The HUD's hidden attribute is
+   already exactly that truth - set for the menu, the join screen and the
+   lobby, cleared when the round starts - so the CSS reads it rather than
+   keeping a second copy of it. */
 body:has(#hud[hidden]) .in-play {
   display: none;
 }
@@ -977,9 +960,9 @@ header {
   min-width: 100%;
   max-width: min(320px, 80vw);
   /* If a screen really is too short for five rows, the list scrolls - never
-     the panel it hangs off. Capped under half the viewport, since it opens
-     downward in the header and upward in the pause panel and either
-     direction has roughly half a screen to work with. */
+     the header it hangs off. Capped under half the viewport: it only ever
+     opens downward, from a trigger at the top of the screen, so that is the
+     room it has. The pause panel's copy is flat and never scrolls. */
   max-height: min(46vh, 320px);
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -1090,9 +1073,11 @@ select {
     left: 22px;
     right: 22px;
   }
-  .connection {
+  .tank-corner {
     right: 22px;
     bottom: 20px;
+  }
+  .connection {
     font-size: 8px;
   }
   .panel {
@@ -1120,10 +1105,10 @@ select {
   .stats b {
     font-size: 21px;
   }
-  body:has(#hud:not([hidden])) .roster {
+  .roster {
     padding: 12px 13px;
   }
-  .roster-head .eyebrow {
+  .roster .eyebrow {
     font-size: 7px;
     letter-spacing: 1px;
   }
@@ -1383,19 +1368,17 @@ select {
     margin-top: 3px;
   }
   .roster {
-    border-radius: 10px;
-  }
-  body:has(#hud:not([hidden])) .roster {
     padding: 8px 10px;
-    gap: 6px;
+    border-radius: 10px;
   }
   /* Clear of the touch zones' own hints along the bottom edge, and inside the
      notch on a landscape phone. */
-  .connection {
+  .tank-corner {
     right: max(20px, env(safe-area-inset-right));
     bottom: max(24px, env(safe-area-inset-bottom));
+    gap: 6px;
   }
-  .roster-head .eyebrow {
+  .roster .eyebrow {
     font-size: 7px;
     letter-spacing: 1.6px;
   }
@@ -1448,11 +1431,17 @@ select {
   }
 }
 
-/* Just a row now. The glass, the border and the shadow it used to carry
-   belong to the panel around it - keeping them here is what made two boxes
-   out of one subject. */
+/* The header's pill: the same three buttons on every screen, in their own
+   glass. It briefly lived inside the roster panel, which put the way out and
+   the scoreboard in one box; the roster is in the bottom corner now and this
+   is a pill again. */
 .display-controls {
   gap: 6px;
+  padding: 5px;
+  border: 1px solid #badbcd26;
+  border-radius: 14px;
+  background: #072c32d9;
+  box-shadow: 0 6px 24px #001c2426;
 }
 /* Touch: a comfortable target without widening the header. */
 .picker-open {
@@ -1612,6 +1601,15 @@ body:has(#hud[hidden]) .exit {
   display: grid;
   gap: 10px;
 }
+/* Only ever seen when the browser refuses to close its own tab, which it does
+   for any tab a script did not open. Amber, like the other line in this game
+   that has to admit something did not work. */
+.pause-note {
+  margin: 14px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #ffd2a4;
+}
 .dialog-actions button {
   border-radius: 10px;
 }
@@ -1622,40 +1620,67 @@ body:has(#hud[hidden]) .exit {
     display: none;
   }
   .display-controls {
+    padding: 3px;
     gap: 2px;
   }
   .exit {
     margin-left: 2px;
   }
-  /* Off the roster, the panel is a pill around the buttons and closes in. */
-  .roster {
-    padding: 3px;
-  }
-  /* The panel is meant to fit a landscape phone outright now that its picker
-     is five flat rows rather than a popup, and it does. The cap and the scroll
-     stay as a floor under that arithmetic: a phone shorter than any I measured,
-     or a browser with a larger minimum font, must still be able to reach
-     Continue and Leave. Nothing inside is absolutely positioned any more, so
-     there is nothing left for the scroll box to clip. */
+}
+/* The pause panel on a phone: the whole screen, in two columns, and no scroll
+   at all.
+   A short landscape screen is wide and shallow, and this panel was stacking
+   five graphics rows on top of two buttons down the middle of it - a column
+   taller than the phone, which is why it scrolled however the picker was laid
+   out. Turned on its side it fits with room to spare: the rows on the left,
+   the two actions on the right, everything centred vertically. Full bleed
+   because there is nothing to gain from a 440 px card floating in a 780 px
+   window, and the glass is translucent, so this is still the tank with a panel
+   over it rather than a page.
+   Explicit grid placement rather than source order: the eyebrow spans the top,
+   the label and the rows take the left column, and the actions take the right
+   for both of its rows. */
+@media (max-height: 520px) and (orientation: landscape) {
   #leave-dialog {
-    padding: 20px;
-    max-height: calc(100vh - 16px);
-    max-height: calc(100dvh - 16px);
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    /* Momentum scrolling on iOS, and a scroll that starts from a touch that
-       lands on a row rather than only from the gap beside them. */
-    -webkit-overflow-scrolling: touch;
-    touch-action: pan-y;
+    inset: 0;
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    max-height: none;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    overflow: visible;
+    padding: 14px max(24px, env(safe-area-inset-left)) 14px
+      max(24px, env(safe-area-inset-right));
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto 1fr;
+    align-content: center;
+    column-gap: 26px;
+  }
+  #pause-tag {
+    grid-area: 1 / 1 / 2 / 3;
+    margin-bottom: 10px;
+  }
+  #leave-dialog .group-label {
+    grid-area: 2 / 1 / 3 / 2;
   }
   #leave-dialog .quality-slot {
-    margin-bottom: 16px;
+    grid-area: 3 / 1 / 4 / 2;
+    margin-bottom: 0;
   }
+  #leave-dialog .dialog-actions {
+    grid-area: 2 / 2 / 4 / 3;
+    align-content: center;
+  }
+  #pause-note {
+    grid-area: 4 / 1 / 5 / 3;
+  }
+  /* The rows have the room for their notes here, where the stacked layout
+     did not. */
   .picker-flat .picker-option {
-    padding: 7px 10px;
-  }
-  .picker-flat .picker-option small {
-    display: none;
+    padding: 6px 10px;
   }
 }
 

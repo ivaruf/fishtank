@@ -440,19 +440,62 @@ function showHero(dt) {
   );
   hero.update(dt);
 }
+// Leaving the game itself, which is what the corner means on the menu where
+// there is no tank to leave. Neither exit is guaranteed: a tab a script did
+// not open cannot be closed by one, and inside the arcade this is an iframe
+// with the arcade behind it. So the button says which of the two it is about
+// to try, and if the browser refuses the close it says so rather than looking
+// broken.
+const framed = () => {
+  try {
+    return window.top !== window.self;
+  } catch {
+    // A cross-origin parent throws on access, which is itself the answer.
+    return true;
+  }
+};
+function quitGame() {
+  if (framed()) {
+    history.back();
+    return;
+  }
+  window.close();
+  // Still here a moment later means the browser refused, which it does for
+  // any tab a script did not open itself.
+  setTimeout(() => {
+    if (!leavePromptOpen) return;
+    $("pause-note").textContent =
+      "Your browser will not let a page close its own tab — close it yourself to finish.";
+    $("pause-note").hidden = false;
+  }, 250);
+}
 let leavePromptOpen = false;
+// The X in the corner, and Escape, open this panel wherever you are: on the
+// menu, in the lobby, mid-round. One button always goes back to what you were
+// doing and the other always takes you one step out, and only their labels
+// change - so the corner means the same thing on all three screens.
 function openGameMenu() {
-  if (!myId || $("hud").hidden || leavePromptOpen) return;
+  if (leavePromptOpen || portrait.matches) return;
   leavePromptOpen = true;
   controls.setActive(false);
-  // Alone in the tank, this really is a pause: the host stops the world. The
+  const inRound = !!state && state.phase !== "lobby";
+  // Alone in a round this really is a pause: the host stops the world. The
   // host decides that, not this - World.setPaused refuses with anyone else in
-  // the water - so the request is sent either way and the panel says which of
-  // the two it got, because a panel labelled "paused" over a tank that is
+  // the water - so the request is sent either way and the eyebrow says which
+  // of the two it got, because a panel labelled "paused" over a tank that is
   // still hunting you is worse than one that never claimed to be.
+  if (inRound) network?.request("PAUSE", { on: true });
   const alone = state?.players.length === 1;
-  network?.request("PAUSE", { on: true });
-  $("pause-tag").textContent = alone ? "PAUSED" : "FISHTANK";
+  $("pause-tag").textContent = inRound && alone ? "PAUSED" : "FISHTANK";
+  $("continue").textContent = inRound ? "Continue" : "Back";
+  $("confirm-leave").textContent = !state
+    ? framed()
+      ? "Back to the arcade"
+      : "Close the tab"
+    : inRound
+      ? "Leave fish tank"
+      : "Leave the lobby";
+  $("pause-note").hidden = true;
   $("leave-dialog").showModal();
 }
 function continueGame() {
@@ -849,7 +892,10 @@ $("games-back").onclick = () => {
 $("leave").onclick = openGameMenu;
 $("confirm-leave").onclick = () => {
   audio.play("click");
-  leave();
+  // One step out of wherever you are: out of the round or the lobby and back
+  // to the menu, and out of the menu means out of the game.
+  if (state) leave();
+  else quitGame();
 };
 // A new game means back to the lobby, not straight into another round: the
 // code is on screen there, the match length can change, and anyone watching

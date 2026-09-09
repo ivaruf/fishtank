@@ -83,78 +83,76 @@
         />
       </a>
       <div class="header-tools">
-        <!-- One panel, not three things stacked in a corner: which tank you
-             are in, who is in it, and the buttons that belong to the whole
-             session. On the menu the roster lines are empty and it closes up
-             around the buttons, which is the pill the header used to have. -->
-        <aside class="glass roster">
-          <div class="roster-head">
-            <div class="eyebrow in-play">PLAYERS <span id="count"></span></div>
-            <div class="display-controls">
-              <!-- Menu only: during play the same picker lives in the pause
-                   dialog, so the HUD is not carrying a settings row. -->
-              <div class="quality-slot menu-only" id="quality-menu"></div>
-              <button
-                id="mute"
-                class="secondary sound-toggle"
-                type="button"
-                aria-label="Mute sound"
-                aria-pressed="false"
-                title="Mute sound"
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M11 5 6 9H3v6h3l5 4Z" />
-                  <path
-                    class="sound-waves"
-                    d="M15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"
-                  />
-                  <path class="sound-slash" d="m15 9 6 6m0-6-6 6" />
-                </svg>
-              </button>
-              <button
-                id="fullscreen"
-                class="secondary fullscreen-toggle"
-                type="button"
-                aria-label="Enter fullscreen"
-                aria-pressed="false"
-                title="Enter fullscreen"
-                hidden
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M9 3H3v6m12-6h6v6M3 15v6h6m12-6v6h-6" />
-                </svg>
-              </button>
-              <!-- The pause button belongs to this row, not to a corner of
-                   its own. It used to be fixed at top/right 42px while the
-                   row it should line up with sat in the header's flow, so
-                   the two could never agree - a wrapped connection line
-                   moved one and not the other. In the row, the browser
-                   aligns them. -->
-              <button
-                id="leave"
-                class="exit in-play secondary"
-                type="button"
-                aria-label="Open game menu"
-                title="Game menu (Esc)"
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="m6 6 12 12M18 6 6 18" />
-                </svg>
-              </button>
-            </div>
-          </div>
-          <ol id="leaders" class="in-play"></ol>
-        </aside>
+        <!-- The same three buttons on every screen: sound, fullscreen, and the
+             way out. Nothing here belongs to a round, so nothing here comes
+             and goes with one. -->
+        <div class="display-controls">
+          <!-- Menu only: during play the same picker lives in the pause
+               dialog, so the HUD is not carrying a settings row. -->
+          <div class="quality-slot menu-only" id="quality-menu"></div>
+          <button
+            id="mute"
+            class="secondary sound-toggle"
+            type="button"
+            aria-label="Mute sound"
+            aria-pressed="false"
+            title="Mute sound"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M11 5 6 9H3v6h3l5 4Z" />
+              <path
+                class="sound-waves"
+                d="M15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"
+              />
+              <path class="sound-slash" d="m15 9 6 6m0-6-6 6" />
+            </svg>
+          </button>
+          <button
+            id="fullscreen"
+            class="secondary fullscreen-toggle"
+            type="button"
+            aria-label="Enter fullscreen"
+            aria-pressed="false"
+            title="Enter fullscreen"
+            hidden
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M9 3H3v6m12-6h6v6M3 15v6h6m12-6v6h-6" />
+            </svg>
+          </button>
+          <!-- On every screen, not only during a round: the corner means the
+               same thing on the menu, in the lobby and mid-round, and the
+               panel it opens relabels its two buttons to match. -->
+          <button
+            id="leave"
+            class="exit secondary"
+            type="button"
+            aria-label="Open game menu"
+            title="Game menu (Esc)"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m6 6 12 12M18 6 6 18" />
+            </svg>
+          </button>
+        </div>
         <div id="fullscreen-status" role="status" hidden></div>
       </div>
     </header>
-    <!-- Which tank you are in, and the code to get into it. Bare text in the
-         bottom corner rather than a row in a panel: it is a line you read out
-         once, not a readout to watch, and it is empty on the menu - main.js
-         clears it, and CSS takes an empty one out of the layout. Outside the
-         HUD on purpose, because the lobby hides the HUD and the lobby is
-         exactly when someone is reading this out. -->
-    <div class="connection" id="connection"></div>
+    <!-- The bottom right corner: who is in the tank, and the code to get into
+         it. One column, so the code stays under the roster whatever height
+         either takes - the code wraps to two lines on a narrow screen, and the
+         roster grows with the number of players. Bottom left belongs to the
+         touch joystick, so nothing goes there.
+         Both are outside the HUD, because the lobby hides the HUD and the
+         lobby is exactly when someone is reading the code out. The roster
+         itself is in-play: there is nothing to rank before a round. -->
+    <div class="tank-corner">
+      <aside class="glass roster in-play">
+        <div class="eyebrow">PLAYERS <span id="count"></span></div>
+        <ol id="leaders"></ol>
+      </aside>
+      <div class="connection" id="connection"></div>
+    </div>
     <!-- The chosen fish, swimming large beside the menu. The hint's wording is
          set in main.js, because which gesture to name depends on the device. -->
     <div
@@ -333,12 +331,17 @@
       <div class="eyebrow" id="pause-tag">FISHTANK</div>
       <div class="group-label">GRAPHICS</div>
       <div class="quality-slot" id="quality-play"></div>
+      <!-- Both labels are set by main.js: one always goes back to whatever you
+           were doing, the other always takes you one step out - out of the
+           round, out of the lobby, or out of the game. -->
       <div class="dialog-actions">
         <button id="continue" type="button" autofocus>Continue</button>
         <button id="confirm-leave" class="secondary" type="button">
           Leave fish tank
         </button>
       </div>
+      <!-- Only ever seen if the browser refuses to close its own tab. -->
+      <p class="pause-note" id="pause-note" hidden></p>
     </dialog>
 
     <div id="touch" hidden>
