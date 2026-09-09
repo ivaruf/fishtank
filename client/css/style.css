@@ -728,12 +728,14 @@ header {
   line-height: 1.45;
   color: #9bb5ae;
 }
-/* The code as pictures, above the same code as words. Both, always: one is
-   for the player who cannot type it and one is for the parent pasting it
-   into a chat. */
+/* The code as pictures, above the same code as words. Both, always: one is for
+   the player who cannot type it and one is for the parent pasting it into a
+   chat. The pictures take their size from the `b` rule above, which both
+   halves share, and it is the words below that are shrunk out of their way -
+   this rule cannot say otherwise even where it looks like it does, because
+   `.lobby-invite b` carries a type selector and outranks a bare class. It
+   asked for 40px for a while and got 30. */
 .lobby-icons {
-  font-size: 40px;
-  letter-spacing: 6px;
   line-height: 1.1;
 }
 .lobby-invite #lobby-code {
@@ -868,25 +870,58 @@ header {
     padding: 3px 0;
     font-size: 10px;
   }
-  /* The code stays the biggest thing on the screen - it is being read out
-     loud - but it does not need to be the size it is on a monitor. */
-  .lobby-invite {
-    margin-bottom: 10px;
-    padding: 8px 10px;
+  /* The roster scrolls instead of pushing the panel down the screen. Sixteen
+     can be in a tank and each row is 21px, so the list was what decided how
+     tall this panel got - and the things it was pushing off the bottom were
+     the sliders and Start. Four and a half rows: the half is deliberate, since
+     a clipped row is the only honest way a list says there is more of it, and
+     the count in the eyebrow above says how many that is. */
+  .lobby ol {
+    max-height: 96px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
-  .lobby-icons {
-    font-size: 30px;
-    letter-spacing: 4px;
+  /* The invite block, turned on its side. Stacked - eyebrow, pictures, words,
+     button, note, five things down a column - it took 130px of the 350 a
+     landscape phone has, to carry three symbols and a line of text. Across the
+     panel it is 90: the pictures on the left, still the size they are read out
+     from, the words and Copy beside them, the note under both.
+     `#lobby-icons` rather than the class it also has, because `.lobby-invite b`
+     would outrank the class - see the note on `.lobby-icons` above. */
+  .lobby-invite {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    column-gap: 10px;
+    align-items: center;
+    margin-bottom: 8px;
+    padding: 7px 9px;
+    text-align: left;
+  }
+  .lobby-invite span {
+    grid-area: 1 / 1 / 2 / 3;
+  }
+  .lobby-invite #lobby-icons {
+    grid-area: 2 / 1 / 4 / 2;
+    margin: 0;
+    font-size: 24px;
+    letter-spacing: 2px;
   }
   .lobby-invite #lobby-code {
-    font-size: 15px;
+    grid-area: 2 / 2 / 3 / 3;
+    margin: 0;
+    font-size: 13px;
+    letter-spacing: 2px;
   }
   .lobby-invite button {
-    margin: 2px 0 6px;
-    padding: 6px 12px;
-    font-size: 11px;
+    grid-area: 3 / 2 / 4 / 3;
+    justify-self: start;
+    margin: 0;
+    padding: 5px 10px;
+    font-size: 10px;
   }
   .lobby-invite small {
+    grid-area: 4 / 1 / 5 / 3;
+    margin-top: 4px;
     font-size: 10px;
   }
   .lobby-setting {
