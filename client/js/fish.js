@@ -163,12 +163,18 @@ function prepare(container, scene, species, detail) {
   }
 }
 // species picks the model; color only feeds the procedural fallback palette.
+// `own` is the viewer's own fish, and it wears neither of the two markers a
+// player fish carries. Both exist to pick a player out of a hundred wild fish
+// from across the tank - which is a thing everyone else needs and you never
+// do. On your own fish they sit in the middle of your view, a hand's width
+// above your head, and tell you what the HUD already says.
 export function createFish(
   scene,
   species,
   npc = false,
   color = 0,
   preview = false,
+  own = false,
 ) {
   // Three nodes, and the split matters. root carries the transform the
   // simulation sent. pose plays the bite lunge and the death tumble. swell
@@ -185,7 +191,10 @@ export function createFish(
   const body = model
     ? instantiate(model, swell, preview)
     : procedural(scene, swell, color);
-  if (!npc) {
+  // Both markers are for other people. Your own fish is `own`, and the menu's
+  // preview is a picture of your own fish, so neither wears one.
+  const marked = !npc && !own && !preview;
+  if (marked) {
     if (!crests.has(scene))
       crests.set(scene, material(scene, "crest", "#e4ffc3", 0.7));
     const crest = B.MeshBuilder.CreateSphere(
@@ -218,9 +227,10 @@ export function createFish(
     return m;
   });
   mouth.setEnabled(false);
-  // A little gold crown marks the round's current leader.
+  // A little gold crown marks the round's current leader - to everybody else.
+  // Alone in the tank it would have crowned you for leading yourself.
   let crown = null;
-  if (!npc) {
+  if (marked) {
     const gold = shared(crowns, scene, () =>
       material(scene, "crown", "#f2c14e", 0.6),
     );

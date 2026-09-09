@@ -1334,6 +1334,8 @@ engine.runRenderLoop(() => {
         f.species ?? SPECIES[f.color % SPECIES.length],
         f.npc,
         f.color,
+        false,
+        f.id === myId,
       );
       visuals.set(f.id, v);
     }
