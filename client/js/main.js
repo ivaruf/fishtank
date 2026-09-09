@@ -520,7 +520,9 @@ function handlers(current, kind) {
       $("hud").hidden = false;
       $("error").textContent = "";
       touchMode = matchMedia("(pointer:coarse)").matches;
-      $("touch").hidden = !touchMode;
+      // The zones themselves are put up by syncControls, on the first snapshot
+      // that says a round is actually running - welcome lands in the lobby,
+      // whose buttons they would otherwise be covering.
       controls.setTouchMode(touchMode);
       audio.music("game");
       $("connection").textContent = solo
@@ -824,9 +826,17 @@ $("confirm-leave").onclick = () => {
   audio.play("click");
   leave();
 };
+// A new game means back to the lobby, not straight into another round: the
+// code is on screen there, the match length can change, and anyone watching
+// the results can still join. The host's world decides that - see
+// World.nextRound - so this only has to ask.
 $("next-round").onclick = () => {
   audio.play("click");
   network?.request("NEXT_ROUND");
+};
+$("overlay-leave").onclick = () => {
+  audio.play("click");
+  leave();
 };
 $("ready").onclick = () => {
   audio.play("click");
@@ -968,9 +978,11 @@ function updateUI() {
     const largest = [...state.players].sort((a, b) => b.mass - a.mass)[0];
     $("overlay-text").textContent =
       `Largest fish: ${largest.name} · ${largest.mass.toFixed(1)} mass\nYour score: ${me.score}`;
-    $("next-round").hidden = false;
+    $("overlay-actions").hidden = false;
   } else if (!me.alive) {
-    $("next-round").hidden = true;
+    // Being eaten is not the end of anything: the respawn counter is already
+    // running, so this card offers nothing to press.
+    $("overlay-actions").hidden = true;
     $("overlay-tag").textContent = "THERE’S ALWAYS A BIGGER FISH";
     $("overlay-title").textContent = "You became lunch.";
     $("overlay-text").textContent =
@@ -1091,9 +1103,16 @@ function deathCamera(dt, now) {
 // holds still until the phone is turned.
 const portrait = matchMedia("(pointer: coarse) and (orientation: portrait)");
 function syncControls(me, phase) {
-  controls.setActive(
-    !!me?.alive && phase === "playing" && !portrait.matches && !leavePromptOpen,
-  );
+  const live =
+    !!me?.alive && phase === "playing" && !portrait.matches && !leavePromptOpen;
+  controls.setActive(live);
+  // The steer and look zones cover the entire screen and swallow every tap,
+  // and they sit above the results, lobby and join panels, which are not the
+  // HUD's children and so are not on the HUD's layer. Left up between rounds
+  // they made those panels' buttons impossible to press on a tablet - the
+  // round would end and nothing on screen would answer. They belong to a
+  // round in progress, so they live exactly as long as one.
+  $("touch").hidden = !touchMode || !live;
 }
 portrait.addEventListener("change", () => {
   syncControls(

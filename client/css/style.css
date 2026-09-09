@@ -367,30 +367,68 @@ button span {
   margin-top: 8px;
   font-weight: 500;
 }
-/* Same top as the stats panel, and the same 42 px right edge as the header's
-   control row above it: the whole right side is one column too. */
-.leaderboard {
-  position: absolute;
-  top: 126px;
-  right: 42px;
-  width: 230px;
-  padding: 22px;
+/* The right column is one panel: which tank you are in, who is in it, and the
+   buttons for the whole session. It was a pill in the header with a separate
+   leaderboard floating below it - two boxes, one subject. Living in the
+   header's flow it needs no coordinates of its own: its top is the header's
+   top, level with the wordmark across the screen, and its right edge is the
+   header's. Empty children take themselves out (`:empty` below, and .in-play
+   off the roster), so the gap only ever falls between rows that are there. */
+.roster {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  /* Off the roster the panel holds nothing but the buttons, so it closes up
+     around them the way the header's pill did. */
+  padding: 5px;
 }
-.leaderboard .eyebrow {
+/* As soon as it has a tank to name it is the session panel: full measure -
+   the stats panel's, across the screen - and roomy with it. Keyed on having
+   something to say rather than on the phase, so it does not resize when a
+   round starts or ends; the lobby and the round get the same panel. A long
+   name and code wraps to a second line inside it rather than setting the
+   width of everything below. */
+.roster:has(.connection:not(:empty)) {
+  width: var(--hud-col);
+  padding: 18px 20px;
+}
+/* Title on the left, buttons hard right, on one line whether or not the title
+   is there: `margin-right: auto` does the pushing, so nothing moves when the
+   roster's own rows come and go. */
+.roster-head {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.roster-head .eyebrow {
+  margin-right: auto;
   font-size: 9px;
 }
-.leaderboard ol {
+.roster ol {
+  margin: 0;
   padding-left: 20px;
-  margin-bottom: 0;
 }
-.leaderboard li {
+.roster li {
   font-size: 12px;
   padding: 8px 0;
   color: #b7d4cc;
 }
-.leaderboard li span {
+.roster li span {
   float: right;
   color: #d1ed9e;
+}
+/* Both of these are set by main.js and are empty until a tank is joined; an
+   empty one must not leave a row's worth of gap behind it. */
+.connection:empty {
+  display: none;
+}
+/* The roster's own rows, and the pause button: all three mean nothing outside
+   a round, and the HUD's hidden attribute is already exactly that truth - set
+   for the menu, the join screen and the lobby, cleared when the round starts.
+   The CSS reads it rather than keeping a second copy. */
+body:has(#hud[hidden]) .in-play {
+  display: none;
 }
 .aim {
   position: absolute;
@@ -414,6 +452,16 @@ button span {
 }
 .overlay p {
   white-space: pre-line;
+}
+/* The panel is centred text, so its actions centre too rather than sitting
+   against the left edge the way a form's row does. Two of them, because a
+   finished match has exactly two answers: go again, or get out. */
+#overlay-actions {
+  justify-content: center;
+  margin-top: 18px;
+}
+#overlay-actions button {
+  border-radius: 12px;
 }
 #toast {
   position: absolute;
@@ -490,9 +538,6 @@ header {
   margin: -21px;
   border-radius: 50%;
   background: #d1ed9e99;
-}
-#next-round {
-  margin-top: 18px;
 }
 .games {
   position: absolute;
@@ -1016,8 +1061,6 @@ select {
   }
   .connection {
     font-size: 8px;
-    max-width: 110px;
-    text-align: right;
   }
   .panel {
     left: 7%;
@@ -1032,7 +1075,7 @@ select {
     right: 22px;
     font-size: 8px;
   }
-  /* Both panels take the header's own margin here. They used to sit 7 px
+  /* The stats panel takes the header's own margin here. It used to sit 7 px
      further out than it, which is invisible until the logo above shares an
      edge with the panel below and the pair is 7 px adrift. */
   .stats {
@@ -1044,17 +1087,14 @@ select {
   .stats b {
     font-size: 21px;
   }
-  .leaderboard {
-    top: 93px;
-    right: 22px;
-    width: 145px;
-    padding: 13px;
+  .roster:has(.connection:not(:empty)) {
+    padding: 12px 13px;
   }
-  .leaderboard .eyebrow {
+  .roster-head .eyebrow {
     font-size: 7px;
     letter-spacing: 1px;
   }
-  .leaderboard li {
+  .roster li {
     font-size: 10px;
   }
   .buttons button {
@@ -1082,12 +1122,14 @@ select {
   }
 }
 
-@media (max-width: 420px) {
-  /* No room for the two panels side by side, so the leaderboard drops below
-     the stats. It keeps the same right edge as the controls above it. */
-  .leaderboard {
-    top: 180px;
-    width: 145px;
+@media (max-width: 460px) {
+  /* Narrow enough that two 200 px columns would meet in the middle: the
+     stats panel reaches 222 px in from the left and the roster the same from
+     the right, which collide below about 444 px. One measure narrower and
+     they clear each other, and 160 px of wordmark is still 47 px tall - above
+     the floor where the word stops reading. */
+  :root {
+    --hud-col: 160px;
   }
   .overlay {
     max-width: 92vw;
@@ -1274,10 +1316,6 @@ select {
   }
 }
 @media (max-height: 520px) and (orientation: landscape) {
-  .header-tools {
-    flex-direction: row;
-    gap: 12px;
-  }
   .group-label {
     margin-top: 12px;
   }
@@ -1296,9 +1334,9 @@ select {
   }
 }
 @media (max-height: 520px) and (orientation: landscape) {
-  /* Phone-sized HUD: tuck the panels under the header and keep them small.
-     Both margins are the header's, so each panel stays under the chrome it
-     belongs with. */
+  /* Phone-sized HUD: tuck the stats under the wordmark and keep everything
+     small. The stats panel takes the header's own left margin, so it stays
+     under the chrome it belongs with. */
   .stats {
     top: 66px;
     left: max(20px, env(safe-area-inset-left));
@@ -1314,27 +1352,26 @@ select {
     font-size: 15px;
     margin-top: 3px;
   }
-  .leaderboard {
-    top: 66px;
-    right: max(20px, env(safe-area-inset-right));
-    width: 150px;
-    padding: 8px 10px;
+  .roster {
     border-radius: 10px;
   }
-  .leaderboard .eyebrow {
+  .roster:has(.connection:not(:empty)) {
+    padding: 8px 10px;
+    gap: 6px;
+  }
+  .roster-head .eyebrow {
     font-size: 7px;
     letter-spacing: 1.6px;
   }
-  .leaderboard ol {
+  .roster ol {
     padding-left: 14px;
-    margin-top: 4px;
   }
-  .leaderboard li {
+  .roster li {
     font-size: 9px;
     padding: 2px 0;
   }
   /* Only the top three fit comfortably on a phone. */
-  .leaderboard li:nth-child(n + 4) {
+  .roster li:nth-child(n + 4) {
     display: none;
   }
   #toast {
@@ -1354,8 +1391,10 @@ select {
     font-size: 11px;
     margin: 6px 0;
   }
-  #next-round {
+  #overlay-actions {
     margin-top: 8px;
+  }
+  #overlay-actions button {
     padding: 9px 12px;
   }
   .cover {
@@ -1373,13 +1412,11 @@ select {
   }
 }
 
+/* Just a row now. The glass, the border and the shadow it used to carry
+   belong to the panel around it - keeping them here is what made two boxes
+   out of one subject. */
 .display-controls {
   gap: 6px;
-  padding: 5px;
-  border: 1px solid #badbcd26;
-  border-radius: 14px;
-  background: #072c32d9;
-  box-shadow: 0 6px 24px #001c2426;
 }
 /* Touch: a comfortable target without widening the header. */
 .picker-open {
@@ -1534,11 +1571,14 @@ body:has(#hud[hidden]) .exit {
     display: none;
   }
   .display-controls {
-    padding: 3px;
     gap: 2px;
   }
   .exit {
     margin-left: 2px;
+  }
+  /* Off the roster, the panel is a pill around the buttons and closes in. */
+  .roster {
+    padding: 3px;
   }
   /* A landscape phone is shorter than this panel's content, so here the panel
      has to scroll or Continue and Leave cannot be reached at all - which is

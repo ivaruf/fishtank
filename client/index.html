@@ -83,61 +83,69 @@
         />
       </a>
       <div class="header-tools">
-        <div class="connection" id="connection"></div>
-        <div class="display-controls">
-          <!-- Menu only: during play the same picker lives in the pause
-               dialog, so the HUD is not carrying a settings row. -->
-          <div class="quality-slot menu-only" id="quality-menu"></div>
-          <button
-            id="mute"
-            class="secondary sound-toggle"
-            type="button"
-            aria-label="Mute sound"
-            aria-pressed="false"
-            title="Mute sound"
-          >
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M11 5 6 9H3v6h3l5 4Z" />
-              <path
-                class="sound-waves"
-                d="M15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"
-              />
-              <path class="sound-slash" d="m15 9 6 6m0-6-6 6" />
-            </svg>
-          </button>
-          <button
-            id="fullscreen"
-            class="secondary fullscreen-toggle"
-            type="button"
-            aria-label="Enter fullscreen"
-            aria-pressed="false"
-            title="Enter fullscreen"
-            hidden
-          >
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M9 3H3v6m12-6h6v6M3 15v6h6m12-6v6h-6" />
-            </svg>
-          </button>
-          <!-- The pause button belongs to this row, not to a corner of its
-               own. It used to be fixed at top/right 42px while the row it
-               should line up with sat in the header's flow, so the two could
-               never agree - a wrapped connection line moved one and not the
-               other. In the row, the browser aligns them. It only makes sense
-               while a round is on screen, and the HUD's own hidden attribute
-               is already that truth, so the CSS reads it rather than keeping
-               a second copy. -->
-          <button
-            id="leave"
-            class="exit secondary"
-            type="button"
-            aria-label="Open game menu"
-            title="Game menu (Esc)"
-          >
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="m6 6 12 12M18 6 6 18" />
-            </svg>
-          </button>
-        </div>
+        <!-- One panel, not three things stacked in a corner: which tank you
+             are in, who is in it, and the buttons that belong to the whole
+             session. On the menu the roster lines are empty and it closes up
+             around the buttons, which is the pill the header used to have. -->
+        <aside class="glass roster">
+          <div class="connection" id="connection"></div>
+          <div class="roster-head">
+            <div class="eyebrow in-play">PLAYERS <span id="count"></span></div>
+            <div class="display-controls">
+              <!-- Menu only: during play the same picker lives in the pause
+                   dialog, so the HUD is not carrying a settings row. -->
+              <div class="quality-slot menu-only" id="quality-menu"></div>
+              <button
+                id="mute"
+                class="secondary sound-toggle"
+                type="button"
+                aria-label="Mute sound"
+                aria-pressed="false"
+                title="Mute sound"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M11 5 6 9H3v6h3l5 4Z" />
+                  <path
+                    class="sound-waves"
+                    d="M15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"
+                  />
+                  <path class="sound-slash" d="m15 9 6 6m0-6-6 6" />
+                </svg>
+              </button>
+              <button
+                id="fullscreen"
+                class="secondary fullscreen-toggle"
+                type="button"
+                aria-label="Enter fullscreen"
+                aria-pressed="false"
+                title="Enter fullscreen"
+                hidden
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M9 3H3v6m12-6h6v6M3 15v6h6m12-6v6h-6" />
+                </svg>
+              </button>
+              <!-- The pause button belongs to this row, not to a corner of
+                   its own. It used to be fixed at top/right 42px while the
+                   row it should line up with sat in the header's flow, so
+                   the two could never agree - a wrapped connection line
+                   moved one and not the other. In the row, the browser
+                   aligns them. -->
+              <button
+                id="leave"
+                class="exit in-play secondary"
+                type="button"
+                aria-label="Open game menu"
+                title="Game menu (Esc)"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="m6 6 12 12M18 6 6 18" />
+                </svg>
+              </button>
+            </div>
+          </div>
+          <ol id="leaders" class="in-play"></ol>
+        </aside>
         <div id="fullscreen-status" role="status" hidden></div>
       </div>
     </header>
@@ -218,10 +226,6 @@
         <div><small>SCORE</small><b id="score">0</b></div>
         <div><small>ROUND</small><b id="timer">5:00</b></div>
       </div>
-      <aside class="glass leaderboard">
-        <div class="eyebrow">THE BIG FISH <span id="count"></span></div>
-        <ol id="leaders"></ol>
-      </aside>
       <div class="aim">·</div>
       <div id="labels" class="labels"></div>
       <div id="toast" aria-live="polite"></div>
@@ -285,13 +289,22 @@
         <button id="lobby-leave" class="secondary" type="button">Leave</button>
       </div>
     </section>
+    <!-- Shown between rounds and while you are waiting to respawn. The two
+         actions are the only two things anyone wants at the end of a match, so
+         they are both here rather than one of them being behind the pause
+         button: a new game goes back to the lobby, where the code is still on
+         screen and anyone can join before the next round starts. -->
     <section id="overlay" class="glass overlay" hidden>
       <div class="eyebrow" id="overlay-tag"></div>
       <h2 id="overlay-title"></h2>
       <p id="overlay-text"></p>
-      <button id="next-round" class="secondary" type="button" hidden>
-        Start the next round <span>→</span>
-      </button>
+      <div class="buttons" id="overlay-actions" hidden>
+        <button id="next-round" type="button">
+          Start a new game <span>→</span></button
+        ><button id="overlay-leave" class="secondary" type="button">
+          Leave
+        </button>
+      </div>
     </section>
     <dialog id="leave-dialog" aria-label="Paused">
       <div class="eyebrow">FISHTANK</div>
