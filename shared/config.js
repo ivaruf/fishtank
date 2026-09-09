@@ -6,6 +6,8 @@ export const CONFIG = Object.freeze({
   speed: 7,
   turnSpeed: 3.5,
   inputTimeout: 0.35,
+  // The most wild fish any tank holds, which is what a host's uplink is sized
+  // for. The chosen difficulty may seed fewer, never more.
   npcCount: 100,
   // Heavier eats lighter, full stop: with 1 the food chain is binary and only
   // an exact tie (two fresh spawns) leaves two fish neutral to each other.
@@ -23,31 +25,9 @@ export const CONFIG = Object.freeze({
   // different disguise. Capped, a maximum meal is +26% mass and +11% radius:
   // plainly visible, and about twenty of them from spawn to the cap.
   bite: 0.35,
-  // The wild population's shape: mass = wildHeaviest ^ (random ^ wildTail),
-  // log-uniform bent hard toward the small end, so most of the tank is fry,
-  // the tail keeps climbing, and wildHeaviest is a ceiling rather than a
-  // fat-tail surprise.
-  //
-  // It replaced two flat bands, 1-4 and 5-27. Their whole range was cleared in
-  // about twenty meals - inside a two-minute round - and from mass 27 up not
-  // one fish in the tank was too big to eat, so growing past it changed
-  // nothing a player could do. That, not the arithmetic of size, is why
-  // growing never meant anything.
-  //
-  // This shape leaves 87 of the 100 edible at spawn, about seven still above
-  // you at mass 30, and three above you at 100. Five fish are big enough to be
-  // drawn as predators, the heaviest around 230.
-  //
-  // The tail is there to be climbed, not to crowd the tank, and it took two
-  // passes to believe that: 600 with a tail of 3 put fourteen big fish in the
-  // water and 600 with 5 put nine, both of which played as an aquarium full of
-  // sharks. Five reads as "there are a few things in here that will eat you",
-  // which is the whole job. Note the spawn is now *safer* than the two flat
-  // bands this replaced - thirteen fish outweigh a fresh player where twenty
-  // two used to - so what makes the tank feel dangerous is that the few big
-  // ones are genuinely big, not that there are many of them.
-  wildHeaviest: 250,
-  wildTail: 7,
+  // The host picks one of DIFFICULTY below in the lobby; this is where the
+  // slider starts.
+  difficulty: 3,
   // Where growing stops. The fish is 16 units long here and move() has kept it
   // off the glass, which leaves a 13-unit band of water to swim in: past this
   // the tank stops being a tank. It was 1800, which was never reachable and so
@@ -77,13 +57,15 @@ export const CONFIG = Object.freeze({
 // Bumped whenever snapshots or join messages change shape, so a guest can tell
 // when it has connected to a host running older code than itself.
 //
-// 9 is not a shape change: radius() took a new exponent. The host stays
-// authoritative for who eats whom, so a stale guest would still play a correct
-// game - it would just draw every fish in the tank at the wrong size, on its
-// own screen only, with no way to tell. A visible contract is a contract, and
-// "DIFFERENT BUILDS · RELOAD BOTH" is a better answer than two people
-// describing different tanks to each other.
-export const PROTOCOL = 9;
+// 10 is a shape change: the lobby block carries the chosen difficulty now.
+//
+// 9 was not, and is worth keeping the reasoning for: radius() took a new
+// exponent. The host stays authoritative for who eats whom, so a stale guest
+// would still have played a correct game - it would just have drawn every fish
+// in the tank at the wrong size, on its own screen only, with no way to tell.
+// A visible contract is a contract, and "DIFFERENT BUILDS · RELOAD BOTH" is a
+// better answer than two people describing different tanks to each other.
+export const PROTOCOL = 10;
 // Mass is a volume and a fish is a thing you look at, so the honest exponent
 // is a third - and a third is exactly why growing never read on screen: it
 // makes mass the cube of the only thing a player can see, so thirteen times
@@ -123,6 +105,69 @@ export const SPECIES = Object.freeze([
   "royal-gramma",
   "triggerfish",
 ]);
+// What the lobby's difficulty slider actually sets: how many wild fish there
+// are and how big the biggest of them get. Nothing else - not your speed, not
+// the respawn wait, not the filter - because a difficulty that quietly changes
+// six things is one nobody can reason about.
+//
+// Each tier draws its population as mass = heaviest ^ (random ^ tail): a
+// log-uniform spread bent hard toward the small end, so most of the tank is
+// always fry and `heaviest` is a ceiling rather than a fat-tail surprise. A
+// bigger `tail` bends it harder and leaves fewer big fish; `heaviest` sets how
+// big those few get.
+//
+// The one rule every tier keeps: there is always plenty smaller than you. Even
+// the trench leaves fifty fish a fresh spawn can eat, because a tank where you
+// cannot get started is not difficult, it is broken. A test asserts it.
+//
+// This replaced two flat bands, 1-4 and 5-27, whose whole range a player
+// cleared in about twenty meals - and from mass 27 up not one fish in the tank
+// was too big to eat, so growing past it changed nothing a player could do.
+// That, not the arithmetic of size, was why growing never meant anything.
+export const DIFFICULTY = Object.freeze(
+  [
+    // name, blurb: what the lobby shows. npcs/heaviest/tail: what it does.
+    // `outweigh` and `edible` are measured, not promised - see the test.
+    {
+      name: "Shallows",
+      blurb: "Almost everything here is smaller than you.",
+      npcs: 100,
+      heaviest: 25,
+      tail: 8,
+    },
+    {
+      name: "The reef",
+      blurb: "A few fish can eat you. Most cannot.",
+      npcs: 100,
+      heaviest: 60,
+      tail: 8,
+    },
+    {
+      name: "Open water",
+      blurb: "Some big ones about. Watch your back.",
+      npcs: 100,
+      heaviest: 150,
+      tail: 7,
+    },
+    {
+      name: "The deep",
+      blurb: "Big fish everywhere, and less to go round.",
+      npcs: 85,
+      heaviest: 400,
+      tail: 5,
+    },
+    {
+      name: "The trench",
+      blurb: "Something in here is always hunting you.",
+      npcs: 70,
+      heaviest: 700,
+      tail: 3.5,
+    },
+  ].map(Object.freeze),
+);
+// The tier for a level, which is 1-based because the slider is.
+export const tier = (level) =>
+  DIFFICULTY[clamp(Math.round(level) - 1, 0, DIFFICULTY.length - 1)];
 // The species the heavy end of the wild population is drawn from, so the fish
 // that outweighs you looks like a fish that outweighs you. All of them are in
 // SPECIES above, which stays the single source of truth for what may be sent

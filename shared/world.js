@@ -6,6 +6,8 @@ import {
   wrap,
   SPECIES,
   PREDATORS,
+  DIFFICULTY,
+  tier,
   speciesLabel,
   inCover,
   outweighs,
@@ -55,7 +57,13 @@ export class World {
     this.npcs = [];
     this.events = [];
     this.roundLength = C.roundLength;
-    this.lobby = lobby ? { duration: C.roundLength, ready: new Set() } : null;
+    // The level the round is being played at. In a lobby room the host sets it
+    // and start() copies it across, exactly as it does the duration; a room
+    // with no lobby just keeps the default.
+    this.difficulty = C.difficulty;
+    this.lobby = lobby
+      ? { duration: C.roundLength, difficulty: C.difficulty, ready: new Set() }
+      : null;
     this.phase = lobby ? "lobby" : "playing";
     this.remaining = C.roundLength;
     this.round = 1;
@@ -83,12 +91,22 @@ export class World {
     this.lobby.duration = clamp(Math.round(seconds), 60, 300);
     return true;
   }
+  // Host only: which DIFFICULTY tier the next round is seeded from. Set in the
+  // lobby and applied by start(), so it never changes the tank underneath a
+  // round in progress.
+  setDifficulty(id, level) {
+    if (!this.lobby || this.phase !== "lobby" || id !== this.host) return false;
+    if (!Number.isFinite(level)) return false;
+    this.lobby.difficulty = clamp(Math.round(level), 1, DIFFICULTY.length);
+    return true;
+  }
   // Host only, and only once every player in the lobby is ready.
   start(id) {
     if (!this.lobby || this.phase !== "lobby" || id !== this.host) return false;
     if ([...this.players.keys()].some((k) => !this.lobby.ready.has(k)))
       return false;
     this.roundLength = this.lobby.duration;
+    this.difficulty = this.lobby.difficulty;
     this.lobby.ready.clear();
     this.beginRound();
     return true;
@@ -125,23 +143,25 @@ export class World {
     }
   }
   seedNPCs() {
-    this.npcs = Array.from({ length: C.npcCount }, (_, i) => {
-      // See wildHeaviest and wildTail: fry with a climbing tail, so there is
-      // always something in the tank that outweighs you.
+    const level = tier(this.difficulty);
+    this.npcs = Array.from({ length: level.npcs }, (_, i) => {
+      // See DIFFICULTY: fry with a climbing tail, so there is always something
+      // in the tank that outweighs you and always plenty that does not.
       //
-      // One draw per percentile rather than a hundred free draws. The shape is
-      // the whole point - a tank with nothing left above the player is the bug
-      // being fixed - and free draws leave that to luck: they miss the top of
-      // the tail outright about one round in five hundred, and vary the number
-      // of big fish every round for no reason anyone would enjoy. Stratifying
-      // holds it to about three fish above mass 100 and one above 200 - within
-      // one either way, since the boundary percentile can still land either
-      // side of a given mass - rather than to none at all. It also keeps the
-      // population honest under a constant RNG, which is how the tests seed a
-      // world: a hundred free draws of 0.5 is a hundred identical fish.
+      // One draw per percentile rather than one free draw per fish. The shape
+      // is the whole point - a tank with nothing left above the player is the
+      // bug being fixed, and a tier that seeds no big fish is that bug back
+      // for one round with nothing to show why - and free draws leave it to
+      // luck: they miss the top of the tail outright about one round in five
+      // hundred, and vary the count every round for no reason anyone would
+      // enjoy. Stratifying holds each tier to its own counts, within one
+      // either way, since the boundary percentile can still land either side
+      // of a given mass. It also keeps the population honest under a constant
+      // RNG, which is how the tests seed a world: a hundred free draws of 0.5
+      // would be a hundred identical fish.
       const mass = Math.pow(
-        C.wildHeaviest,
-        Math.pow((i + this.random()) / C.npcCount, C.wildTail),
+        level.heaviest,
+        Math.pow((i + this.random()) / level.npcs, level.tail),
       );
       const f = {
         id: `npc-${i}`,
@@ -459,6 +479,7 @@ export class World {
         ? {
             host: this.host,
             duration: this.lobby.duration,
+            difficulty: this.lobby.difficulty,
             ready: [...this.lobby.ready],
           }
         : undefined,

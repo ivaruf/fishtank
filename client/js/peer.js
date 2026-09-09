@@ -46,7 +46,12 @@ function localEngine({ lobby, onState }) {
     request: (id, request, payload = {}) => {
       if (request === "NEXT_ROUND") world.nextRound();
       if (request === "READY") world.setReady(id, !!payload.ready);
-      if (request === "SETTINGS") world.setDuration(id, payload.duration);
+      if (request === "SETTINGS") {
+        if (payload.duration !== undefined)
+          world.setDuration(id, payload.duration);
+        if (payload.difficulty !== undefined)
+          world.setDifficulty(id, payload.difficulty);
+      }
       if (request === "START") world.start(id);
     },
     stop: () => {

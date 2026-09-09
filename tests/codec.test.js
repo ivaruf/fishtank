@@ -209,10 +209,14 @@ test("the lobby survives packing, by slot rather than by id", () => {
   world.addPlayer("kid", "Kid");
   world.setReady("kid", true);
   world.setDuration("host", 180);
+  world.setDifficulty("host", 5);
   const { seen } = link().send(world.snapshot());
   assert.equal(seen.phase, "lobby");
   assert.equal(seen.lobby.host, "host");
   assert.equal(seen.lobby.duration, 180);
+  // A guest has to see what it is about to swim into, so the chosen tier rides
+  // along with the duration rather than being the host's private business.
+  assert.equal(seen.lobby.difficulty, 5);
   assert.deepEqual(seen.lobby.ready, ["kid"]);
 });
 

@@ -177,6 +177,7 @@ export function createPacker() {
         u8(1);
         w16u(slot(snapshot.lobby.host));
         w16u(clampTo(Math.round(snapshot.lobby.duration ?? 0), 0, 65535));
+        u8(clampTo(Math.round(snapshot.lobby.difficulty ?? 1), 1, 255));
         w16u(ready.length);
         for (const id of ready) w16u(slot(id));
       } else u8(0);
@@ -296,13 +297,14 @@ export function createUnpacker() {
       if (u8()) {
         const host = idOf(r16u()) ?? null;
         const duration = r16u();
+        const difficulty = u8();
         const count = r16u();
         const ready = [];
         for (let i = 0; i < count; i++) {
           const id = idOf(r16u());
           if (id !== undefined) ready.push(id);
         }
-        lobby = { host, duration, ready };
+        lobby = { host, duration, difficulty, ready };
       }
 
       const players = [];

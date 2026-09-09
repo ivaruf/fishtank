@@ -271,7 +271,7 @@
         <small id="lobby-reach"></small>
       </p>
       <ol id="lobby-players"></ol>
-      <label class="lobby-duration" for="lobby-slider"
+      <label class="lobby-setting" for="lobby-slider"
         ><span>MATCH LENGTH · <b id="lobby-minutes">2 min</b></span>
         <input
           id="lobby-slider"
@@ -282,6 +282,24 @@
           value="2"
           aria-label="Match length in minutes"
         />
+      </label>
+      <!-- How many wild fish there are and how big the biggest get, and
+           nothing else. `max` and the tier names come from shared/config.js so
+           the slider cannot drift from the table it is choosing from, and
+           aria-valuetext carries the name because "3 of 5" is not the thing a
+           player is picking. -->
+      <label class="lobby-setting" for="lobby-difficulty"
+        ><span>DIFFICULTY · <b id="lobby-level">Open water</b></span>
+        <input
+          id="lobby-difficulty"
+          type="range"
+          min="1"
+          max="5"
+          step="1"
+          value="3"
+          aria-label="Difficulty"
+        />
+        <small id="lobby-level-note"></small>
       </label>
       <p class="lobby-hint" id="lobby-hint"></p>
       <div class="buttons">

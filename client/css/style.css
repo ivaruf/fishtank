@@ -623,16 +623,16 @@ header {
 .lobby li .state.ready {
   color: #d1ed9e;
 }
-.lobby-duration {
+.lobby-setting {
   display: block;
   margin: 18px 0 0;
   font-size: 9px;
   letter-spacing: 2px;
 }
-.lobby-duration b {
+.lobby-setting b {
   color: #d1ed9e;
 }
-.lobby-duration input {
+.lobby-setting input {
   display: block;
   width: 100%;
   max-width: none;
@@ -642,8 +642,19 @@ header {
   background: transparent;
   accent-color: #d1ed9e;
 }
-.lobby-duration input:disabled {
+.lobby-setting input:disabled {
   opacity: 0.55;
+}
+/* What the chosen tier means, in words. Sentence case and no tracking: it is
+   a line to read, not a label to scan, and it sits under the slider it
+   describes rather than in the panel's one hint line at the bottom. */
+.lobby-setting small {
+  display: block;
+  margin: 6px 0 0;
+  font-size: 11px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: #9bb5ae;
 }
 .lobby-hint {
   margin: 14px 0 0;
@@ -804,7 +815,7 @@ header {
     padding: 4px 0;
     font-size: 11px;
   }
-  .lobby-duration {
+  .lobby-setting {
     margin-top: 10px;
   }
   .lobby .buttons {

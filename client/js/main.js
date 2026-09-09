@@ -21,6 +21,8 @@ import {
   CONFIG as C,
   SPECIES,
   PROTOCOL,
+  DIFFICULTY,
+  tier,
   radius,
   direction,
   clamp,
@@ -859,7 +861,29 @@ $("lobby-slider").addEventListener("input", () => {
     duration: Number($("lobby-slider").value) * 60,
   });
 });
-// Lobby panel: who is in, who is ready, the host's match length, and start.
+// The slider's range is the table's length, so adding a tier to
+// shared/config.js is the whole change - there is no second place that says
+// how many there are.
+$("lobby-difficulty").max = String(DIFFICULTY.length);
+$("lobby-difficulty").value = String(C.difficulty);
+$("lobby-difficulty").addEventListener("pointerdown", () => (dragging = true));
+$("lobby-difficulty").addEventListener("pointerup", () => (dragging = false));
+$("lobby-difficulty").addEventListener("input", () => {
+  showDifficulty(Number($("lobby-difficulty").value));
+  network?.request("SETTINGS", {
+    difficulty: Number($("lobby-difficulty").value),
+  });
+});
+// Named, described, and announced by name: a slider reading "3 of 5" tells a
+// player nothing about what they just chose.
+function showDifficulty(level) {
+  const chosen = tier(level);
+  $("lobby-level").textContent = chosen.name;
+  $("lobby-level-note").textContent = chosen.blurb;
+  $("lobby-difficulty").setAttribute("aria-valuetext", chosen.name);
+}
+// Lobby panel: who is in, who is ready, the host's match length and
+// difficulty, and start.
 let dragging = false;
 function updateLobby(me) {
   const lobby = state.lobby,
@@ -909,6 +933,13 @@ function updateLobby(me) {
   if (!dragging) $("lobby-slider").value = String(minutes);
   $("lobby-slider").disabled = !iAmHost;
   $("lobby-minutes").textContent = `${minutes} min`;
+  // Everyone sees what they are about to swim into, host or not; only the host
+  // can move it. Not while a thumb is on it, or the host's own drag fights the
+  // snapshot coming back.
+  const level = lobby.difficulty ?? C.difficulty;
+  if (!dragging) $("lobby-difficulty").value = String(level);
+  $("lobby-difficulty").disabled = !iAmHost;
+  showDifficulty(level);
   const mine = ready.has(myId);
   // Alone in a tank you are hosting, there is nobody to be ready for: readying
   // yourself is a press that can only ever have one answer, so it answers

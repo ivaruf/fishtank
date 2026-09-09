@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { World, canEat } from "../shared/world.js";
 import {
   CONFIG as C,
+  DIFFICULTY,
   FILTER,
   PLANTS,
   PREDATORS,
@@ -115,32 +116,83 @@ test("NPCs move and empty rooms pause", () => {
   assert.notEqual(w.npcs[0].z, before);
 });
 
-// The bug this shape exists to fix: the old two-band spread topped out at
-// mass 27, which a player cleared in about twenty meals, and from there up
-// nothing in the tank was too big to eat. Growing past it changed nothing a
-// player could do, which is why it never felt like growing.
-test("the wild population keeps something above the player all round", () => {
-  const w = new World(Math.random);
-  const above = (mass) => w.npcs.filter((n) => n.mass >= mass).length;
-  // Floors with room under the real counts - about 13, 7 and 3 - so tuning the
-  // tail's shape does not have to come here, but emptying it does.
-  assert.ok(above(C.startMass) >= 8, `only ${above(C.startMass)} above spawn`);
-  assert.ok(above(30) >= 4, `only ${above(30)} above mass 30`);
-  assert.ok(above(100) >= 2, `only ${above(100)} above mass 100`);
-  // And plenty to eat at spawn, or the climb never starts.
-  const prey = w.npcs.filter((n) => n.mass < C.startMass).length;
-  assert.ok(prey > 50, `only ${prey} edible at a spawn`);
-  // One draw per percentile, so the shape holds round to round instead of
-  // being left to luck - a tank that happened to seed no big fish would be
-  // the bug back again for that round, with nothing to show why. It pins the
-  // count to within one rather than exactly: the boundary percentile can
-  // still land either side of any particular mass.
-  const again = new World(Math.random);
-  const there = again.npcs.filter((n) => n.mass >= 100).length;
-  assert.ok(Math.abs(there - above(100)) <= 1, `${above(100)} then ${there}`);
-  // The heavy end looks the part: a sixteen-unit clownfish would undercut it.
-  for (const n of w.npcs)
-    if (n.mass > 60) assert.ok(PREDATORS.includes(n.species), n.species);
+// Seed a tank at one difficulty without going through a lobby.
+function tankAt(level, random = Math.random) {
+  const w = new World(random);
+  w.difficulty = level;
+  w.seedNPCs();
+  return w;
+}
+// The rule the slider must never break, at any setting: there is always
+// plenty smaller than you. A tank you cannot get started in is not difficult,
+// it is broken - and the trench is the tier where that is easy to get wrong.
+//
+// The other half is the bug the whole shape exists to fix. The two flat bands
+// this replaced topped out at mass 27, which a player cleared in about twenty
+// meals, and from there up nothing in the tank was too big to eat: growing
+// changed nothing a player could do, which is why it never felt like growing.
+test("every difficulty leaves food on the table and something above you", () => {
+  for (let level = 1; level <= DIFFICULTY.length; level++) {
+    const { name } = DIFFICULTY[level - 1];
+    const w = tankAt(level);
+    const edible = w.npcs.filter((n) => n.mass < C.startMass).length;
+    const above = w.npcs.filter((n) => n.mass >= C.startMass).length;
+    // Never more than a host's uplink was sized for.
+    assert.ok(w.npcs.length <= C.npcCount, `${name} seeds ${w.npcs.length}`);
+    assert.ok(edible >= 40, `${name} leaves only ${edible} edible at a spawn`);
+    assert.ok(above >= 3, `${name} has only ${above} above a spawn`);
+    // The heavy end looks the part wherever a tier's tail reaches: a
+    // sixteen-unit clownfish would undercut the whole ladder.
+    for (const n of w.npcs)
+      if (n.mass > 60)
+        assert.ok(PREDATORS.includes(n.species), `${name}: ${n.species}`);
+  }
+});
+test("difficulty is monotonic: harder is bigger fish and more of them", () => {
+  const heaviest = [],
+    threats = [];
+  for (let level = 1; level <= DIFFICULTY.length; level++) {
+    const w = tankAt(level, () => 0.5);
+    heaviest.push(Math.round(Math.max(...w.npcs.map((n) => n.mass))));
+    threats.push(w.npcs.filter((n) => n.mass >= C.startMass).length);
+  }
+  for (let i = 1; i < DIFFICULTY.length; i++) {
+    assert.ok(heaviest[i] > heaviest[i - 1], `heaviest: ${heaviest}`);
+    assert.ok(threats[i] >= threats[i - 1], `above a spawn: ${threats}`);
+  }
+  // One draw per percentile, so a tier's counts hold round to round instead of
+  // being left to luck - a trench that happened to seed no big fish would be
+  // the old bug back for one round with nothing to show why. Within one,
+  // rather than exactly: the boundary percentile can still land either side of
+  // a given mass.
+  const a = tankAt(3).npcs.filter((n) => n.mass >= 100).length;
+  const b = tankAt(3).npcs.filter((n) => n.mass >= 100).length;
+  assert.ok(Math.abs(a - b) <= 1, `${a} then ${b} above mass 100`);
+});
+test("only the host sets difficulty, and it lands on the next round", () => {
+  const w = new World(() => 0.5, { lobby: true });
+  w.addPlayer("a", "Host");
+  w.addPlayer("b", "Guest");
+  assert.equal(w.setDifficulty("b", 5), false, "a guest cannot set it");
+  assert.equal(w.setDifficulty("a", 5), true);
+  assert.equal(w.lobby.difficulty, 5);
+  // Clamped into the table rather than trusted: this arrives over a wire.
+  w.setDifficulty("a", 99);
+  assert.equal(w.lobby.difficulty, DIFFICULTY.length);
+  w.setDifficulty("a", -3);
+  assert.equal(w.lobby.difficulty, 1);
+  assert.equal(w.setDifficulty("a", NaN), false, "nonsense is refused");
+  assert.equal(w.lobby.difficulty, 1, "and changes nothing");
+  // The tier chosen in the lobby is the tank the round is seeded from.
+  w.setDifficulty("a", DIFFICULTY.length);
+  w.setReady("a", true);
+  w.setReady("b", true);
+  assert.equal(w.start("a"), true);
+  assert.equal(w.difficulty, DIFFICULTY.length);
+  assert.equal(w.npcs.length, DIFFICULTY.at(-1).npcs);
+  // And a round in progress is never re-tuned underneath the players in it.
+  assert.equal(w.setDifficulty("a", 1), false);
+  assert.equal(w.difficulty, DIFFICULTY.length);
 });
 test("a meal is a mouthful: one fish cannot multiply you", () => {
   const { w, p } = setup();
@@ -429,6 +481,7 @@ test("a lobby room waits for everyone ready and the host's start, then returns t
   assert.deepEqual(w.snapshot().lobby, {
     host: "a",
     duration: 240,
+    difficulty: C.difficulty,
     ready: ["a", "b"],
   });
   assert.equal(w.start("a"), true);
