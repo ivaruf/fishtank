@@ -267,45 +267,115 @@ const previewLight = new B.HemisphericLight(
   scene,
 );
 const mobilePreview = matchMedia("(pointer: coarse)");
-const syncPreviewLight = () => {
-  previewLight.intensity = mobilePreview.matches ? 2.1 : 1.5;
+const previewHint = preview.querySelector("span");
+const syncPreview = () => {
+  const touch = mobilePreview.matches;
+  previewLight.intensity = touch ? 2.1 : 1.5;
+  // The gesture worth naming is the one this device has.
+  previewHint.textContent = touch
+    ? "Your fish · drag to turn · pinch to zoom"
+    : "Your fish · drag to turn · scroll to zoom";
 };
-mobilePreview.addEventListener("change", syncPreviewLight);
-syncPreviewLight();
+mobilePreview.addEventListener("change", syncPreview);
+syncPreview();
 previewLight.diffuse = new B.Color3(1, 0.96, 0.88);
 previewLight.groundColor = new B.Color3(0.48, 0.65, 0.7);
 previewLight.specular = new B.Color3(0.25, 0.25, 0.25);
 previewLight.renderPriority = 100;
 previewLight.setEnabled(false);
-const spin = { pointer: null, x: 0, y: 0, yaw: 0, pitch: 0, touched: false };
+// Turning the fish and getting closer to it. The drag is inverted from the
+// obvious mapping on purpose: dragging right pushes the near side of the fish
+// away from you rather than swinging it with the cursor, which is how looking
+// at an object in your hands works and is what everyone tried first.
+const ZOOM = { min: 0.55, max: 2.4 };
+const spin = {
+  // Every pointer currently down, so two of them can be a pinch. One is a
+  // turn, two is a zoom, and dropping back to one becomes a turn again.
+  pointers: new Map(),
+  x: 0,
+  y: 0,
+  yaw: 0,
+  pitch: 0,
+  zoom: 1,
+  pinch: 0,
+  touched: false,
+};
 function releasePreview() {
-  if (spin.pointer !== null && preview.hasPointerCapture(spin.pointer))
-    preview.releasePointerCapture(spin.pointer);
-  spin.pointer = null;
+  for (const id of spin.pointers.keys())
+    if (preview.hasPointerCapture(id)) preview.releasePointerCapture(id);
+  spin.pointers.clear();
+  spin.pinch = 0;
   preview.classList.remove("grabbing");
 }
+// The gap between two fingers, or 0 unless there are exactly two.
+const spread = () => {
+  if (spin.pointers.size !== 2) return 0;
+  const [a, b] = [...spin.pointers.values()];
+  return Math.hypot(a.x - b.x, a.y - b.y);
+};
 preview.addEventListener("pointerdown", (event) => {
-  if (event.button !== 0 || spin.pointer !== null) return;
-  spin.pointer = event.pointerId;
-  spin.x = event.clientX;
-  spin.y = event.clientY;
+  if (event.button !== 0 || spin.pointers.size >= 2) return;
+  // Catch the idle sway where it stands, so grabbing it never jumps.
   if (!spin.touched) spin.yaw = Math.sin(time * 0.45) * 0.55;
   spin.touched = true;
+  spin.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+  spin.x = event.clientX;
+  spin.y = event.clientY;
+  spin.pinch = spread();
   preview.setPointerCapture(event.pointerId);
   preview.classList.add("grabbing");
   event.preventDefault();
 });
 preview.addEventListener("pointermove", (event) => {
-  if (event.pointerId !== spin.pointer) return;
-  spin.yaw += (event.clientX - spin.x) * 0.012;
-  spin.pitch = clamp(spin.pitch + (event.clientY - spin.y) * 0.01, -1.3, 1.3);
+  const at = spin.pointers.get(event.pointerId);
+  if (!at) return;
+  at.x = event.clientX;
+  at.y = event.clientY;
+  const gap = spread();
+  if (gap) {
+    // Pinching: the ratio of the gap to the gap it started at, so the fish
+    // tracks the fingers rather than drifting at a rate.
+    if (spin.pinch)
+      spin.zoom = clamp(spin.zoom * (gap / spin.pinch), ZOOM.min, ZOOM.max);
+    spin.pinch = gap;
+    return;
+  }
+  spin.yaw -= (event.clientX - spin.x) * 0.012;
+  spin.pitch = clamp(spin.pitch - (event.clientY - spin.y) * 0.01, -1.3, 1.3);
   spin.x = event.clientX;
   spin.y = event.clientY;
 });
 for (const type of ["pointerup", "pointercancel", "lostpointercapture"])
   preview.addEventListener(type, (event) => {
-    if (event.pointerId === spin.pointer) releasePreview();
+    if (!spin.pointers.delete(event.pointerId)) return;
+    if (preview.hasPointerCapture(event.pointerId))
+      preview.releasePointerCapture(event.pointerId);
+    // A finger lifted out of a pinch leaves one behind, and turning has to
+    // resume from where that one is rather than from where the other was.
+    spin.pinch = 0;
+    const left = [...spin.pointers.values()][0];
+    if (left) {
+      spin.x = left.x;
+      spin.y = left.y;
+    } else preview.classList.remove("grabbing");
   });
+// Exponential, so every notch of the wheel is the same proportional step
+// whatever the zoom already is, and deltaMode is honoured because a line-mode
+// wheel reports single digits where a pixel-mode one reports hundreds.
+preview.addEventListener(
+  "wheel",
+  (event) => {
+    event.preventDefault();
+    spin.touched = true;
+    const lines = event.deltaMode === 1 ? event.deltaY * 16 : event.deltaY;
+    spin.zoom = clamp(
+      spin.zoom * Math.exp(-lines * 0.0012),
+      ZOOM.min,
+      ZOOM.max,
+    );
+  },
+  { passive: false },
+);
 window.addEventListener("blur", releasePreview);
 function hideHero() {
   releasePreview();
@@ -351,7 +421,10 @@ function showHero(dt) {
     0,
   );
   hero.root.scaling.setAll(
-    (Math.min(bounds.width, bounds.height) / screen.height) * halfHeight * 0.65,
+    (Math.min(bounds.width, bounds.height) / screen.height) *
+      halfHeight *
+      0.65 *
+      spin.zoom,
   );
   hero.update(dt);
 }
