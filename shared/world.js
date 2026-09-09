@@ -5,6 +5,7 @@ import {
   clamp,
   wrap,
   SPECIES,
+  PREDATORS,
   speciesLabel,
   inCover,
   outweighs,
@@ -125,12 +126,35 @@ export class World {
   }
   seedNPCs() {
     this.npcs = Array.from({ length: C.npcCount }, (_, i) => {
+      // See wildHeaviest and wildTail: fry with a climbing tail, so there is
+      // always something in the tank that outweighs you.
+      //
+      // One draw per percentile rather than a hundred free draws. The shape is
+      // the whole point - a tank with nothing left above the player is the bug
+      // being fixed - and free draws leave that to luck: they miss the top of
+      // the tail outright about one round in five hundred, and vary the number
+      // of big fish every round for no reason anyone would enjoy. Stratifying
+      // holds it to about four fish above mass 200 and one above 400 - within
+      // one either way, since the boundary percentile can still land either
+      // side of a given mass - rather than to none at all. It also keeps the
+      // population honest under a constant RNG, which is how the tests seed a
+      // world: a hundred free draws of 0.5 is a hundred identical fish.
+      const mass = Math.pow(
+        C.wildHeaviest,
+        Math.pow((i + this.random()) / C.npcCount, C.wildTail),
+      );
       const f = {
         id: `npc-${i}`,
         npc: true,
-        mass: i < 75 ? 1 + this.random() * 3 : 5 + this.random() * 22,
+        mass,
         color: i % 5,
-        species: SPECIES[i % SPECIES.length],
+        // The heavy end draws from the species that read as predators. A
+        // sixteen-unit clownfish would undercut the whole point of the ladder:
+        // the thing above you has to look like a thing above you.
+        species:
+          mass > 60
+            ? PREDATORS[i % PREDATORS.length]
+            : SPECIES[i % SPECIES.length],
         decision: 0,
       };
       this.spawn(f);
@@ -198,7 +222,11 @@ export class World {
   }
   eat(predator, prey) {
     const before = predator.mass;
-    predator.mass = Math.min(1800, predator.mass + prey.mass * C.growth);
+    // See CONFIG.bite: a meal is a mouthful, so a fish far bigger than you
+    // feeds you well without multiplying you. Score is the whole animal
+    // though - the hunt earned that, and the scoreboard is not the food chain.
+    const bite = Math.min(prey.mass, predator.mass * C.bite);
+    predator.mass = Math.min(C.massCap, predator.mass + bite * C.growth);
     if (!predator.npc) predator.score += Math.round(prey.mass * 10);
     prey.alive = false;
     if (prey.chunk) prey.gone = true;

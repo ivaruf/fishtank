@@ -47,9 +47,12 @@ test("a small fish ducks under the arch and a grown one has to go over", () => {
     free(arch.x, OVER_ARCH + radius(45) + 0.5, arch.z, 45),
     "a grown fish can still swim over the arch",
   );
-  // Where the gate closes. Growth is 0.75 of what you eat, so this is four or
-  // five meals from a start of 8: if that beat moves, this number moves. It is
-  // also what pins the arch's scale - see the note in shared/scenery.js.
+  // Where the gate closes: about twenty meals from a start of 8, a third of
+  // the way into a round. It was 32.3 while radius() used a cube root; the
+  // steeper exponent that made growing visible on screen also brings this beat
+  // forward, and the arch itself has not moved. This number is what pins the
+  // arch's scale - see the note in shared/scenery.js - so if radius(), growth
+  // or the arch's placement changes, it changes here.
   let pass = 1,
     stop = 400;
   for (let i = 0; i < 44; i++) {
@@ -58,8 +61,8 @@ test("a small fish ducks under the arch and a grown one has to go over", () => {
     else stop = mid;
   }
   assert.ok(
-    Math.abs(pass - 32.3) < 1,
-    `arch closes at mass ${pass.toFixed(1)}, expected about 32.3`,
+    Math.abs(pass - 22.5) < 1,
+    `arch closes at mass ${pass.toFixed(1)}, expected about 22.5`,
   );
 });
 

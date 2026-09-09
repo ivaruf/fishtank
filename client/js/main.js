@@ -1247,19 +1247,17 @@ engine.runRenderLoop(() => {
     // The camera looks where the player is aiming, on touch exactly as on
     // desktop: one scheme, one camera.
     const d = direction(input);
-    // The follow distance is what decides whether growing is visible at all,
-    // and it used to be 7 + r * 3 - three units back for every one unit of
-    // radius gained, so it cancelled most of the growth as it happened. Over
-    // the whole mass range, 8 to the 1800 cap, a fish went from filling 19% of
-    // the screen to 46%: 225 times the mass for 2.4 times the size, with a
-    // hard ceiling of 65% however big you ever got.
+    // The follow distance decides how much of the growth survives to the
+    // screen, because backing away as the fish gets bigger subtracts from the
+    // thing it is trying to frame. It was 7 + r * 3, then 8.6 + r * 1.5; at
+    // 0.8 it gives up a fifth of what it used to. Together with the exponent
+    // in config.js - mass is no longer the cube of the visible size - a strong
+    // round reads about 3.4x its spawn size where it used to read 2.2x.
     //
-    // 8.6 + r * 1.5 keeps the spawn framing almost exactly as it was and
-    // halves the cancellation above it: a good round now reads 19% -> 30%
-    // instead of 19% -> 27%, and the cap fills two thirds of the frame. Mass
-    // is still the cube of the thing you can see, so the rest of the feeling
-    // has to come from the pop in fish.js.
-    const back = 8.6 + r * 1.5;
+    // The constant is chosen to hold the spawn framing exactly: at the spawn
+    // radius of 0.96 this is 10.04 units back, which is what it has always
+    // been. A player who never eats sees no change at all.
+    const back = 9.3 + r * 0.8;
     const desired = new B.Vector3(
       p.x - d.x * back,
       p.y + 2 + r * 0.4 - d.y * back,

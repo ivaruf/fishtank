@@ -31,11 +31,13 @@ const CODEC = 1;
 const PHASES = ["lobby", "playing", "results"];
 const NONE = 0xffff;
 
-// Scales. The tank spans ±34 and mass caps at 1800 (shared/world.js), which is
-// what decides each width below.
+// Scales. The tank spans ±34 and mass caps at CONFIG.massCap, now 900, which
+// is what decides each width below. The cap was 1800 when these were chosen,
+// so MASS has room to spare rather than being tight: raising it would buy
+// precision nobody can see, and would change the wire format to do it.
 const POS = 100; // 0.01 of a unit, inside an i16's ±327
 const ANGLE = 10000; // radians: yaw wraps to ±π, so ±31416 fits an i16
-const MASS = 32; // 1800 × 32 fits a u16; 0.03 of a unit, invisible on a radius
+const MASS = 32; // 900 × 32 leaves half a u16 spare; 0.03 of a unit, invisible
 const TIME = 100; // the short countdowns, in centiseconds
 // Nobody aims a wild fish, so they get coarser angles: a byte of yaw is 1.4°.
 const NPC_YAW = 256 / (2 * Math.PI);

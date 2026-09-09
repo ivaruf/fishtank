@@ -11,12 +11,19 @@
 // arch behave the way an arch should. Nothing anywhere says "small fish may
 // pass"; a small fish fits between the legs and under the lintel and a big one
 // does not, because that is what its radius does. The crossover for the arch
-// as placed is mass 32.3, and it is the crown rather than the legs that
+// as placed is mass 22.5, and it is the crown rather than the legs that
 // closes: a fish needs room between the sand and the stone overhead, and its
 // centre cannot go below r + 0.5. Fish start at mass 8, so the arch stops
-// being a shortcut after four or five meals and has to be gone over instead.
-// A test asserts it, so moving the arch or changing growth will say so - and
-// it is why the arch is placed at 3.8 rather than 3. Modelling the collision
+// being a shortcut about twenty meals in - a third of the way through a
+// two-minute round - and has to be gone over instead.
+//
+// It was mass 32.3 until radius() took a steeper exponent to make growing
+// visible; the arch has not moved. In meals the beat barely shifted, because
+// the wild population got a longer tail in the same change, and outgrowing
+// this arch is the plainest thing in the game that tells a player they are
+// bigger than they were. A test asserts the crossover, so moving the arch or
+// changing radius() or growth will say so - and it is why the arch is placed
+// at 3.8 rather than 3. Modelling the collision
 // as the real ring of stones instead of a flat lintel lowered the ceiling
 // toward the legs, which closed the gate at mass 16 and made the passage a
 // thing you lose after one meal; scaling the arch up gave the beat back and

@@ -11,6 +11,41 @@ export const CONFIG = Object.freeze({
   // an exact tie (two fresh spawns) leaves two fish neutral to each other.
   eatRatio: 1,
   growth: 0.75,
+  // A mouthful, not the whole animal: one meal can only ever be this share of
+  // your own mass, whatever you just swallowed.
+  //
+  // Without it the long tail below turns into a rocket. Gain is a share of the
+  // prey's mass and prey can be almost your own size, so eating the biggest
+  // thing you can reach multiplies you by about 1.75 every time - and because
+  // a wild fish's speed is 2.4 + 1/r, the biggest fish in the tank is also the
+  // slowest and the easiest to catch. A player who hunts upward hit the cap in
+  // ten meals, which is the same "growing stopped meaning anything" in a
+  // different disguise. Capped, a maximum meal is +26% mass and +11% radius:
+  // plainly visible, and about twenty of them from spawn to the cap.
+  bite: 0.35,
+  // The wild population's shape: mass = wildHeaviest ^ (random ^ wildTail),
+  // log-uniform bent hard toward the small end, so most of the tank is fry,
+  // the tail keeps climbing, and wildHeaviest is a ceiling rather than a
+  // fat-tail surprise.
+  //
+  // It replaced two flat bands, 1-4 and 5-27. Their whole range was cleared in
+  // about twenty meals - inside a two-minute round - and from mass 27 up not
+  // one fish in the tank was too big to eat, so growing past it changed
+  // nothing a player could do. That, not the arithmetic of size, is why
+  // growing never meant anything.
+  //
+  // This shape leaves 80 of the 100 edible at spawn, a dozen still above you
+  // at mass 30, and four above you at 200. Only nine fish are big enough to be
+  // drawn as predators and one of those is a monster, which is the point: the
+  // tail is there to be climbed, not to crowd the tank. wildTail was 3 to
+  // begin with, and nine big fish were fourteen - too many to look at.
+  wildHeaviest: 600,
+  wildTail: 5,
+  // Where growing stops. The fish is 16 units long here and move() has kept it
+  // off the glass, which leaves a 13-unit band of water to swim in: past this
+  // the tank stops being a tank. It was 1800, which was never reachable and so
+  // never a decision.
+  massCap: 900,
   // Wild fish large enough to eat a player drift toward one this close (plus
   // their own radius) and swim a little faster while doing so.
   npcHuntRange: 9,
@@ -29,8 +64,25 @@ export const CONFIG = Object.freeze({
 });
 // Bumped whenever snapshots or join messages change shape, so a guest can tell
 // when it has connected to a host running older code than itself.
-export const PROTOCOL = 8;
-export const radius = (mass) => Math.cbrt(mass) * 0.48;
+//
+// 9 is not a shape change: radius() took a new exponent. The host stays
+// authoritative for who eats whom, so a stale guest would still play a correct
+// game - it would just draw every fish in the tank at the wrong size, on its
+// own screen only, with no way to tell. A visible contract is a contract, and
+// "DIFFERENT BUILDS · RELOAD BOTH" is a better answer than two people
+// describing different tanks to each other.
+export const PROTOCOL = 9;
+// Mass is a volume and a fish is a thing you look at, so the honest exponent
+// is a third - and a third is exactly why growing never read on screen: it
+// makes mass the cube of the only thing a player can see, so thirteen times
+// the mass buys 2.4 times the size and the follow camera cancels a fifth of
+// even that. 0.45 is deliberately not physical. The coefficient pins a fresh
+// spawn to the 0.96 radius it has always had, so nothing about the start
+// changes - the framing, the hitbox and the speed penalty at spawn are all
+// what they were; what changes is everything after it. At mass 200 the radius
+// goes 2.81 -> 4.09, and a good round now reads about 3.4x its spawn size
+// instead of 2.2x.
+export const radius = (mass) => Math.pow(mass, 0.45) * 0.377;
 export const outweighs = (predator, prey) =>
   predator.mass > prey.mass * CONFIG.eatRatio;
 export const direction = (fish) => ({
@@ -57,6 +109,16 @@ export const SPECIES = Object.freeze([
   "seahorse",
   "manta-ray",
   "royal-gramma",
+  "triggerfish",
+]);
+// The species the heavy end of the wild population is drawn from, so the fish
+// that outweighs you looks like a fish that outweighs you. All of them are in
+// SPECIES above, which stays the single source of truth for what may be sent
+// over the wire.
+export const PREDATORS = Object.freeze([
+  "shark",
+  "manta-ray",
+  "lionfish",
   "triggerfish",
 ]);
 export const speciesLabel = (species = "fish") =>

@@ -5,6 +5,7 @@ import {
   CONFIG as C,
   FILTER,
   PLANTS,
+  PREDATORS,
   inCover,
   radius,
   wrap,
@@ -114,6 +115,46 @@ test("NPCs move and empty rooms pause", () => {
   assert.notEqual(w.npcs[0].z, before);
 });
 
+// The bug this shape exists to fix: the old two-band spread topped out at
+// mass 27, which a player cleared in about twenty meals, and from there up
+// nothing in the tank was too big to eat. Growing past it changed nothing a
+// player could do, which is why it never felt like growing.
+test("the wild population keeps something above the player all round", () => {
+  const w = new World(Math.random);
+  const above = (mass) => w.npcs.filter((n) => n.mass >= mass).length;
+  // Floors with room under the real counts - about 20, 12 and 4 - so tuning
+  // the tail's shape does not have to come here, but emptying it does.
+  assert.ok(above(C.startMass) >= 15, `only ${above(C.startMass)} above spawn`);
+  assert.ok(above(30) >= 8, `only ${above(30)} above mass 30`);
+  assert.ok(above(200) >= 2, `only ${above(200)} above mass 200`);
+  // And plenty to eat at spawn, or the climb never starts.
+  const prey = w.npcs.filter((n) => n.mass < C.startMass).length;
+  assert.ok(prey > 50, `only ${prey} edible at a spawn`);
+  // One draw per percentile, so the shape holds round to round instead of
+  // being left to luck - a tank that happened to seed no big fish would be
+  // the bug back again for that round, with nothing to show why. It pins the
+  // count to within one rather than exactly: the boundary percentile can
+  // still land either side of any particular mass.
+  const again = new World(Math.random);
+  const there = again.npcs.filter((n) => n.mass >= 200).length;
+  assert.ok(Math.abs(there - above(200)) <= 1, `${above(200)} then ${there}`);
+  // The heavy end looks the part: a sixteen-unit clownfish would undercut it.
+  for (const n of w.npcs)
+    if (n.mass > 60) assert.ok(PREDATORS.includes(n.species), n.species);
+});
+test("a meal is a mouthful: one fish cannot multiply you", () => {
+  const { w, p } = setup();
+  w.npcs = [];
+  const whale = w.addPlayer("whale", "Whale");
+  Object.assign(whale, { mass: 400, x: 0, y: 15, z: 40, protection: 0 });
+  p.mass = 20;
+  w.eat(p, whale);
+  // Uncapped this was 20 + 400 * 0.75, or sixteen times the eater.
+  assert.equal(p.mass, 20 + 20 * C.bite * C.growth);
+  // Score is the whole animal: the hunt earned that.
+  assert.equal(p.score, Math.round(400 * 10));
+});
+
 test("players can stand still, move along camera aim, strafe, and stop", () => {
   const { w, p } = setup();
   w.npcs = [];
@@ -169,7 +210,10 @@ test("a wild fish big enough to eat a player does so, is named, and the player r
   w.tick(0);
   assert.equal(p.alive, false);
   assert.equal(p.killedBy, "a wild pufferfish");
-  assert.equal(giant.mass, 20 + C.startMass * C.growth);
+  // The bite cap applies to wild fish as well: this pufferfish takes a
+  // mouthful of its own mass times bite, not the whole eight-mass player.
+  const mouthful = Math.min(C.startMass, 20 * C.bite) * C.growth;
+  assert.equal(giant.mass, 20 + mouthful);
   assert.deepEqual(
     w.events.filter((e) => e.type === "PLAYER_EATEN"),
     [
@@ -178,7 +222,7 @@ test("a wild fish big enough to eat a player does so, is named, and the player r
         predator: "giant",
         prey: "one",
         label: "One",
-        grew: 6,
+        grew: +mouthful.toFixed(1),
       },
     ],
   );
