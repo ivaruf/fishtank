@@ -20,7 +20,26 @@ import { clamp, wrap } from "../../shared/config.js";
 const STICK = 48, // px of thumb travel for full deflection
   LOOK = 0.005, // rad per px of look drag
   DEAD = 0.2, // stick deflection below this is treated as centred
-  FULL = 0.8; // deflection at which the fish is at full speed
+  FULL = 0.8, // deflection at which the fish is at full speed
+  // The band along each screen edge in which an unlocked cursor keeps turning,
+  // and how fast it turns at the very edge. See edgeLook.
+  EDGE = 80,
+  EDGE_YAW = 1.9, // rad/s
+  EDGE_PITCH = 1; // rad/s, and pitch only has ±1.35 to cover
+// How hard the cursor is pushing against an edge on one axis: 0 anywhere in
+// the middle, ramping to -1 at the low edge and +1 at the high one. Pure, and
+// exported, because it is the whole geometry of edgeLook and the only part of
+// this file a test can reach without a browser. Positions outside the window
+// clamp to full rather than running past it.
+// The `+ 0` normalises -0, which the low edge's own boundary produces and
+// which strict equality treats as a different value - the same reason read()
+// below adds it to a stick pushed exactly sideways.
+export const edgePush = (at, size, edge = EDGE) =>
+  (at <= edge
+    ? -(1 - Math.max(0, at) / edge)
+    : at >= size - edge
+      ? 1 - Math.max(0, size - at) / edge
+      : 0) + 0;
 export function createControls(canvas, onStop = () => {}) {
   const keys = new Set();
   const aim = { yaw: 0, pitch: 0 };
@@ -87,14 +106,24 @@ export function createControls(canvas, onStop = () => {}) {
   document.addEventListener("pointerlockchange", () => {
     if (document.pointerLockElement !== canvas) reset();
   });
+  // Where the cursor is, for edgeLook below. Tracked from every move rather
+  // than only the ones over the canvas, because a cursor resting on a HUD
+  // panel in the corner of the screen is one of the cases it exists for.
+  const cursor = { x: null, y: null };
   // Hover aiming works without pointer lock; clicking removes screen-edge limits.
   document.addEventListener("mousemove", (e) => {
+    cursor.x = e.clientX;
+    cursor.y = e.clientY;
     if (
       !active ||
       (document.pointerLockElement !== canvas && e.target !== canvas)
     )
       return;
     look(e.movementX * 0.0025, -e.movementY * 0.0025);
+  });
+  // Off the window entirely - another monitor, another app - is not aiming.
+  document.addEventListener("mouseleave", () => {
+    cursor.x = cursor.y = null;
   });
   canvas.addEventListener("click", async (e) => {
     if (!active || e.pointerType === "touch") return;
@@ -192,6 +221,30 @@ export function createControls(canvas, onStop = () => {}) {
     orient(yaw, pitch) {
       aim.yaw = yaw;
       aim.pitch = pitch;
+    },
+    // Keeps turning while an unlocked cursor is held against a screen edge.
+    //
+    // Mouse aim is relative - it reads movementX - and at the edge of the
+    // screen the pointer stops, so the deltas stop with it and the fish simply
+    // cannot be turned any further that way. Pointer lock is the real answer
+    // and a click still takes it, but a player who has not clicked yet should
+    // not be stuck facing a wall, and finding that out while something eats
+    // you is no way to learn it.
+    //
+    // So the last 80 px of each edge becomes a turn rate instead: nothing at
+    // the inner boundary, full at the very edge, which makes it a place you
+    // push into rather than a cliff you fall off. Nothing happens until the
+    // cursor is right at the edge, where the alternative is nothing happening
+    // at all.
+    //
+    // Silent when locked. There are no edges then, and a cursor left parked at
+    // x=0 from before the lock would otherwise spin the fish for ever.
+    edgeLook(dt) {
+      if (!active || touchMode || cursor.x === null) return;
+      if (document.pointerLockElement === canvas) return;
+      const x = edgePush(cursor.x, innerWidth),
+        y = edgePush(cursor.y, innerHeight);
+      if (x || y) look(x * EDGE_YAW * dt, -y * EDGE_PITCH * dt);
     },
     // The stick is already screen-relative: its deflection becomes
     // forward/strafe, and the server resolves those against the aim being sent

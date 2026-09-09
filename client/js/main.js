@@ -1207,6 +1207,9 @@ engine.runRenderLoop(() => {
   const now = performance.now();
   adaptResolution(now);
   const me = state?.players.find((p) => p.id === myId);
+  // Before read(), so a turn held at the screen's edge is in the input that
+  // goes out on this frame rather than the next one.
+  controls.edgeLook(dt);
   const input = controls.read();
   if (network && myId && now - lastSend > 50) {
     network.send(input);

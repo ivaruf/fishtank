@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createControls } from "../client/js/controls.js";
+import { createControls, edgePush } from "../client/js/controls.js";
 
 class Element extends EventTarget {
   constructor(rect = { left: 0, top: 0, width: 800, height: 600 }) {
@@ -149,5 +149,94 @@ test("touch moves with the left thumb and aims with the right", () => {
   } finally {
     globalThis.window = originalWindow;
     globalThis.document = originalDocument;
+  }
+});
+// Mouse aim is relative, so at the edge of the screen the pointer stops and
+// the deltas stop with it: the fish could not be turned any further that way.
+// Pointer lock fixes it and a click still takes the lock, but the fix cannot
+// be "click first or be eaten".
+test("an unlocked cursor held at the screen edge keeps turning", () => {
+  const originalWindow = globalThis.window,
+    originalDocument = globalThis.document,
+    originalWidth = globalThis.innerWidth,
+    originalHeight = globalThis.innerHeight;
+  try {
+    const { doc, canvas, controls } = setup();
+    globalThis.innerWidth = 800;
+    globalThis.innerHeight = 600;
+    doc.pointerLockElement = null;
+    const at = (clientX, clientY) =>
+      dispatch(doc, "mousemove", {
+        target: canvas,
+        clientX,
+        clientY,
+        movementX: 0,
+        movementY: 0,
+      });
+    controls.setActive(true);
+    controls.orient(0, 0);
+
+    // Anywhere a cursor normally sits, nothing happens however long the frame.
+    at(400, 300);
+    controls.edgeLook(0.5);
+    assert.equal(controls.read().yaw, 0, "the middle is still");
+
+    // Held against the right edge it keeps turning, frame after frame, with
+    // the mouse itself reporting no movement at all.
+    at(800, 300);
+    controls.edgeLook(0.1);
+    const first = controls.read().yaw;
+    assert.ok(first > 0, `the right edge turns right: ${first}`);
+    controls.edgeLook(0.1);
+    assert.ok(controls.read().yaw > first, "and goes on turning");
+
+    // The far edges are signed the way the mouse would be.
+    controls.orient(0, 0);
+    at(0, 0);
+    controls.edgeLook(0.1);
+    assert.ok(controls.read().yaw < 0, "the left edge turns left");
+    assert.ok(controls.read().pitch > 0, "the top edge looks up");
+
+    // While the pointer is locked there are no edges, and a cursor left
+    // parked at zero from before the lock must not spin the fish for ever.
+    controls.orient(0, 0);
+    doc.pointerLockElement = canvas;
+    controls.edgeLook(0.5);
+    assert.equal(controls.read().yaw, 0, "locked, the edges do not exist");
+    doc.pointerLockElement = null;
+
+    // And nothing drifts while the fish is not being flown - the pause panel
+    // is open, or the round is over, and the cursor is wherever it was left.
+    controls.setActive(false);
+    controls.edgeLook(0.5);
+    assert.equal(controls.read().yaw, 0, "inactive controls never drift");
+  } finally {
+    globalThis.window = originalWindow;
+    globalThis.document = originalDocument;
+    globalThis.innerWidth = originalWidth;
+    globalThis.innerHeight = originalHeight;
+  }
+});
+test("the edge turn ramps rather than switching on at a line", () => {
+  const W = 1440,
+    EDGE = 80;
+  assert.equal(edgePush(720, W, EDGE), 0, "the middle is still");
+  assert.equal(edgePush(EDGE, W, EDGE), 0, "and so is the inner boundary");
+  assert.equal(edgePush(EDGE / 2, W, EDGE), -0.5, "half in, half rate");
+  assert.equal(edgePush(0, W, EDGE), -1, "hard against it, full rate");
+  assert.equal(edgePush(W, W, EDGE), 1);
+  // Past the window - a stale coordinate, a drag that captured the pointer -
+  // clamps to full rather than running away.
+  assert.equal(edgePush(-40, W, EDGE), -1);
+  assert.equal(edgePush(W + 40, W, EDGE), 1);
+  // Monotonic across the width, so there is no seam to catch on.
+  let last = -1;
+  for (let x = 0; x <= W; x += 4) {
+    const push = edgePush(x, W, EDGE);
+    assert.ok(push >= -1 && push <= 1, `out of range at ${x}: ${push}`);
+    if (push !== 0) {
+      assert.ok(push >= last - 1e-9, `dipped at ${x}: ${push} after ${last}`);
+      last = push;
+    }
   }
 });
