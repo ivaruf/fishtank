@@ -240,12 +240,22 @@
         <button id="dive">Dive in <span>↗</span></button
         ><button id="join" class="secondary">Join game <span>→</span></button>
       </div>
+      <!-- One line of advice, and two versions of it, because this line had
+           been telling a phone about W, A, S, D and a mouse click. Which one
+           shows is decided by `(pointer: coarse)` in CSS - the same test
+           main.js uses to choose the scheme the game will actually run - so
+           the menu cannot describe controls this device is not getting. -->
       <div class="menu-instructions">
-        <div>
+        <div class="keys-only">
           <span class="key">W</span><span class="key">S</span> forward / back
           <span class="key">A</span><span class="key">D</span> strafe
           <span class="divider">/</span> Mouse to aim · Click to capture · Esc
           for menu
+        </div>
+        <div class="touch-only">
+          Left thumb pushes to swim, let go to stop
+          <span class="divider">/</span> drag the right half to look
+          <span class="divider">/</span> you swim where you look
         </div>
         <span id="version" class="version" title="Checking the running build…"
           >…</span
@@ -387,16 +397,25 @@
       <p class="pause-note" id="pause-note" hidden></p>
     </dialog>
 
+    <!-- What each half does, in the fewest words that are true. The left thumb
+         is the keyboard: it moves you while you push it and you stop the moment
+         you let go. It used to say STEER, which is what a thumb did in the
+         scheme where the fish never stopped swimming - that scheme is gone
+         from controls.js and the word outlived it, along with the `steer-zone`
+         class and the `depth-zone` id on its neighbour. The right half is the
+         mouse, and because forward means "the way you are looking", the hint
+         over there says so: it is the one fact about swimming here that
+         neither zone can demonstrate on its own. -->
     <div id="touch" hidden>
-      <div id="move-zone" class="touch-zone steer-zone" aria-label="Steer">
+      <div id="move-zone" class="touch-zone steer-zone" aria-label="Swim">
         <div id="move-stick" class="joystick floating" hidden>
           <div class="knob"></div>
         </div>
-        <span class="zone-hint">MOVE · PUSH THE STICK</span>
+        <span class="zone-hint">PUSH TO SWIM · LET GO TO STOP</span>
       </div>
       <!-- No widget on this side: the camera turning is the feedback. -->
       <div id="depth-zone" class="touch-zone depth-zone" aria-label="Look">
-        <span class="zone-hint">LOOK · DRAG ANYWHERE HERE</span>
+        <span class="zone-hint">DRAG TO LOOK · YOU SWIM WHERE YOU LOOK</span>
       </div>
     </div>
     <div id="rotate" class="rotate" role="dialog" aria-live="polite">

@@ -374,6 +374,12 @@ button span {
   border-radius: 999px;
   padding: 3px 9px;
   cursor: pointer;
+  /* And tappable, which needs saying twice over: the line this sits in is
+     decoration and takes `pointer-events: none` so it can never eat a click
+     meant for the tank, and on a phone the whole menu panel does too. This is
+     the one thing in there that is really a button - it clears the caches and
+     reloads - and it said TAP FOR THE NEW ONE while refusing the tap. */
+  pointer-events: auto;
 }
 .key {
   display: inline-block;
@@ -1219,9 +1225,16 @@ dialog:not([open]) {
     /* minmax(0, …) keeps a wide carousel from stretching its column. */
     grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
     column-gap: 20px;
+    /* Centred in the room the form actually has, which is the screen without
+       the header - the same 56px the title art below is pushed down by. The
+       panel is the whole screen so that "centred" has something to mean, but
+       the top of it belongs to the control pill, and centring the form on the
+       glass instead of on the screen is what puts it in the middle of what is
+       left rather than a thumb's width under the corner. */
+    padding-top: 56px;
     align-content: center;
     /* And if a phone really is too short for the form, `safe` flushes it to
-       the top instead of centring its first row under the header. */
+       the top instead of centring its first row out of reach. */
     align-content: safe center;
   }
   .panel h1 {
@@ -1331,14 +1344,20 @@ dialog:not([open]) {
   align-items: center;
   gap: 8px;
 }
-/* The swim style only affects the touch sticks, so it is hidden where there
-   are none rather than confusing a keyboard player. */
+/* One line of control advice per input scheme, and only the one this device is
+   going to get: keys and a mouse where there is a pointer, thumbs where there
+   is a touch screen. Advice for controls you do not have is worse than none -
+   the menu was telling phones about W, A, S, D and a click - and this is the
+   same test main.js uses to pick the scheme, so the two cannot disagree. */
 .touch-only {
   display: none;
 }
 @media (pointer: coarse) {
   .touch-only {
     display: revert;
+  }
+  .keys-only {
+    display: none;
   }
 }
 .fullscreen-toggle,
@@ -1768,13 +1787,21 @@ a:focus-visible {
   margin: 0 6px;
 }
 @media (max-height: 520px) and (orientation: landscape) {
+  /* Down at the foot of the screen here, the way it sits on a desktop, rather
+     than as the last row of the form. It is a line of keyboard help and a
+     build number - neither is what a phone came to this screen for - and as a
+     row it was 30px of the group being centred, which lifted the name field
+     and the fish that far off the middle.
+     `grid-area: auto` is load-bearing: an absolutely positioned grid child
+     that still names a grid area is positioned inside that area, not against
+     the panel, so it would have stayed exactly where it was. */
   .panel .menu-instructions {
-    grid-column: 2;
-    grid-row: 4;
-    margin-top: 10px;
-  }
-  .panel .error {
-    grid-row: 5;
+    position: absolute;
+    grid-area: auto;
+    left: 0;
+    right: 0;
+    bottom: max(6px, env(safe-area-inset-bottom));
+    margin: 0;
   }
 }
 

@@ -1,10 +1,12 @@
 import { clamp, wrap } from "../../shared/config.js";
 
-// Desktop: WASD plus mouse aim, and the fish swims where you look. Touch: one
-// thumb steers with a floating stick relative to the camera, the other drags up
-// or down for depth (and the fish levels out when released), and main.js keeps
-// the camera behind the fish. Both produce the same {forward, strafe, yaw,
-// pitch} for the server.
+// Desktop: WASD plus mouse aim, and the fish swims where you look. Touch: a
+// floating stick under the left thumb moves you while you push it, and a drag
+// anywhere on the right half turns the camera - so the fish swims where you
+// look there too. Both produce the same {forward, strafe, yaw, pitch} for the
+// server. Keep this in step with the zone hints in index.html, which are the
+// same thing said to the player: both described depth dragging and a fish that
+// levelled out on release long after neither was true.
 //
 // Touch mirrors the keyboard exactly: the left stick is WASD (it moves you, and
 // releasing it stops you) while dragging anywhere on the right is the mouse (it
@@ -63,6 +65,10 @@ export function createControls(canvas, onStop = () => {}) {
   const steer = { pointer: null, x: 0, y: 0 },
     // The look zone keeps no value of its own: a drag turns the camera and
     // that is the whole state. lx/ly are just the last point, for the delta.
+    // The name, and the `depth-zone` id it is wired to, are what this was when
+    // a drag here changed depth and nothing else. Left alone because renaming
+    // an element id to fix a word is how you break the thing it names; what
+    // the player reads says LOOK.
     depth = { pointer: null };
   function release(zone) {
     if (zone.pointer !== null && zone.element.hasPointerCapture(zone.pointer))
