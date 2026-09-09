@@ -62,8 +62,15 @@ for path in (BRAND, ICONS, DOCS):
 LO, HI = 14, 46
 # The row where the wordmark's descenders and the tagline's ascenders are least
 # tangled, and the top of the strip in which they overlap at all. Both are in
-# the coordinates of the trimmed art, which is 1817 x 610.
+# the coordinates of the trimmed art, which is 1818 x 611.
 SPLIT, TANGLE = 529, 470
+# Telling the two lines apart inside that strip, by colour. Measured on the
+# painting: green minus red is 63 in the middle of the word and -1 in the
+# middle of the tagline, and only 0.3% of the word's own pixels are cream at
+# all. CREAM is the green-minus-red below which a pixel is not teal, LIT the
+# luminance above which it is the tagline's ink rather than a letter's dark
+# outline, and TEAL the margin that puts a pixel beyond doubt in the word.
+CREAM, LIT, TEAL = 14, 140, 30
 # A box around the fish and its bubbles, then trimmed to whatever ink is
 # actually inside it, because a box measured by eye leaves the motif swimming
 # in dead space once it is centred in a square.
@@ -97,6 +104,12 @@ def keyed():
     # Flood inward from the border through everything within reach of the
     # background colour. Anything enclosed is never touched.
     reachable = Image.fromarray(((distance < HI) * 255).astype(np.uint8))
+    # The copy is load-bearing, not tidiness. Image.fromarray hands back a
+    # readonly image wrapping the array's buffer, and ImageDraw.floodfill
+    # writes through load() without asking for a mutable one: given the
+    # original it fills nothing, raises nothing, and every pixel comes back
+    # unflooded - which reads as "the background could not be keyed" and sends
+    # you looking at the thresholds instead.
     filled = reachable.copy()
     seeds = [(x, y) for x in range(0, w, 40) for y in (0, h - 1)]
     seeds += [(x, y) for y in range(0, h, 40) for x in (0, w - 1)]
@@ -118,21 +131,56 @@ def keyed():
 
 
 def wordmark(art):
-    """The word on its own, with the tagline's ascender tips removed."""
+    """The word on its own, with the tagline's ascender tips removed.
+
+    The tips reach up to about row 510, well above the cut at SPLIT, so the cut
+    alone cannot take them: `welcome to the foodchain` has an ascender in six
+    of its words and they stand up into the word's own band.
+
+    Geometry cannot separate them either, which is the thing worth knowing
+    here. Alpha in this painting marks the background and nothing else - the
+    letters, the tagline and the painted halo between them are all opaque - so
+    the halo bridges the two lines into one region. Every run-based or
+    connectivity-based rule then joins them: a per-column rule that kept the
+    ink attached to the top of the strip found *one* run per column spanning
+    both lines, so it kept the tips it was written to remove, and a flood from
+    the tagline's band ran up into the word as far as row 84.
+
+    Colour does separate them, cleanly. The word is teal and the tagline is
+    cream: green minus red is 63 in the middle of the word and -1 in the middle
+    of the tagline. So inside the strip the cream is removed, along with the
+    glow immediately around it, and anything convincingly teal or dark is kept
+    - those are the letters and their outlines.
+    """
+    rgba = np.array(art).astype(np.int16)
     alpha = np.array(art)[:, :, 3].copy()
-    ink = alpha > 60
-    for x in range(art.size[0]):
-        column = ink[TANGLE:SPLIT, x]
-        if not column.any() or not column[0]:
-            # Nothing at the top of the strip means nothing here is joined to
-            # the word: whatever it is, it belongs to the tagline.
-            alpha[TANGLE:SPLIT, x] = 0
-            continue
-        gap = np.argmax(~column) if (~column).any() else len(column)
-        alpha[TANGLE + gap : SPLIT, x] = 0
+    r, g, b = rgba[:, :, 0], rgba[:, :, 1], rgba[:, :, 2]
+    teal = g - r
+    lum = (r + g + b) // 3
+    cream = (teal < CREAM) & (lum > LIT)
+    # Only where the lines interleave. The word's own glossy highlights are
+    # cream-bright higher up and are none of this rule's business.
+    cream[:TANGLE] = False
+    cream[SPLIT:] = False
+    # A tip's antialiasing and its glow have to go with it or it comes back as
+    # a soft smudge, so the removal grows a few pixels - but it never takes a
+    # teal pixel, which is a letter, nor a dark one, which is a letter's
+    # outline.
+    grown = (
+        np.array(
+            Image.fromarray((cream * 255).astype(np.uint8)).filter(
+                ImageFilter.MaxFilter(7)
+            )
+        )
+        > 0
+    )
+    alpha[grown & (teal < TEAL) & (lum > 90)] = 0
     out = Image.fromarray(np.dstack([np.array(art)[:, :, :3], alpha]))
     out = out.crop((0, 0, art.size[0], SPLIT))
-    return out.crop(out.getbbox())
+    box = out.getbbox()
+    print(f"  the tagline's tips were {cream.sum()} px of cream in the strip")
+    print(f"  the word's own ink ends at row {box[3]} of the painting")
+    return out.crop(box)
 
 
 def wide(image, width, path, quality=90):
