@@ -72,7 +72,12 @@ header {
   right: 42px;
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  /* flex-start, not center: the roster on the right grows with the number of
+     players, and centred that growth pushed the wordmark down the screen into
+     the stats panel below it - which sits at a fixed offset and knows nothing
+     about it. Both columns start at the header's top instead, which is also
+     the alignment the corner was built for. */
+  align-items: flex-start;
   pointer-events: none;
 }
 /* The top-left corner is one column, and --hud-col is its measure: the
@@ -88,17 +93,25 @@ header {
    tier here clears that - 146 px of width is 43 px of it, 256 px is 75. That
    floor is also why the corner mark is the whole word rather than the little
    fish: a mark this small has to be a shape, and the shape here is the word. */
+/* The roster keeps its own measure rather than borrowing the left column's.
+   Its title and its three buttons have to share one line, and the buttons are
+   36 px whatever the screen is: at 146 px the row left five pixels for the
+   word PLAYERS, which wrapped it onto two lines with the count under it. What
+   the two columns share is their top edge, not their width. */
 :root {
   --hud-col: 256px;
+  --roster-col: 264px;
 }
 @media (max-width: 650px) {
   :root {
     --hud-col: 200px;
+    --roster-col: 210px;
   }
 }
 @media (max-height: 520px) and (orientation: landscape) {
   :root {
     --hud-col: 146px;
+    --roster-col: 210px;
   }
 }
 .brand {
@@ -389,12 +402,12 @@ button span {
    name and code wraps to a second line inside it rather than setting the
    width of everything below. */
 .roster:has(.connection:not(:empty)) {
-  width: var(--hud-col);
+  width: var(--roster-col);
   padding: 18px 20px;
 }
-/* Title on the left, buttons hard right, on one line whether or not the title
-   is there: `margin-right: auto` does the pushing, so nothing moves when the
-   roster's own rows come and go. */
+/* Title on the left, buttons hard right in the panel's corner, on one line
+   whether or not the title is there: `margin-right: auto` does the pushing,
+   so nothing moves when the roster's own rows come and go. */
 .roster-head {
   display: flex;
   align-items: center;
@@ -403,7 +416,15 @@ button span {
 }
 .roster-head .eyebrow {
   margin-right: auto;
+  min-width: 0;
   font-size: 9px;
+  letter-spacing: 1.8px;
+  /* One line: the count belongs beside the word, not under it. If a full
+     lobby's count ever needs more room than the buttons leave, this gives up
+     its tail rather than wrapping or shoving them off the panel. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .roster ol {
   margin: 0;
@@ -1338,7 +1359,7 @@ select {
      small. The stats panel takes the header's own left margin, so it stays
      under the chrome it belongs with. */
   .stats {
-    top: 66px;
+    top: 68px;
     left: max(20px, env(safe-area-inset-left));
     padding: 7px 12px;
     gap: 8px;
