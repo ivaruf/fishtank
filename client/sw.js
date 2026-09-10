@@ -45,7 +45,7 @@ const SHELL = [
   "js/filter.js",
   "js/audio.js",
   "js/quality.js",
-  "js/fullscreen.js",
+  "js/screen.js",
   "../shared/config.js",
   "../shared/movement.js",
   "../shared/world.js",

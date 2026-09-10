@@ -1,4 +1,4 @@
-import { setupFullscreen } from "./fullscreen.js";
+import { setupFullscreen } from "./screen.js";
 import { createAquarium } from "./world.js";
 import { createFish, loadFishModels } from "./fish.js";
 import { mountQuality, quality, modelDetail, reliefStep } from "./quality.js";
