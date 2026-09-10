@@ -212,12 +212,20 @@ export function createControls(canvas, onStop = () => {}) {
     },
   );
   return {
-    setActive(value) {
+    // keepPointer stops the fish answering without handing the mouse back.
+    // Being eaten is what it exists for: death released the lock and nothing
+    // ever took it again, so every respawn needed a fresh click on the tank
+    // before the mouse steered anything — and you found that out while
+    // something was already hunting you. The menu, the results card and
+    // leaving the tank still release it, because their whole point is having
+    // something to click.
+    setActive(value, keepPointer = false) {
       if (active === value) return;
       active = value;
       if (!value) {
         reset();
-        if (document.pointerLockElement === canvas) document.exitPointerLock();
+        if (!keepPointer && document.pointerLockElement === canvas)
+          document.exitPointerLock();
       }
     },
     setTouchMode(value) {

@@ -527,7 +527,15 @@ window.addEventListener("keydown", (event) => {
     openGameMenu();
   }
 });
-// Browsers consume Escape when releasing pointer lock.
+// Browsers consume Escape when releasing pointer lock, so an unlock during a
+// round is how Escape reaches the menu at all.
+//
+// This deliberately no longer asks whether the player is alive. It used to,
+// because death released the lock itself and the menu would have landed on top
+// of the you-became-lunch card. Death keeps the lock now (syncControls), which
+// leaves the player asking for the cursor back as the only thing that unlocks
+// mid-round — and Escape while dead opens the menu on the first press instead
+// of spending one press on the lock and needing a second.
 let wasPointerLocked = false;
 document.addEventListener("pointerlockchange", () => {
   const locked = document.pointerLockElement === $("game");
@@ -535,7 +543,6 @@ document.addEventListener("pointerlockchange", () => {
     wasPointerLocked &&
     !locked &&
     state?.phase === "playing" &&
-    state.players.find((p) => p.id === myId)?.alive &&
     !portrait.matches
   )
     openGameMenu();
@@ -1263,9 +1270,14 @@ function deathCamera(dt, now) {
 // holds still until the phone is turned.
 const portrait = matchMedia("(pointer: coarse) and (orientation: portrait)");
 function syncControls(me, phase) {
-  const live =
-    !!me?.alive && phase === "playing" && !portrait.matches && !leavePromptOpen;
-  controls.setActive(live);
+  // Two different questions. Seated is whether the tank is yours to steer at
+  // all; live is whether there is a fish on the other end of the controls
+  // right now. Dying answers only the second, so it stops the input and keeps
+  // the pointer: the you-became-lunch card has nothing to press, and the
+  // respawn hands control straight back.
+  const seated = phase === "playing" && !portrait.matches && !leavePromptOpen;
+  const live = !!me?.alive && seated;
+  controls.setActive(live, seated);
   // The steer and look zones cover the entire screen and swallow every tap,
   // and they sit above the results, lobby and join panels, which are not the
   // HUD's children and so are not on the HUD's layer. Left up between rounds
