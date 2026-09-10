@@ -41,12 +41,27 @@ function loadBroker() {
     script.src = PEERJS.url;
     script.integrity = PEERJS.integrity;
     script.crossOrigin = "anonymous";
+    // Answered below, and said where the player is looking — so index.html's
+    // crash bar leaves this one alone rather than throwing a fatal-looking
+    // red strip over a game that still plays perfectly well alone.
+    script.dataset.handled = "loadBroker";
     script.onload = () =>
       window.Peer
         ? resolve(window.Peer)
         : reject(new Error("Broker script loaded but is unusable."));
+    // A blocked script and a dead network are the same event here, and which
+    // one it was is the whole of what the player should do next. The old
+    // wording blamed the network for both, so the one cause somebody can
+    // actually fix went unmentioned: an ad blocker refusing a CDN, on a page
+    // with nothing for it to catch. onLine is trusted only when it says no.
     script.onerror = () =>
-      reject(new Error("Could not reach the matchmaking service."));
+      reject(
+        new Error(
+          navigator.onLine === false
+            ? "You are offline, so matchmaking is out of reach."
+            : "A content blocker is stopping the matchmaking code from loading — allow this page and try again.",
+        ),
+      );
     document.head.appendChild(script);
   }).catch((error) => {
     loading = null;

@@ -56,6 +56,9 @@ canvas {
   line-height: 1.5;
   font-family: ui-monospace, Menlo, monospace;
   word-break: break-word;
+  /* The report puts what failed on one line and what to do about it on the
+     next, so the newline it writes has to survive. */
+  white-space: pre-line;
 }
 .vignette {
   position: fixed;

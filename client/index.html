@@ -30,13 +30,34 @@
       // Inline and before the modules, to catch their evaluation too.
       (function () {
         var shown = false;
-        function report(what) {
+        function report(what, hint) {
           if (shown) return;
           shown = true;
           var box = document.getElementById("crash");
           if (!box) return;
-          box.textContent = what;
+          box.textContent = hint ? what + "\n" + hint : what;
           box.hidden = false;
+        }
+        function tail(url) {
+          return String(url || "")
+            .split("/")
+            .pop();
+        }
+        // Why a file that did not load gets a second line, and a thrown error
+        // does not. The two are not equally mysterious: uBlock Origin's
+        // default lists ban a handful of filenames across the whole of
+        // github.io, because adware is hosted there under those names, and
+        // this game has no ads or trackers of its own for a blocker to be
+        // aiming at. One of our own modules was blocked exactly that way, and
+        // a bar reading only "Could not load main.js" sent the first person
+        // who saw it after a file that was serving perfectly well.
+        //
+        // navigator.onLine is worth believing only when it says no, which is
+        // the one thing it is asked here.
+        function why() {
+          return navigator.onLine === false
+            ? "You appear to be offline."
+            : "A content blocker is the usual cause — try switching yours off for this page and reloading.";
         }
         addEventListener(
           "error",
@@ -44,22 +65,26 @@
             // Script errors carry a message; a failed <script> tag does not,
             // and is equally fatal. Other failed subresources are not.
             if (e.message)
-              report(
-                e.message +
-                  " — " +
-                  String(e.filename || "")
-                    .split("/")
-                    .pop() +
-                  ":" +
-                  e.lineno,
-              );
-            else if (e.target && e.target.tagName === "SCRIPT")
+              report(e.message + " — " + tail(e.filename) + ":" + e.lineno);
+            else if (e.target && e.target.tagName === "SCRIPT") {
+              // Scripts that already answer for themselves — the two CDN
+              // bundles with a local copy behind them, and the broker, which
+              // tells the player on the lobby's own reach line. Their failing
+              // is survivable, so a red bar over the whole game is a lie.
+              if (e.target.dataset && e.target.dataset.handled) return;
+              // A module script reports its entire graph through the one tag,
+              // so this name is the entry point and the file that actually
+              // failed may be any of its imports. Saying so is the difference
+              // between a lead and a wild goose chase.
               report(
                 "Could not load " +
-                  String(e.target.src || "")
-                    .split("/")
-                    .pop(),
+                  tail(e.target.src) +
+                  (e.target.type === "module"
+                    ? " or one of the files it imports"
+                    : ""),
+                why(),
               );
+            }
           },
           true,
         );
@@ -470,6 +495,7 @@
       src="https://cdn.jsdelivr.net/npm/babylonjs@8.56.2/babylon.js"
       integrity="sha384-bJ7uvrJB0MXh1qhQouRHX/NbjOQywkt/ZxeFnrMiiFYG8InDFZlQdzVpAGaMhfwZ"
       crossorigin="anonymous"
+      data-handled="vendor/babylon.js"
     ></script>
     <script>
       window.BABYLON ||
@@ -479,6 +505,7 @@
       src="https://cdn.jsdelivr.net/npm/babylonjs-loaders@8.56.2/babylonjs.loaders.min.js"
       integrity="sha384-u+jmBF3Ig/827G8UT4kF+dDbuY0uXakBSGip6BUjiZ7IHqxA44vGxcpx76wGLI3f"
       crossorigin="anonymous"
+      data-handled="vendor/loaders.js"
     ></script>
     <script>
       window.BABYLON?.GLTFFileLoader ||
