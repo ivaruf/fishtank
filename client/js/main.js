@@ -464,6 +464,13 @@ const framed = () => {
 };
 function quitGame() {
   if (framed()) {
+    // The arcade publishes its own way out and ../../arcade/exit.js hands it
+    // to us. Prefer it: a deep link straight to #play=fishtank leaves the
+    // launcher no history entry of its own to unwind, and back() would then
+    // take the player out of the arcade rather than back to the floor. Absent
+    // — played inside some other frame, or /arcade/ unreachable — this is
+    // undefined and the history entry is still the best guess available.
+    if (window.ArcadeExit?.leave()) return;
     history.back();
     return;
   }
