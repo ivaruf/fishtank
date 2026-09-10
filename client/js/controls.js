@@ -43,20 +43,41 @@ export const edgePush = (at, size, edge = EDGE) =>
       ? 1 - Math.max(0, size - at) / edge
       : 0) + 0;
 export function createControls(canvas, onStop = () => {}) {
-  const keys = new Set();
+  // What is being held, as directions rather than keystrokes.
+  //
+  // Resolved from the physical key first and the printed letter second, and
+  // that order is the point. e.key is whatever the modifiers say it is at the
+  // instant of the event, so a D let go while Option is down arrives as "∂"
+  // on a Mac and a set keyed on letters never hears the release: the fish
+  // strafes right for the rest of the round and the player has to hold A to
+  // swim straight, which is exactly how this was found. e.code is the same
+  // string in both events whatever else is pressed. The letter stays as a
+  // second chance, so a keyboard that does not put WASD where QWERTY does
+  // still answers to the keys it has printed on it.
+  const pressed = new Set();
+  const DIRECTIONS = {
+    KeyW: "forward",
+    ArrowUp: "forward",
+    w: "forward",
+    arrowup: "forward",
+    KeyS: "back",
+    ArrowDown: "back",
+    s: "back",
+    arrowdown: "back",
+    KeyA: "left",
+    ArrowLeft: "left",
+    a: "left",
+    arrowleft: "left",
+    KeyD: "right",
+    ArrowRight: "right",
+    d: "right",
+    arrowright: "right",
+  };
+  const directionOf = (e) =>
+    DIRECTIONS[e.code] ?? DIRECTIONS[String(e.key).toLowerCase()];
   const aim = { yaw: 0, pitch: 0 };
   let active = false,
     touchMode = false;
-  const allowed = [
-    "w",
-    "a",
-    "s",
-    "d",
-    "arrowup",
-    "arrowdown",
-    "arrowleft",
-    "arrowright",
-  ];
   const look = (x, y) => {
     aim.yaw = wrap(aim.yaw + x);
     aim.pitch = clamp(aim.pitch + y, -1.35, 1.35);
@@ -78,19 +99,31 @@ export function createControls(canvas, onStop = () => {}) {
     if (zone.visual) zone.visual.hidden = true;
   }
   function reset() {
-    keys.clear();
+    pressed.clear();
     for (const zone of [steer, depth]) release(zone);
     onStop();
   }
   window.addEventListener("keydown", (e) => {
     if (!active || e.target.closest?.("input, select, button")) return;
-    if (allowed.includes(e.key.toLowerCase())) {
+    // A chord belongs to the browser, not to the fish. Cmd+D is a bookmark,
+    // and while Cmd is down macOS stops delivering keyup for letters at all,
+    // so a direction registered here is one that can never be released. Drop
+    // whatever is already held along with it: the modifier may well have
+    // arrived after the letter, which is the same trap one keystroke later.
+    if (e.ctrlKey || e.altKey || e.metaKey) {
+      pressed.clear();
+      onStop();
+      return;
+    }
+    const direction = directionOf(e);
+    if (direction) {
       e.preventDefault();
-      keys.add(e.key.toLowerCase());
+      pressed.add(direction);
     }
   });
   window.addEventListener("keyup", (e) => {
-    keys.delete(e.key.toLowerCase());
+    const direction = directionOf(e);
+    if (direction) pressed.delete(direction);
     if (active) onStop();
   });
   // Safari reports pinches as gesture events rather than as touch-action, so
@@ -271,12 +304,10 @@ export function createControls(canvas, onStop = () => {}) {
       // letting go stops the fish outright. Nothing steers but the thumb.
       const ramp = held ? Math.min(1, (push - DEAD) / (FULL - DEAD)) / push : 0;
       const forward = !touchMode
-        ? Number(keys.has("w") || keys.has("arrowup")) -
-          Number(keys.has("s") || keys.has("arrowdown"))
+        ? Number(pressed.has("forward")) - Number(pressed.has("back"))
         : -steer.y * ramp;
       const strafe = !touchMode
-        ? Number(keys.has("d") || keys.has("arrowright")) -
-          Number(keys.has("a") || keys.has("arrowleft"))
+        ? Number(pressed.has("right")) - Number(pressed.has("left"))
         : steer.x * ramp;
       return {
         ...aim,
