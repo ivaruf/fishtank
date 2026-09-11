@@ -20,12 +20,12 @@
     <link rel="icon" href="assets/icons/favicon-32.png" sizes="32x32" />
     <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png" />
     <link rel="stylesheet" href="css/style.css" />
-  <!-- A way back to the arcade, but only when the arcade is what framed us:
-       standalone this adds nothing at all. Classic and deferred on purpose, so
-       /arcade/ being unreachable costs a button rather than the whole page.
-      fishtank already has its own quit, which calls history.back() when framed —
-      so this only publishes window.ArcadeExit and draws nothing. -->
-  <script src="../../arcade/exit.js" defer data-no-button></script>
+  <!-- What quitting means here: back to the arcade when the arcade is what
+       framed us, closing the window when we are installed, and an honest note
+       when we are a tab no script may close. It draws nothing — the button is
+       ours, in the pause menu. Classic and deferred on purpose, so /arcade/
+       being unreachable costs the quit button rather than the whole page. -->
+  <script src="../../arcade/exit.js" defer></script>
   </head>
   <body>
     <div id="crash" hidden></div>
