@@ -449,11 +449,15 @@ function showHero(dt) {
   hero.update(dt);
 }
 // Leaving the game itself, which is what the corner means on the menu where
-// there is no tank to leave. Neither exit is guaranteed: a tab a script did
-// not open cannot be closed by one, and inside the arcade this is an iframe
-// with the arcade behind it. So the button says which of the two it is about
-// to try, and if the browser refuses the close it says so rather than looking
-// broken.
+// there is no tank to leave.
+//
+// ../../arcade/exit.js owns this question for the whole hub and it is the only
+// thing that knows all of the answer, so it is asked rather than guessed at
+// here. This file used to do its own half of it, and the half it did not do is
+// the part that was wrong: "close the tab" in an ordinary tab, on a button the
+// browser will not honour for any window a script did not open, which left the
+// player reading an apology where they had pressed leave. The arcade is a URL.
+// exit.js goes there.
 const framed = () => {
   try {
     return window.top !== window.self;
@@ -463,26 +467,24 @@ const framed = () => {
   }
 };
 function quitGame() {
-  if (framed()) {
-    // The arcade publishes its own way out and ../../arcade/exit.js hands it
-    // to us. Prefer it: a deep link straight to #play=fishtank leaves the
-    // launcher no history entry of its own to unwind, and back() would then
-    // take the player out of the arcade rather than back to the floor. Absent
-    // — played inside some other frame, or /arcade/ unreachable — this is
-    // undefined and the history entry is still the best guess available.
-    if (window.ArcadeExit?.leave()) return;
-    history.back();
+  const exit = window.ArcadeExit;
+  if (exit) {
+    exit.quit().then((how) => {
+      // 'refused' is the one outcome we are still alive to see, and it now
+      // only happens to an installed app whose window the browser will not
+      // close - iOS, in practice. Framed hands back to the launcher and a tab
+      // navigates to the arcade; neither comes back here.
+      if (how !== "refused" || !leavePromptOpen) return;
+      $("pause-note").textContent =
+        "Your browser will not let this window close itself — close it yourself to finish.";
+      $("pause-note").hidden = false;
+    });
     return;
   }
-  window.close();
-  // Still here a moment later means the browser refused, which it does for
-  // any tab a script did not open itself.
-  setTimeout(() => {
-    if (!leavePromptOpen) return;
-    $("pause-note").textContent =
-      "Your browser will not let a page close its own tab — close it yourself to finish.";
-    $("pause-note").hidden = false;
-  }, 250);
+  // exit.js is another repository's file and is allowed to be missing. Then
+  // the best guess left is the history entry, which is what this did before
+  // exit.js existed at all.
+  if (framed()) history.back();
 }
 let leavePromptOpen = false;
 // The X in the corner, and Escape, open this panel wherever you are: on the
@@ -503,10 +505,15 @@ function openGameMenu() {
   const alone = state?.players.length === 1;
   $("pause-tag").textContent = inRound && alone ? "PAUSED" : "FISHTANK";
   $("continue").textContent = inRound ? "Continue" : "Back";
+  // On the menu there is no tank to leave, so the corner leaves the GAME - and
+  // what that means is exit.js's question, not ours. It says "back to the
+  // arcade" for a framed game AND for an ordinary tab, because a tab has
+  // nowhere to close to but somewhere to go; only an installed window closes.
   $("confirm-leave").textContent = !state
-    ? framed()
-      ? "Back to the arcade"
-      : "Close the tab"
+    ? (window.ArcadeExit?.verb({
+        arcade: "Back to the arcade",
+        app: "Close fish tank",
+      }) ?? (framed() ? "Back to the arcade" : "Close the tab"))
     : inRound
       ? "Leave fish tank"
       : "Leave the lobby";
