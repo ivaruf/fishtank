@@ -21,6 +21,9 @@ const CACHE = "fishtank-dev";
 const SHELL = [
   "./",
   "index.html",
+  // Has to be IN the cache, not merely deployed: the players this rescues
+  // are the ones whose browser has stopped asking this origin for anything.
+  "moved.js",
   "css/style.css",
   // The title art and the in-game corner logo. Both are brand, both are on
   // screen within a second of a cold start, and a menu or a HUD with a hole
