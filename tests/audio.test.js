@@ -141,3 +141,35 @@ test("effects fall off with distance, honour mute, and mute is remembered", asyn
   assert.equal(storage.get("fishtank.muted"), "1");
   assert.equal(createAudio().muted, true, "mute survives a reload");
 });
+test("the two volumes start at the authored mix, move their own bus, and survive a reload", async () => {
+  contexts = [];
+  storage.clear();
+  const audio = createAudio();
+  // Nothing stored: the defaults are the gains this file carried before the
+  // sliders existed, so an upgrading player hears no change at all.
+  assert.equal(audio.musicVolume, 0.55);
+  assert.equal(audio.sfxVolume, 0.9);
+  // Set before any gesture — legal, and the bus must come up at the new value
+  // rather than at the default.
+  audio.setMusicVolume(0.2);
+  audio.unlock();
+  const ctx = contexts[0];
+  audio.music("menu");
+  await settle();
+  const musicBus = ctx.started[0].source.connections[0].connections[0];
+  assert.equal(musicBus.gain.value, 0.2, "music bus follows the slider");
+  await audio.play("chomp");
+  const sfxBus = ctx.started[1].source.connections[0].connections[0];
+  assert.equal(sfxBus.gain.value, 0.9, "the other bus is untouched");
+  audio.setSfxVolume(0.4);
+  assert.equal(sfxBus.gain.value, 0.4);
+  // Out of range is clamped rather than trusted: these come off a slider, but
+  // they also come off localStorage, which anything may have written to.
+  audio.setSfxVolume(5);
+  assert.equal(audio.sfxVolume, 1);
+  audio.setSfxVolume("nonsense");
+  assert.equal(audio.sfxVolume, 0);
+  const reloaded = createAudio();
+  assert.equal(reloaded.musicVolume, 0.2, "music level survives a reload");
+  assert.equal(reloaded.sfxVolume, 0, "effects level survives a reload");
+});

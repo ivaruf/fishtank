@@ -17,6 +17,20 @@ const EFFECTS = [
   "buzz",
   "zap",
 ];
+// Two volumes rather than one, because the loops and the cues are not the same
+// request: someone playing with a film on in the background wants the theme
+// down and the chomp left alone. The defaults ARE the authored mix - 0.55
+// against 0.9 were the bus gains hard-coded here before the sliders existed -
+// so a player who never opens the panel hears exactly what they always did.
+//
+// The slider sets the bus gain directly. It is not a scale over a hidden
+// master, so the number in the panel is the gain, 0 is silence, and there is
+// no second volume multiplying it behind the player's back.
+const MUSIC_KEY = "fishtank.vol.music.v1";
+const SFX_KEY = "fishtank.vol.sfx.v1";
+const DEFAULT_MUSIC = 0.55;
+const DEFAULT_SFX = 0.9;
+const clamp = (value) => Math.min(1, Math.max(0, Number(value) || 0));
 export function createAudio({ base = "assets/audio/" } = {}) {
   let context = null,
     master,
@@ -24,12 +38,21 @@ export function createAudio({ base = "assets/audio/" } = {}) {
     sfxBus,
     current = null,
     wanted = null,
-    muted = false;
+    muted = false,
+    musicVolume = DEFAULT_MUSIC,
+    sfxVolume = DEFAULT_SFX;
   const buffers = new Map();
   try {
     muted = localStorage.getItem("fishtank.muted") === "1";
+    // Mute is kept as its own thing rather than folded into "both sliders at
+    // zero": it is one tap in the header and it has to give you back the mix
+    // you had, which a pair of zeroed sliders cannot.
+    const storedMusic = localStorage.getItem(MUSIC_KEY);
+    const storedSfx = localStorage.getItem(SFX_KEY);
+    if (storedMusic !== null) musicVolume = clamp(storedMusic);
+    if (storedSfx !== null) sfxVolume = clamp(storedSfx);
   } catch {
-    /* Storage unavailable: start unmuted. */
+    /* Storage unavailable: start unmuted, at the authored mix. */
   }
   function load(name) {
     if (!buffers.has(name))
@@ -95,10 +118,10 @@ export function createAudio({ base = "assets/audio/" } = {}) {
       master.gain.value = muted ? 0 : 1;
       master.connect(context.destination);
       musicBus = context.createGain();
-      musicBus.gain.value = 0.55;
+      musicBus.gain.value = musicVolume;
       musicBus.connect(master);
       sfxBus = context.createGain();
-      sfxBus.gain.value = 0.9;
+      sfxBus.gain.value = sfxVolume;
       sfxBus.connect(master);
       for (const name of EFFECTS) load(name);
       if (wanted) startMusic(wanted);
@@ -115,6 +138,36 @@ export function createAudio({ base = "assets/audio/" } = {}) {
       }
       if (master)
         master.gain.setTargetAtTime(value ? 0 : 1, context.currentTime, 0.05);
+    },
+    // Both setters share this: remember it, then move the bus if there is one
+    // yet. Dragging a slider before the first gesture is legal - the value is
+    // stored and unlock() starts the bus at it - so nothing here may assume a
+    // context exists.
+    get musicVolume() {
+      return musicVolume;
+    },
+    setMusicVolume(value) {
+      musicVolume = clamp(value);
+      try {
+        localStorage.setItem(MUSIC_KEY, String(musicVolume));
+      } catch {
+        /* Not remembered this time. */
+      }
+      if (musicBus)
+        musicBus.gain.setTargetAtTime(musicVolume, context.currentTime, 0.05);
+    },
+    get sfxVolume() {
+      return sfxVolume;
+    },
+    setSfxVolume(value) {
+      sfxVolume = clamp(value);
+      try {
+        localStorage.setItem(SFX_KEY, String(sfxVolume));
+      } catch {
+        /* Not remembered this time. */
+      }
+      if (sfxBus)
+        sfxBus.gain.setTargetAtTime(sfxVolume, context.currentTime, 0.05);
     },
     // Switch loops with a crossfade; null fades the music out.
     music(track) {

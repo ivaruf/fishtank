@@ -97,6 +97,40 @@ quality.addEventListener("change", loadModels);
 // buttons that are not settings, and it was the widest thing in the pill on
 // the one screen where the pill has least room.
 mountQuality($("quality-play"), () => audio.play("click"));
+// The two volume sliders beside it. `input` rather than `change`, so the bus
+// follows the thumb and you are setting a level you can hear rather than
+// guessing at a number - which is also why dragging either one clears the
+// mute. A slider that does nothing until you find the button that is
+// cancelling it is a slider nobody can use. Music needs no cue of its own:
+// the loop is already playing and moving the thumb IS the demonstration.
+function mountVolume(id, read, write, cue) {
+  const input = $(id),
+    value = $(`${id}-val`);
+  input.value = String(Math.round(read() * 100));
+  value.textContent = input.value;
+  input.addEventListener("input", () => {
+    value.textContent = input.value;
+    write(Number(input.value) / 100);
+    if (audio.muted) {
+      audio.setMuted(false);
+      syncMute();
+    }
+  });
+  if (cue) input.addEventListener("change", cue);
+}
+mountVolume(
+  "vol-music",
+  () => audio.musicVolume,
+  (v) => audio.setMusicVolume(v),
+);
+mountVolume(
+  "vol-sfx",
+  () => audio.sfxVolume,
+  (v) => audio.setSfxVolume(v),
+  // One cue when the thumb is let go, so the level you just chose is the level
+  // you just heard.
+  () => audio.play("click"),
+);
 let network = null,
   myId = null,
   state = null,

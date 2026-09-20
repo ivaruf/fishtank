@@ -20,14 +20,14 @@
     <link rel="icon" href="assets/icons/favicon-32.png" sizes="32x32" />
     <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png" />
     <link rel="stylesheet" href="css/style.css" />
-  <!-- What quitting means here: back to the arcade when the arcade is what
+    <!-- What quitting means here: back to the arcade when the arcade is what
        framed us, closing the window when we are installed, and an honest note
        when we are a tab no script may close. It draws nothing — the button is
        ours, in the pause menu. Classic and deferred on purpose, so /arcade/
        being unreachable costs the quit button rather than the whole page. -->
-  <script src="../../arcade/exit.js" defer></script>
-  <!-- The address change. Inert until gophercloud.games answers; see the file. -->
-  <script src="moved.js" defer></script>
+    <script src="../../arcade/exit.js" defer></script>
+    <!-- The address change. Inert until gophercloud.games answers; see the file. -->
+    <script src="moved.js" defer></script>
   </head>
   <body>
     <div id="crash" hidden></div>
@@ -421,8 +421,44 @@
       <!-- Says PAUSED only when the tank really has stopped, which is when you
            are the only fish in it. main.js sets it. -->
       <div class="eyebrow" id="pause-tag">FISHTANK</div>
-      <div class="group-label">GRAPHICS</div>
+      <div class="group-label" id="graphics-label">GRAPHICS</div>
       <div class="quality-slot" id="quality-play"></div>
+      <!-- Two volumes, not the one the header's button already covers. Mute is
+           a tap for the moment someone walks into the room; these are the mix,
+           and they are two because the loops and the cues are two different
+           requests - the theme down, the chomp left alone. They live behind the
+           gear with GRAPHICS rather than on the menu, for the same reason the
+           graphics picker moved in here: a thing you set once does not belong
+           permanently in front of the game.
+           Label above the slider, which is the shape this game already uses for
+           MATCH LENGTH and DIFFICULTY in the lobby. -->
+      <div class="group-label" id="sound-label">SOUND</div>
+      <div class="sound-slot">
+        <label class="sound-setting" for="vol-music"
+          ><span>MUSIC · <b id="vol-music-val">55</b></span>
+          <input
+            id="vol-music"
+            type="range"
+            min="0"
+            max="100"
+            step="5"
+            value="55"
+            aria-label="Music volume"
+          />
+        </label>
+        <label class="sound-setting" for="vol-sfx"
+          ><span>EFFECTS · <b id="vol-sfx-val">90</b></span>
+          <input
+            id="vol-sfx"
+            type="range"
+            min="0"
+            max="100"
+            step="5"
+            value="90"
+            aria-label="Effects volume"
+          />
+        </label>
+      </div>
       <!-- Both labels are set by main.js: one always goes back to whatever you
            were doing, the other always takes you one step out - out of the
            round, out of the lobby, or out of the game. -->
