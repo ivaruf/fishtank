@@ -78,8 +78,16 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     (async () => {
+      // Ours, and only ours. CacheStorage is per ORIGIN rather than per
+      // scope, and every game in this hub is served from the one origin - so
+      // the obvious `name !== CACHE` this used to say was deleting swirls'
+      // cache on every visit to fishtank, and supermine's, and dam_break's,
+      // taking their offline support with them until each was opened online
+      // again. The build stamps CACHE as `fishtank-<version>`, so the slug
+      // and its dash are what make this filter mean "mine".
       for (const name of await caches.keys())
-        if (name !== CACHE) await caches.delete(name);
+        if (name !== CACHE && name.startsWith("fishtank-"))
+          await caches.delete(name);
       await self.clients.claim();
     })(),
   );
