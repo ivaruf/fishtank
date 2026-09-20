@@ -540,17 +540,22 @@ function openGameMenu() {
   $("pause-tag").textContent = inRound && alone ? "PAUSED" : "FISHTANK";
   $("continue").textContent = inRound ? "Continue" : "Back";
   // On the menu there is no tank to leave, so the corner leaves the GAME - and
-  // what that means is exit.js's question, not ours. It says "back to the
-  // arcade" for a framed game AND for an ordinary tab, because a tab has
-  // nowhere to close to but somewhere to go; only an installed window closes.
+  // what that means is exit.js's question, not ours. It says "back to arcade"
+  // for a framed game AND for an ordinary tab, because a tab has nowhere to
+  // close to but somewhere to go; only an installed window closes.
+  //
+  // Plain words, and deliberately not this game's own. A way out is the one
+  // control a player reaches for when they have stopped wanting to play, and
+  // "Leave fish tank" made them read a joke to find the door. The aquarium
+  // does the talking everywhere else.
   $("confirm-leave").textContent = !state
     ? (window.ArcadeExit?.verb({
-        arcade: "Back to the arcade",
-        app: "Close fish tank",
-      }) ?? (framed() ? "Back to the arcade" : "Close the tab"))
+        arcade: "Back to arcade",
+        app: "Close",
+      }) ?? (framed() ? "Back to arcade" : "Close"))
     : inRound
-      ? "Leave fish tank"
-      : "Leave the lobby";
+      ? "Leave game"
+      : "Leave lobby";
   $("pause-note").hidden = true;
   $("leave-dialog").showModal();
 }
