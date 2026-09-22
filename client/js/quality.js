@@ -7,7 +7,8 @@
 // them had to learn that the dropdown became a row of buttons - or that the
 // dropdown is gone.
 //
-// Gone because there is one place to draw this now: the panel the gear opens,
+// Gone because there is one place to draw this now: the panel the menu plate
+// opens,
 // which is on every screen. There used to be two, never on screen together - a
 // dropdown in the header for the menu, and these same five rows behind the
 // pause panel during play - so the header carried a settings control at all

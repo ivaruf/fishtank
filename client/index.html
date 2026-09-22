@@ -22,9 +22,11 @@
     <link rel="stylesheet" href="css/style.css" />
     <!-- What quitting means here: back to the arcade when the arcade is what
        framed us, closing the window when we are installed, and an honest note
-       when we are a tab no script may close. It draws nothing — the button is
-       ours, in the pause menu. Classic and deferred on purpose, so /arcade/
-       being unreachable costs the quit button rather than the whole page. -->
+       when we are a tab no script may close. It draws nothing — the two
+       buttons are ours, one on the menu screen and one in the panel, and
+       main.js takes their words from this file's own verb() so they cannot
+       promise different things. Classic and deferred on purpose, so /arcade/
+       being unreachable costs the way out rather than the whole page. -->
     <script src="../../arcade/exit.js" defer></script>
     <!-- The address change. Inert until gophercloud.games answers; see the file. -->
     <script src="moved.js" defer></script>
@@ -116,14 +118,48 @@
         />
       </a>
       <div class="header-tools">
-        <!-- The same three buttons on every screen: sound, fullscreen, and the
-             gear. Nothing here belongs to a round, so nothing here comes and
-             goes with one - and nothing here is a setting, either. The graphics
-             picker used to sit in front of them on the menu; it lives in the
-             panel the gear opens now, which is on every screen too, so the
-             setting is in one place instead of two and the pill is three
-             buttons wide wherever you are. -->
+        <!-- THE CORNER: menu, mute, fullscreen, reading left to right, so
+             fullscreen is the plate in the actual corner. That order is
+             arbitrary and being arbitrary is the point - it is the same in
+             every game in the hub, and a child who learns "top right makes it
+             bigger" once should not have to learn it again in the next
+             cabinet.
+             ON EVERY SCREEN, which is one of the two placements the hub
+             sanctions and the one this game can afford: nothing in this pill
+             belongs to a round, nothing in it is a setting of the game, and
+             nothing here comes and goes - so the corner means the same thing
+             on the menu, in the lobby and mid-round. The other shape gives the
+             corner up to the HUD in play and costs fullscreen once a round has
+             started; the stats sit under the wordmark on the left here, so
+             nothing is competing for this corner.
+             The three glyphs are the hub's, to the path data, so a player
+             crossing from one cabinet to the next is looking at the same
+             object rather than a family resemblance. The colour, the plate and
+             the stroke width are this game's own; the shapes are not. -->
         <div class="display-controls">
+          <!-- THE MENU, and three bars rather than a gear. A gear says
+               settings, and the panel behind this holds the graphics setting,
+               the two volumes AND the way out - which is more than settings,
+               on a screen where there may be nothing yet to close. It was a
+               gear until the hub settled on three bars, and an X before that,
+               back when it only appeared mid-round and only led out. -->
+          <button
+            id="game-menu"
+            class="game-menu secondary"
+            type="button"
+            aria-label="Open game menu"
+            title="Game menu (Esc)"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 7h16M4 12h16M4 17h16" />
+            </svg>
+          </button>
+          <!-- MUTE, and a door is exactly what it is not: one press for
+               silence, no panel opened, no focus moved, nothing paused. The
+               two sliders behind the menu keep their levels while it is down.
+               main.js writes aria-pressed and the label in the same breath and
+               the CSS draws the slash off that attribute, so what is engraved
+               and what a screen reader hears cannot drift. -->
           <button
             id="mute"
             class="secondary sound-toggle"
@@ -138,9 +174,18 @@
                 class="sound-waves"
                 d="M15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"
               />
-              <path class="sound-slash" d="m15 9 6 6m0-6-6 6" />
+              <path class="sound-slash" d="m15.5 9.5 6 5m0-5-6 5" />
             </svg>
           </button>
+          <!-- Hidden until js/screen.js has checked this browser has element
+               fullscreen at all - iPhone Safari does not, and a button that
+               does nothing when pressed is worse than no button.
+               Both states live in the one svg: four corners pushing out, and
+               the same four pulled in for the pressed one. CSS picks between
+               them off the aria-pressed screen.js already writes beside the
+               label, so the picture cannot say "expand" while the page is
+               fullscreen. Every subpath of both is absolute, which is what
+               keeps the four brackets symmetric about the centre. -->
           <button
             id="fullscreen"
             class="secondary fullscreen-toggle"
@@ -151,31 +196,13 @@
             hidden
           >
             <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M9 3H3v6m12-6h6v6M3 15v6h6m12-6v6h-6" />
-            </svg>
-          </button>
-          <!-- On every screen, not only during a round: the corner means the
-               same thing on the menu, in the lobby and mid-round, and the
-               panel it opens relabels its two buttons to match.
-               A gear, not an X. An X says "close this", which is what it meant
-               back when it only appeared mid-round and only led out; now it
-               opens a panel that holds the graphics setting as well as the way
-               out, on a screen where there may be nothing yet to close. -->
-          <button
-            id="game-menu"
-            class="game-menu secondary"
-            type="button"
-            aria-label="Open game menu"
-            title="Game menu (Esc)"
-          >
-            <!-- Drawn here rather than pulled from an icon set: eight teeth on
-                 the rim at 45° apart, a hub, and the same stroke as its two
-                 neighbours in the pill. -->
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <circle cx="12" cy="12" r="6.2" />
-              <circle cx="12" cy="12" r="2.4" />
               <path
-                d="M18.2 12 L20.8 12M12 5.8 L12 3.2M5.8 12 L3.2 12M12 18.2 L12 20.8M16.38 7.62 L18.22 5.78M7.62 7.62 L5.78 5.78M7.62 16.38 L5.78 18.22M16.38 16.38 L18.22 18.22"
+                class="fullscreen-expand"
+                d="M9 3H3v6m12-6h6v6M3 15v6h6m12-6v6h-6"
+              />
+              <path
+                class="fullscreen-contract"
+                d="M3 9h6V3M21 9h-6V3M3 15h6v6M21 15h-6v6"
               />
             </svg>
           </button>
@@ -272,6 +299,27 @@
       <div class="buttons">
         <button id="dive">Dive in <span>↗</span></button
         ><button id="join" class="secondary">Join game <span>→</span></button>
+      </div>
+      <!-- The way out, on the screen the player actually lands on rather than
+           two taps deep behind the menu plate. It is the same door as
+           #confirm-leave in that panel - main.js labels both from the one
+           verb() call so the two can never come to disagree - but this is
+           where somebody who has stopped wanting to play goes looking.
+           Hidden in the markup, and only ever shown when ../../arcade/exit.js
+           says there is somewhere to go: it is another repository's file and
+           is allowed to be missing, and a door that leads nowhere is worse
+           than no door. Not a third option beside the two above it, either -
+           those are a choice between swimming alone and swimming with someone,
+           and leaving is not one of them, so it stands under them quietly
+           rather than in their row.
+           Plain words, deliberately not this game's own. A way out is the one
+           control a player reaches for when they have stopped wanting to play,
+           and "Leave fish tank" made them read a joke to find the handle. The
+           aquarium does the talking everywhere else. -->
+      <div class="menu-tools">
+        <button id="menu-quit" class="menu-quit" type="button" hidden>
+          Back to arcade
+        </button>
       </div>
       <!-- One line of advice, and two versions of it, because this line had
            been telling a phone about W, A, S, D and a mouse click. Which one
@@ -427,9 +475,9 @@
            a tap for the moment someone walks into the room; these are the mix,
            and they are two because the loops and the cues are two different
            requests - the theme down, the chomp left alone. They live behind the
-           gear with GRAPHICS rather than on the menu, for the same reason the
-           graphics picker moved in here: a thing you set once does not belong
-           permanently in front of the game.
+           menu plate with GRAPHICS rather than on the menu, for the same
+           reason the graphics picker moved in here: a thing you set once does
+           not belong permanently in front of the game.
            Label above the slider, which is the shape this game already uses for
            MATCH LENGTH and DIFFICULTY in the lobby. -->
       <div class="group-label" id="sound-label">SOUND</div>

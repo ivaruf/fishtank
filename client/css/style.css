@@ -325,6 +325,35 @@ input:focus {
   gap: 10px;
   margin-top: 14px;
 }
+/* The way out, under the two ways in. Not in their row and not their size:
+   Dive in and Join game are a choice between swimming alone and swimming with
+   someone, and leaving is not a third of those - equal weight there would say
+   it is. So it keeps their left edge and gives up everything else, which is
+   the quietest a real button can be while still being one. */
+.menu-tools {
+  display: flex;
+  margin-top: 10px;
+}
+.menu-quit {
+  padding: 10px 16px;
+  border: 1px solid #83afa33d;
+  border-radius: 10px;
+  background: transparent;
+  color: #b9ceca;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+}
+.menu-quit:hover {
+  color: #edf8ef;
+  border-color: #83afa38f;
+}
+/* [hidden] is only a presentation hint and loses to any rule that sets
+   `display`. Nothing here sets one on this button today, and stating it anyway
+   costs a line and survives whoever gives it a display later. */
+.menu-quit[hidden] {
+  display: none;
+}
 button {
   border: 0;
   border-radius: 8px;
@@ -1308,6 +1337,7 @@ dialog:not([open]) {
   .panel > .name-row,
   .panel .species-strip,
   .panel .buttons,
+  .panel .menu-tools,
   .panel .error {
     max-width: 340px;
     margin-inline: auto;
@@ -1377,9 +1407,26 @@ dialog:not([open]) {
   .panel .buttons button span {
     display: none;
   }
-  .panel .error {
+  /* Placed, not left to auto-placement. Every other row on this screen names
+     its cell, so an unplaced one would be dropped into column 1 - on top of
+     the title art and the fish - rather than at the foot of the form where it
+     belongs. Adding a row to a hand-cut grid means re-cutting it, and the
+     error line below moves down one to make room. */
+  .panel .menu-tools {
     grid-column: 2;
     grid-row: 4;
+    margin-top: 8px;
+  }
+  /* Down to the height of the two doors above it: the last thirty pixels on a
+     sideways phone are bought back from control heights, and a finger is still
+     the pointer here, so this stops at a comfortable target rather than
+     shrinking to fit. */
+  .panel .menu-quit {
+    padding: 8px 14px;
+  }
+  .panel .error {
+    grid-column: 2;
+    grid-row: 5;
     /* `auto` on the sides, not 0: this row is centred with the rest of the
        form above it. */
     margin: 4px auto 0;
@@ -1589,6 +1636,10 @@ button svg {
   vertical-align: middle;
   pointer-events: none;
 }
+/* Both toggles carry both of their states in one svg and let this pick between
+   them, off the same aria-pressed the JS writes beside the accessible label -
+   so the picture and the label cannot drift. main.js writes mute's, screen.js
+   writes fullscreen's, and neither has to know a glyph exists. */
 .sound-slash,
 .sound-toggle[aria-pressed="true"] .sound-waves {
   display: none;
@@ -1599,6 +1650,17 @@ button svg {
 .sound-toggle[aria-pressed="true"] {
   opacity: 1;
   color: #a3bcb7;
+}
+/* Four corners pushing out, and the same four pulled in once the page really
+   is fullscreen. Without this second half the plate kept saying "expand" while
+   the label underneath it said "Exit fullscreen", which is the exact drift the
+   attribute exists to prevent. */
+.fullscreen-contract,
+.fullscreen-toggle[aria-pressed="true"] .fullscreen-expand {
+  display: none;
+}
+.fullscreen-toggle[aria-pressed="true"] .fullscreen-contract {
+  display: initial;
 }
 button:focus-visible,
 a:focus-visible {
@@ -1626,14 +1688,12 @@ a:focus-visible {
 .secondary {
   border-color: #83afa35c;
 }
-/* Mute and fullscreen flip a switch where they stand; this one opens a panel
-   over the tank, which is a different kind of thing to press. A hairline and a
-   little air say so without making it a separate pill floating on its own. */
-.game-menu {
-  margin-left: 3px;
-  border-left: 1px solid #badbcd2e;
-  border-radius: 0 8px 8px 0;
-}
+/* The hairline that used to set the gear apart from its two neighbours is
+   gone. It said "this one is a different kind of thing", which was true and
+   was also the wrong thing to say: the three plates are one group in one pill
+   in every game in the hub, and a divider inside a group of three tells a
+   player to read it as two. What they are - a window control, a sound control
+   and the one that touches the game - is carried by the drawings. */
 /* Every button in the pill sits on the pill's own glass with no background of
    its own, so the global brightness hover has almost nothing to brighten. An
    inset wash reads on a transparent button and on the lime of a pressed
@@ -1736,9 +1796,6 @@ a:focus-visible {
   .display-controls {
     padding: 3px;
     gap: 2px;
-  }
-  .game-menu {
-    margin-left: 2px;
   }
 }
 /* The pause panel on a phone: the whole screen, in two columns, and no scroll
@@ -1860,7 +1917,8 @@ a:focus-visible {
   }
   .panel .name-row,
   .panel .species-strip,
-  .panel .buttons {
+  .panel .buttons,
+  .panel .menu-tools {
     pointer-events: auto;
   }
 }

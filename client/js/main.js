@@ -91,8 +91,8 @@ function loadModels() {
 loadModels();
 // quality.js owns the value and remembers it; this only reacts to it.
 quality.addEventListener("change", loadModels);
-// One copy, in the panel the gear opens - which is every screen, so there is
-// nowhere left that needs a second one. The header's dropdown went with it: it
+// One copy, in the panel the menu plate opens - which is every screen, so
+// there is nowhere left that needs a second one. The header's dropdown went with it: it
 // was a settings control living permanently in the chrome, in front of the two
 // buttons that are not settings, and it was the widest thing in the pill on
 // the one screen where the pill has least room.
@@ -500,18 +500,32 @@ const framed = () => {
     return true;
   }
 };
-function quitGame() {
+// The words on both of the doors, written once. There are two ways out of this
+// game - the button on the menu screen and #confirm-leave inside the panel -
+// and they are the same door reached from two places, so they must not be able
+// to say different things about where it goes. exit.js's verb() is the only
+// thing that knows the answer; the fallback is reached only when exit.js is
+// missing outright.
+//
+// Plain words, and deliberately not this game's own. A way out is the one
+// control a player reaches for when they have stopped wanting to play, and
+// "Leave fish tank" made them read a joke to find the handle. The aquarium
+// does the talking everywhere else.
+const exitWords = () =>
+  window.ArcadeExit?.verb({
+    arcade: "Back to arcade",
+    app: "Close",
+  }) ?? (framed() ? "Back to arcade" : "Close");
+// `refused` is the one outcome we are still alive to see, and it now only
+// happens to an installed app whose window the browser will not close - iOS,
+// in practice. Framed hands back to the launcher and a tab navigates to the
+// arcade; neither comes back here. The caller says so in its own way, because
+// the two doors stand on different screens with different room to say it in.
+function quitGame(refused) {
   const exit = window.ArcadeExit;
   if (exit) {
     exit.quit().then((how) => {
-      // 'refused' is the one outcome we are still alive to see, and it now
-      // only happens to an installed app whose window the browser will not
-      // close - iOS, in practice. Framed hands back to the launcher and a tab
-      // navigates to the arcade; neither comes back here.
-      if (how !== "refused" || !leavePromptOpen) return;
-      $("pause-note").textContent =
-        "Your browser will not let this window close itself — close it yourself to finish.";
-      $("pause-note").hidden = false;
+      if (how === "refused") refused();
     });
     return;
   }
@@ -521,8 +535,8 @@ function quitGame() {
   if (framed()) history.back();
 }
 let leavePromptOpen = false;
-// The X in the corner, and Escape, open this panel wherever you are: on the
-// menu, in the lobby, mid-round. One button always goes back to what you were
+// The menu plate in the corner, and Escape, open this panel wherever you
+// are: on the menu, in the lobby, mid-round. One button always goes back to what you were
 // doing and the other always takes you one step out, and only their labels
 // change - so the corner means the same thing on all three screens.
 function openGameMenu() {
@@ -540,19 +554,13 @@ function openGameMenu() {
   $("pause-tag").textContent = inRound && alone ? "PAUSED" : "FISHTANK";
   $("continue").textContent = inRound ? "Continue" : "Back";
   // On the menu there is no tank to leave, so the corner leaves the GAME - and
-  // what that means is exit.js's question, not ours. It says "back to arcade"
-  // for a framed game AND for an ordinary tab, because a tab has nowhere to
-  // close to but somewhere to go; only an installed window closes.
-  //
-  // Plain words, and deliberately not this game's own. A way out is the one
-  // control a player reaches for when they have stopped wanting to play, and
-  // "Leave fish tank" made them read a joke to find the door. The aquarium
-  // does the talking everywhere else.
+  // what that means is exit.js's question, not ours, asked through exitWords()
+  // so this and the menu screen's own button cannot come to disagree. It says
+  // "back to arcade" for a framed game AND for an ordinary tab, because a tab
+  // has nowhere to close to but somewhere to go; only an installed window
+  // closes.
   $("confirm-leave").textContent = !state
-    ? (window.ArcadeExit?.verb({
-        arcade: "Back to arcade",
-        app: "Close",
-      }) ?? (framed() ? "Back to arcade" : "Close"))
+    ? exitWords()
     : inRound
       ? "Leave game"
       : "Leave lobby";
@@ -963,8 +971,50 @@ $("confirm-leave").onclick = () => {
   // One step out of wherever you are: out of the round or the lobby and back
   // to the menu, and out of the menu means out of the game.
   if (state) leave();
-  else quitGame();
+  else
+    quitGame(() => {
+      // The panel has a line of its own for this, and it is only worth writing
+      // if the panel is still up to read it in.
+      if (!leavePromptOpen) return;
+      $("pause-note").textContent =
+        "Your browser will not let this window close itself — close it yourself to finish.";
+      $("pause-note").hidden = false;
+    });
 };
+// The same door, on the screen the player lands on. Every other game in the
+// hub puts the way out there rather than behind the menu plate, and this one
+// had it two taps deep.
+//
+// ONLY WHEN THERE IS SOMEWHERE TO GO, which is not the same question as
+// whether quit() could do something: in a plain tab it could - the arcade is a
+// URL and a navigation always works - but somebody who typed this game's own
+// address did not come from the arcade and may never have heard of it. So: a
+// launcher behind us, or an installed window that can genuinely close.
+//
+// ASKED THROUGH framed()/standalone() AND NOT THROUGH exit.js's own offers(),
+// which says exactly this but is newer than both of them. The copy of exit.js
+// that answers may be OLDER than this code - it is fetched from ../../arcade/,
+// and a service worker on this shared origin can hand back a version cached
+// long before offers() was written - and a guard built on the new name fails
+// CLOSED there: the way out silently disappears, inside the arcade, where it
+// is the one control that matters. This cost maxgear a release.
+{
+  const exit = window.ArcadeExit;
+  if (exit && (exit.framed() || exit.standalone())) {
+    const button = $("menu-quit");
+    button.textContent = exitWords();
+    button.hidden = false;
+    button.onclick = () => {
+      audio.play("click");
+      quitGame(() => {
+        // There is no note line on this screen, so the button says it itself
+        // rather than leaving a control that looks like it did nothing.
+        button.textContent = "Close this tab yourself";
+        button.disabled = true;
+      });
+    };
+  }
+}
 // A new game means back to the lobby, not straight into another round: the
 // code is on screen there, the match length can change, and anyone watching
 // the results can still join. The host's world decides that - see
