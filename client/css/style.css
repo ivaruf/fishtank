@@ -103,6 +103,13 @@ header {
 :root {
   --hud-col: 256px;
   --roster-col: 264px;
+  /* THE MENU FORM'S ONE MEASURE. The name row was 432, the fish grid 520 and
+     the two doors whatever their words came to, so the screen's four rows had
+     four right edges and read as four unrelated controls that happened to be
+     stacked. One number, used by all of them, and the form is a column. 520 is
+     the fish grid's old width because that is the row with the least give —
+     it is a wrapping grid of cards, and narrowing it costs a card per row. */
+  --menu-col: 520px;
 }
 @media (max-width: 650px) {
   :root {
@@ -216,7 +223,7 @@ label,
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  max-width: 520px;
+  max-width: var(--menu-col);
 }
 .species-nav {
   display: none;
@@ -297,7 +304,7 @@ input:focus {
   display: flex;
   align-items: stretch;
   gap: 8px;
-  max-width: 432px;
+  max-width: var(--menu-col);
 }
 .name-row input {
   flex: 1 1 auto;
@@ -324,15 +331,28 @@ input:focus {
   display: flex;
   gap: 10px;
   margin-top: 14px;
+  max-width: var(--menu-col);
 }
-/* The way out, under the two ways in. Not in their row and not their size:
-   Dive in and Join game are a choice between swimming alone and swimming with
-   someone, and leaving is not a third of those - equal weight there would say
-   it is. So it keeps their left edge and gives up everything else, which is
-   the quietest a real button can be while still being one. */
+/* The two doors are peers — both are ways into a game — so they get one size.
+   `flex: 1 1 0` and not `1 1 auto`: auto sizes each to its own words, which
+   would say "Dive in" matters less than "Join game" for no better reason than
+   being the shorter sentence. The lime gradient is what carries the
+   difference, which reads as a recommendation rather than as one button being
+   more important because it is bigger. */
+.buttons button {
+  flex: 1 1 0;
+  min-width: 0;
+}
+/* The way out, under the two ways in. It is a row of the same form, so it
+   takes the form's measure and its left edge — but it is not a third door and
+   does not take their weight: Dive in and Join game are a choice between
+   swimming alone and swimming with someone, and leaving is not a third of
+   those. Same column, quieter colour, which is the hub's rule for a group
+   whose members are not peers. */
 .menu-tools {
   display: flex;
   margin-top: 10px;
+  max-width: var(--menu-col);
 }
 .menu-quit {
   padding: 10px 16px;
@@ -1334,11 +1354,20 @@ dialog:not([open]) {
      running under the corner the pill is in. The instruction line below it is
      left out on purpose: it is one long line of grey text and the column's
      full width is fewer wraps. */
+  /* ONE MEASURE FOR THE WHOLE FORM, and `width` as well as `max-width` — that
+     is the fix, and the missing half is what made this look like four
+     unrelated controls stacked up. A max-width alone is only a cap: the name
+     row shrank to its input, the two doors to their words and the way out to
+     its three, and `margin-inline: auto` then centred each of them on its own
+     width. Four rows, four widths, four centres, none of them agreeing.
+     With `width: 100%` under the same cap they are all exactly 340 and the
+     column has one left edge and one right edge. */
   .panel > .name-row,
   .panel .species-strip,
   .panel .buttons,
   .panel .menu-tools,
   .panel .error {
+    width: 100%;
     max-width: 340px;
     margin-inline: auto;
   }
@@ -1401,7 +1430,14 @@ dialog:not([open]) {
     grid-row: 3;
     margin-top: 8px;
   }
+  /* Two doors of equal standing get one size: `flex: 1 1 0`, never
+     `1 1 auto`, which would size each to its own words and tell the player
+     that "Dive in" matters less than "Join game" because it is the shorter
+     sentence. Colour carries the hierarchy instead — the lime one is still
+     the lime one. */
   .panel .buttons button {
+    flex: 1 1 0;
+    min-width: 0;
     padding: 10px 12px;
   }
   .panel .buttons button span {
@@ -1422,6 +1458,7 @@ dialog:not([open]) {
      the pointer here, so this stops at a comfortable target rather than
      shrinking to fit. */
   .panel .menu-quit {
+    width: 100%;
     padding: 8px 14px;
   }
   .panel .error {
