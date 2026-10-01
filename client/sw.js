@@ -49,6 +49,7 @@ const SHELL = [
   "js/audio.js",
   "js/quality.js",
   "js/screen.js",
+  "js/touch-guard.js",
   "../shared/config.js",
   "../shared/movement.js",
   "../shared/world.js",

@@ -30,6 +30,10 @@
     <script src="../../arcade/exit.js" defer></script>
     <!-- The address change. Inert until gophercloud.games answers; see the file. -->
     <script src="moved.js" defer></script>
+    <!-- Stops a tablet treating the tank as a page of text: no selection, no
+       long-press callout, outside real fields and the invite code. Classic
+       and self-contained, so it survives anything the module graph does. -->
+    <script src="js/touch-guard.js" defer></script>
   </head>
   <body>
     <div id="crash" hidden></div>
@@ -395,8 +399,8 @@
         <h2 id="lobby-title">Waiting for the shoal</h2>
         <p class="lobby-invite" id="lobby-invite" hidden>
           <span>SHARE THIS CODE</span>
-          <b id="lobby-icons" class="lobby-icons"></b>
-          <b id="lobby-code"></b>
+          <b id="lobby-icons" class="lobby-icons" data-selectable></b>
+          <b id="lobby-code" data-selectable></b>
           <button id="copy-code" class="secondary" type="button">
             Copy the code
           </button>

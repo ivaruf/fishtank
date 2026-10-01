@@ -10,28 +10,37 @@
 body {
   margin: 0;
   overflow: hidden;
-  /* Kills double-tap-to-zoom, which fires constantly when a player taps
-     quickly. Pinch is handled separately in controls.js, and only while
-     playing, so the menu can still be zoomed by anyone who needs to. */
-  touch-action: manipulation;
   -webkit-text-size-adjust: 100%;
 }
-/* Mashing the screen should never pop the text-selection magnifier or select
-   the HUD. The name field opts back in below. */
-header,
-#hud,
-#touch,
-.games,
-.lobby,
-.overlay {
-  -webkit-touch-callout: none;
+/*
+ * This is a game, not a document. On a tablet a resting thumb is a long press
+ * and a drag that starts on the HUD, a lobby name or a menu label is a text
+ * selection, so iPad Safari highlights words and offers Copy / Look Up in the
+ * middle of a chase. This used to cover a list of containers - header, HUD,
+ * touch pads, the panels - which left the gaps between them selectable and
+ * missed every screen added since; it is the whole page now, and the few
+ * things a player genuinely types into or copies opt back in below.
+ * `manipulation` kills double-tap-to-zoom, which fires constantly when a
+ * player taps quickly, and keeps pinch: that is handled separately in
+ * controls.js, and only while playing, so the menu can still be zoomed by
+ * anyone who needs to. js/touch-guard.js is the second half, because CSS
+ * alone is not honoured everywhere (hub CLAUDE.md §2).
+ */
+html,
+body {
   -webkit-user-select: none;
   user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
+/* The name field, the picture-code search and every other real field. */
 input,
-#name {
+textarea,
+[contenteditable="true"] {
   -webkit-user-select: text;
   user-select: text;
+  -webkit-touch-callout: default;
 }
 canvas {
   width: 100vw;
@@ -778,7 +787,13 @@ header {
   font-weight: 500;
   letter-spacing: 5px;
   color: #d1ed9e;
+  /* The invite code is the one piece of text that is meant to be copied: when
+     the clipboard is refused, "Select it above to copy" is the fallback. So it
+     takes selection and the long-press callout back, and carries
+     data-selectable so js/touch-guard.js leaves it alone too. */
+  -webkit-user-select: all;
   user-select: all;
+  -webkit-touch-callout: default;
 }
 .lobby-invite small {
   display: block;
