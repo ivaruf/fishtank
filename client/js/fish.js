@@ -94,34 +94,53 @@ const EYES = {
 // lands a hat on the crown behind the eyes and a mustache at the mouth on every
 // species without a per-species table - the eyewear is the one exception, below.
 const OUTFIT_SCALE = 1.6;
+// The one body that breaks that: a manta is a flat wing with no throat below
+// its eyes, so a necktie or a medal hangs in open water under it. Lifted onto
+// the underside instead, in anchor units.
+const NECK_LIFT = { "manta-ray": 0.22 };
 const outfitPaint = new WeakMap();
-// A gopher's eyes look forward and a fish's look sideways, so glasses built to
-// sit across a face end up buried in a fish's forehead with its own eyes
-// bulging out past the frames. Each lens is moved onto the eye on its own side
-// instead, turned to face outward, a goggle per eye; the arms and bridge that
-// only make sense across a face are dropped, and so is the monocle's chain,
-// which hangs from a lens that is no longer where it was drawn from. All in
-// anchor-local units, hence the divide by OUTFIT_SCALE.
+// A gopher's eyes look forward and a fish's look sideways, so anything built
+// to sit across a face ends up buried in a fish's forehead with its own eyes
+// bulging out past the frames. Each eye item is refitted instead, a goggle per
+// eye, turned to face outward. Per item: which meshes are the lens and go onto
+// an eye (a centred one, like the snorkel's single mask, is cloned onto both),
+// which stay exactly where the arcade drew them (the snorkel's tube, which
+// reads fine beside the head), and how big a lens comes out. Everything else -
+// arms, bridges, chains, cords, straps, which only make sense across a face -
+// is dropped. All in anchor-local units, hence the divide by OUTFIT_SCALE.
+const EYEWEAR = {
+  sunglasses: { lens: /frame|lens/i, size: 1.2 },
+  monocle: { lens: /rim/i, size: 1.2 },
+  eyePatch: { lens: /^Eye patch$/, size: 1.2 },
+  snorkel: { lens: /mask/i, keep: /tube|tip/i, size: 0.6 },
+};
 function goggles(nodes, [width, eyeY, eyeZ], at) {
   const local = (v, o) => (v - o) / OUTFIT_SCALE;
-  for (const id of ["sunglasses", "monocle"]) {
+  const onto = (mesh, side, size) => {
+    // Just proud of the pupil, which create_fish.py puts at width + 0.19.
+    mesh.position.set(
+      (side * (width + 0.26)) / OUTFIT_SCALE,
+      local(eyeY + 0.015, at.y),
+      local(eyeZ + 0.06, at.z),
+    );
+    // Lenses are authored lying on their faces toward +Z (rotation.x a
+    // quarter turn); a quarter turn about Z instead faces them along X.
+    mesh.rotation.set(0, 0, Math.PI / 2);
+    mesh.scaling.setAll(size);
+  };
+  for (const [id, fit] of Object.entries(EYEWEAR)) {
     for (const mesh of nodes[id]?.getChildMeshes(false) ?? []) {
-      const lens = /frame|lens|rim/i.test(mesh.name);
-      if (!lens) {
+      if (fit.keep?.test(mesh.name)) continue;
+      if (!fit.lens.test(mesh.name)) {
         mesh.dispose(false, false);
         continue;
       }
-      const side = Math.sign(mesh.position.x) || 1;
-      // Just proud of the pupil, which create_fish.py puts at width + 0.19.
-      mesh.position.set(
-        (side * (width + 0.26)) / OUTFIT_SCALE,
-        local(eyeY + 0.015, at.y),
-        local(eyeZ + 0.06, at.z),
-      );
-      // The rings were authored lying on their faces toward +Z (rotation.x a
-      // quarter turn); a quarter turn about Z instead faces them along X.
-      mesh.rotation.set(0, 0, Math.PI / 2);
-      mesh.scaling.setAll(1.2);
+      const side = Math.sign(mesh.position.x);
+      if (side) onto(mesh, side, fit.size);
+      else {
+        onto(mesh, -1, fit.size);
+        onto(mesh.clone(`${mesh.name} right`, mesh.parent), 1, fit.size);
+      }
     }
   }
 }
@@ -187,6 +206,11 @@ function dress(scene, swell, species, selection) {
       mesh.material = paints.get(hex);
     }
   }
+  const lift = NECK_LIFT[species];
+  if (lift)
+    for (const item of wardrobe.ACCESSORIES)
+      if (item.slot === "neck" && selection[item.id])
+        outfit.nodes[item.id].position.y += lift;
   for (const m of originals) m?.dispose();
 }
 function shared(map, scene, make) {
