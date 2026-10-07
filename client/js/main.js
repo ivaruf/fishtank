@@ -1,6 +1,6 @@
 import { setupFullscreen } from "./screen.js";
 import { createAquarium } from "./world.js";
-import { createFish, loadFishModels } from "./fish.js";
+import { createFish, loadFishModels, wornOutfit } from "./fish.js";
 import { mountQuality, quality, modelDetail, reliefStep } from "./quality.js";
 import { createPuffs, createSparks, createStream } from "./effects.js";
 import { createFilter } from "./filter.js";
@@ -838,7 +838,7 @@ $("dive").onclick = async () => {
     lobby: true,
     // In a worker, so looking at another tab does not freeze everyone else.
     engine: createHostEngine,
-    join: { name: playerName(), species: chosenSpecies },
+    join: { name: playerName(), species: chosenSpecies, outfit: wornOutfit() },
     ...handlers(() => host, "peer"),
   });
   network = host;
@@ -877,7 +877,11 @@ async function joinPeer(code) {
     joining = false;
     peerNote(`Joined ${spellCode(code)}.`);
     const guest = joinGame({
-      join: { name: playerName(), species: chosenSpecies },
+      join: {
+        name: playerName(),
+        species: chosenSpecies,
+        outfit: wornOutfit(),
+      },
       channel: found.channel,
       ...handlers(() => guest, "peer"),
     });
@@ -1466,6 +1470,7 @@ engine.runRenderLoop(() => {
         f.color,
         false,
         f.id === myId,
+        f.outfit,
       );
       visuals.set(f.id, v);
     }

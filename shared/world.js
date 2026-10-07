@@ -198,11 +198,18 @@ export class World {
       return f;
     });
   }
-  addPlayer(id, name, species = SPECIES[this.players.size % SPECIES.length]) {
+  addPlayer(
+    id,
+    name,
+    species = SPECIES[this.players.size % SPECIES.length],
+    outfit = [],
+  ) {
     const p = {
       id,
       name,
       species,
+      // Roster data, never per-frame: it is fixed for as long as they stay.
+      outfit,
       mass: C.startMass,
       score: 0,
       color: this.players.size % 8,
@@ -473,6 +480,7 @@ export class World {
       npc: !!f.npc,
       name: f.name,
       species: f.species,
+      outfit: f.outfit,
       x: wire(f.x, 2),
       y: wire(f.y, 2),
       z: wire(f.z, 2),

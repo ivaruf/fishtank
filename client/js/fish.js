@@ -125,9 +125,35 @@ function goggles(nodes, [width, eyeY, eyeZ], at) {
     }
   }
 }
-function dress(scene, swell, species) {
-  const selection = wardrobe.loadOutfit();
-  if (!Object.values(selection).some(Boolean)) return;
+// What to put on a fish, or null for nothing. Your own fish and its menu
+// picture wear what this device picked; anyone else wears the outfit the host's
+// roster says they joined in, rebuilt through selectAccessory so only items the
+// wardrobe knows go on, one per slot - this is the allowlist cleanOutfit in
+// shared/config.js leaves to the renderer.
+function outfitFor(own, list) {
+  if (!wardrobe) return null;
+  let selection;
+  if (own) selection = wardrobe.loadOutfit();
+  else if (list?.length) {
+    selection = Object.fromEntries(
+      wardrobe.ACCESSORIES.map((item) => [item.id, false]),
+    );
+    for (const id of list) wardrobe.selectAccessory(selection, id, true);
+  }
+  return selection && Object.values(selection).some(Boolean) ? selection : null;
+}
+// The ids worn on this device, for the JOIN message. Empty until the wardrobe
+// has loaded, which is milliseconds against the seconds anyone spends in the
+// menu, and empty for good in a tank served without the arcade.
+export function wornOutfit() {
+  const selection = outfitFor(true);
+  return selection
+    ? wardrobe.ACCESSORIES.filter((item) => selection[item.id]).map(
+        (item) => item.id,
+      )
+    : [];
+}
+function dress(scene, swell, species, selection) {
   const [, eyeY] = EYES[species] ?? [0.3, 0.15, 0.7];
   const nose = NOSE[species] ?? 1;
   const anchor = new B.TransformNode("outfit", scene);
@@ -286,6 +312,7 @@ export function createFish(
   color = 0,
   preview = false,
   own = false,
+  outfit = null,
 ) {
   // Three nodes, and the split matters. root carries the transform the
   // simulation sent. pose plays the bite lunge and the death tumble. swell
@@ -305,6 +332,16 @@ export function createFish(
   // Both markers are for other people. Your own fish is `own`, and the menu's
   // preview is a picture of your own fish, so neither wears one.
   const marked = !npc && !own && !preview;
+  const wearing = npc ? null : outfitFor(own || preview, outfit);
+  // The crest and the crown float above the head, which is exactly where a top
+  // hat or antennae go; lift both clear rather than lose either signal.
+  const lift =
+    wearing &&
+    wardrobe.ACCESSORIES.some(
+      (item) => item.slot === "head" && wearing[item.id],
+    )
+      ? 0.6
+      : 0;
   if (marked) {
     if (!crests.has(scene))
       crests.set(scene, material(scene, "crest", "#e4ffc3", 0.7));
@@ -313,7 +350,7 @@ export function createFish(
       { segments: 6, diameter: 0.28 },
       scene,
     );
-    crest.position.set(0, 1.22, 0.05);
+    crest.position.set(0, 1.22 + lift, 0.05);
     crest.parent = swell;
     crest.material = crests.get(scene);
   }
@@ -350,7 +387,7 @@ export function createFish(
       { height: 0.2, diameterTop: 0.5, diameterBottom: 0.4, tessellation: 8 },
       scene,
     );
-    crown.position.set(0, 1.58, 0.05);
+    crown.position.set(0, 1.58 + lift, 0.05);
     crown.parent = swell;
     crown.material = gold;
     for (let i = 0; i < 4; i++) {
@@ -366,8 +403,8 @@ export function createFish(
     }
     crown.setEnabled(false);
   }
-  // Your own fish, and the menu's picture of it, wear what the gopher wears.
-  if ((own || preview) && wardrobe) dress(scene, swell, species);
+  // Everyone in the tank wears what their gopher wears.
+  if (wearing) dress(scene, swell, species, wearing);
   const { swim } = body;
   swim.start(true, 1);
   if (swim.isStarted)

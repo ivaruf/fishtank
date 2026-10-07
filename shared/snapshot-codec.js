@@ -66,13 +66,22 @@ const still = (f) => ({
   name: f.name,
   species: f.species,
   color: f.color,
+  outfit: f.outfit?.length ? f.outfit : undefined,
 });
+// Only players dress, so a wild fish's entry stays six fields long and the
+// hundred of them in a full roster cost nothing for this.
+const entry = (slot, f) => {
+  const row = [slot, f.id, f.npc ? 1 : 0, f.name, f.species, f.color];
+  if (f.outfit) row.push(f.outfit);
+  return row;
+};
 const same = (a, b) =>
   a.id === b.id &&
   a.npc === b.npc &&
   a.name === b.name &&
   a.species === b.species &&
-  a.color === b.color;
+  a.color === b.color &&
+  String(a.outfit ?? "") === String(b.outfit ?? "");
 
 // The host's side: hands out slots, notices when the cast changes, and packs.
 export function createPacker() {
@@ -97,7 +106,7 @@ export function createPacker() {
       const at = slot ?? free.pop() ?? slots.size + free.length;
       slots.set(f.id, at);
       known.set(at, now);
-      add.push([at, now.id, now.npc ? 1 : 0, now.name, now.species, now.color]);
+      add.push(entry(at, now));
     }
     const drop = [];
     for (const [id, slot] of slots)
@@ -124,14 +133,7 @@ export function createPacker() {
         type: "ROSTER",
         v: version,
         reset: 1,
-        add: [...known].map(([slot, f]) => [
-          slot,
-          f.id,
-          f.npc ? 1 : 0,
-          f.name,
-          f.species,
-          f.color,
-        ]),
+        add: [...known].map(([slot, f]) => entry(slot, f)),
         drop: [],
       };
     },
@@ -245,8 +247,9 @@ export function createUnpacker() {
     roster(message) {
       // A full roster replaces what we think we know; a delta amends it.
       if (message.reset) known.clear();
-      for (const [slot, id, npc, name, species, color] of message.add ?? [])
-        known.set(slot, { id, npc: !!npc, name, species, color });
+      for (const [slot, id, npc, name, species, color, outfit] of message.add ??
+        [])
+        known.set(slot, { id, npc: !!npc, name, species, color, outfit });
       for (const slot of message.drop ?? []) known.delete(slot);
       version = message.v;
     },

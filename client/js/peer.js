@@ -1,5 +1,10 @@
 import { World } from "../../shared/world.js";
-import { CONFIG as C, PROTOCOL, SPECIES } from "../../shared/config.js";
+import {
+  CONFIG as C,
+  PROTOCOL,
+  SPECIES,
+  cleanOutfit,
+} from "../../shared/config.js";
 import { createPacker, createUnpacker } from "../../shared/snapshot-codec.js";
 import { fishName } from "./names.js";
 // Host-authoritative peer-to-peer, with no server in the game loop at all.
@@ -38,8 +43,8 @@ function localEngine({ lobby, onState }) {
     world,
     start: () => (ticker = setInterval(step, 1000 / C.tickRate)),
     count: () => world.players.size,
-    add: (id, name, species, seated) => {
-      world.addPlayer(id, name, species);
+    add: (id, name, species, outfit, seated) => {
+      world.addPlayer(id, name, species, outfit);
       seated?.();
     },
     remove: (id) => world.removePlayer(id),
@@ -82,10 +87,10 @@ function workerEngine({ lobby, onState, url }) {
     // Counted optimistically: the worker's reply corrects it, but two joins
     // landing together must not both see a free seat.
     count: () => count,
-    add: (id, name, species, seated) => {
+    add: (id, name, species, outfit, seated) => {
       count++;
       seating.set(id, seated);
-      worker.postMessage({ type: "ADD", id, name, species });
+      worker.postMessage({ type: "ADD", id, name, species, outfit });
     },
     remove: (id) => {
       count = Math.max(0, count - 1);
@@ -209,6 +214,7 @@ export function hostGame({
           id,
           cleanName(message.name),
           cleanSpecies(message.species),
+          cleanOutfit(message.outfit),
           () => {
             if (closed || !peers.has(id)) return;
             seated.add(id);
@@ -230,14 +236,20 @@ export function hostGame({
     channel.onClose = () => drop(id);
   }
 
-  const start = ({ name, species } = {}) => {
+  const start = ({ name, species, outfit } = {}) => {
     sim.start();
-    sim.add(HOST, cleanName(name), cleanSpecies(species), () => {
-      if (closed) return;
-      seated.add(HOST);
-      onWelcome(HOST, PROTOCOL, "Your tank");
-      announce();
-    });
+    sim.add(
+      HOST,
+      cleanName(name),
+      cleanSpecies(species),
+      cleanOutfit(outfit),
+      () => {
+        if (closed) return;
+        seated.add(HOST);
+        onWelcome(HOST, PROTOCOL, "Your tank");
+        announce();
+      },
+    );
   };
   if (join) start(join);
 
@@ -346,6 +358,7 @@ export function joinGame({
       type: "JOIN",
       name: cleanName(payload.name),
       species: cleanSpecies(payload.species),
+      outfit: cleanOutfit(payload.outfit),
     });
   if (join) start(join);
   return {

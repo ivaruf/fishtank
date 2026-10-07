@@ -25,8 +25,8 @@
  * whose job is to rescue a stranded game must not be able to break one.
  * ========================================================================== */
 (function () {
-  var OLD_HOST = 'ivaruf.github.io';
-  var NEW_ORIGIN = 'https://gophercloud.games';
+  var OLD_HOST = "ivaruf.github.io";
+  var NEW_ORIGIN = "https://gophercloud.games";
 
   if (location.hostname !== OLD_HOST) return;
 
@@ -50,7 +50,7 @@
   // even a 404, means the new host is serving and it is safe to send people
   // there. Probing our own path rather than a fixed file keeps each game
   // asking about its own new home and depending on no other repo.
-  fetch(NEW_ORIGIN + here, { mode: 'no-cors', cache: 'no-store' })
+  fetch(NEW_ORIGIN + here, { mode: "no-cors", cache: "no-store" })
     .then(function () {
       // Hand the scope back before leaving. Not strictly required — the old
       // page would simply run this again and redirect again — but once the
@@ -68,9 +68,11 @@
           })
         : Promise.resolve();
 
-      return release.catch(function () {}).then(function () {
-        location.replace(NEW_ORIGIN + here);
-      });
+      return release
+        .catch(function () {})
+        .then(function () {
+          location.replace(NEW_ORIGIN + here);
+        });
     })
     .catch(function () {
       // The new home is not up yet. Stay exactly where we are and say nothing:

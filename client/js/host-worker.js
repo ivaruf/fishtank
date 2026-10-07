@@ -10,7 +10,7 @@
 // shared/world.js has no DOM dependencies, which is what let it move
 // client-side for solo in the first place, and lets it move again here.
 import { World } from "../../shared/world.js";
-import { CONFIG as C, SPECIES } from "../../shared/config.js";
+import { CONFIG as C, SPECIES, cleanOutfit } from "../../shared/config.js";
 import { fishName } from "./names.js";
 
 let world = null,
@@ -53,6 +53,9 @@ onmessage = ({ data }) => {
         data.id,
         cleanName(data.name),
         cleanSpecies(data.species),
+        // Cleaned again here, as name and species are: the worker trusts
+        // nothing about the page that posts to it beyond the message shape.
+        cleanOutfit(data.outfit),
       );
       postMessage({ type: "ADDED", id: data.id, players: world.players.size });
       break;

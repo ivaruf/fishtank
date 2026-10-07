@@ -65,7 +65,10 @@ export const CONFIG = Object.freeze({
 // in the tank at the wrong size, on its own screen only, with no way to tell.
 // A visible contract is a contract, and "DIFFERENT BUILDS · RELOAD BOTH" is a
 // better answer than two people describing different tanks to each other.
-export const PROTOCOL = 10;
+// 11: the roster carries each player's outfit as a seventh field. An old peer
+// would play on regardless and simply see nobody's hat - harmless, but the
+// rule above holds: two builds disagreeing about what is in the tank say so.
+export const PROTOCOL = 11;
 // Mass is a volume and a fish is a thing you look at, so the honest exponent
 // is a third - and a third is exactly why growing never read on screen: it
 // makes mass the cube of the only thing a player can see, so thirteen times
@@ -178,6 +181,24 @@ export const PREDATORS = Object.freeze([
   "lionfish",
   "triggerfish",
 ]);
+// What a player is wearing, off the wire: the item ids of the outfit picked at
+// the arcade's dresser (arcade/js/wardrobe.js, a proof of concept). Checked for
+// SHAPE only - a short list of short plain words, no repeats - because the list
+// of real items lives in the arcade's repository and neither the host page nor
+// its worker may depend on another repo being reachable. The renderer is the
+// allowlist: it puts on only ids the wardrobe knows, one per slot, so a guest
+// claiming "jetpack" gets a fish with nothing on. Cosmetic, so a guest who
+// lies about it gains a hat and nothing else (hub CLAUDE.md §1, §7).
+export const cleanOutfit = (outfit) =>
+  Array.isArray(outfit)
+    ? [
+        ...new Set(
+          outfit.filter(
+            (id) => typeof id === "string" && /^[A-Za-z]{1,24}$/.test(id),
+          ),
+        ),
+      ].slice(0, 8)
+    : [];
 export const speciesLabel = (species = "fish") =>
   String(species).replaceAll("-", " ");
 // Kelp clusters across the tank. A fish low enough inside one is hidden from

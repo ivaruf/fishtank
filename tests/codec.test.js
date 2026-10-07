@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createPacker, createUnpacker } from "../shared/snapshot-codec.js";
 import { World } from "../shared/world.js";
-import { CONFIG as C, wrap } from "../shared/config.js";
+import { CONFIG as C, cleanOutfit, wrap } from "../shared/config.js";
 
 // A world with people in it, run far enough that fish have spread out, turned
 // to face all directions, grown, and started eating each other.
@@ -245,5 +245,31 @@ test("a full tank packs small enough to stop being a bandwidth problem", () => {
   assert.ok(
     frame.length < 16384,
     `a frame must fit the 16 KB limit: ${frame.length}`,
+  );
+});
+
+test("what a player wears rides the roster, and wild fish carry nothing for it", () => {
+  const world = new World(Math.random);
+  world.addPlayer("hat", "Dapper", "pufferfish", ["topHat", "monocle"]);
+  world.addPlayer("bare", "Plain", "clownfish");
+  const { seen, roster } = link().send(world.snapshot());
+  const by = Object.fromEntries(seen.players.map((p) => [p.id, p]));
+  assert.deepEqual(by.hat.outfit, ["topHat", "monocle"]);
+  assert.equal(by.bare.outfit, undefined);
+  // Only a dressed player's entry grows a seventh field.
+  for (const row of roster.add)
+    assert.equal(row.length, row[1] === "hat" ? 7 : 6);
+});
+
+test("an outfit off the wire is cut down to a short list of plain words", () => {
+  assert.deepEqual(cleanOutfit("topHat"), []);
+  assert.deepEqual(
+    cleanOutfit(["topHat", "topHat", 7, "<img>", "x".repeat(40)]),
+    ["topHat"],
+  );
+  assert.equal(
+    cleanOutfit(Array.from({ length: 50 }, (_, i) => `a${"b".repeat(i % 20)}`))
+      .length <= 8,
+    true,
   );
 });
