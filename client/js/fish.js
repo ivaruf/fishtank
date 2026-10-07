@@ -52,6 +52,117 @@ const NOSE = {
   "royal-gramma": 1.02,
   triggerfish: 1.03,
 };
+// The gopher's outfit from the arcade, worn by your own fish and by the menu's
+// picture of it (PROOF OF CONCEPT, 2026-10-07; the why is in
+// arcade/js/wardrobe.js, and neonfox's fox does the same). A dynamic import
+// because the module is another repository's: served without the arcade beside
+// it, or blocked, it is a rejected promise and a fish with nothing on, never a
+// module graph that failed to load. Fish created before it lands go undressed;
+// the next one - a respawn, a new round, a turn of the species carousel - wears
+// whatever was picked at the dresser, read fresh each time.
+let wardrobe = null;
+import(new URL("../../../arcade/js/wardrobe.js", import.meta.url).href).then(
+  (module) => {
+    wardrobe = module;
+  },
+  () => console.info("fishtank: no arcade wardrobe beside this game"),
+);
+// Where each species keeps its eyes, from the eyes() calls in
+// tools/blender/create_fish.py: [socket half-spacing, height, depth]. The
+// wardrobe's items are authored on the gopher's head, eyes at (+-0.127, 0.25,
+// 0.307), facing +Z like these fish, so one transform per species carries the
+// gopher's eye line onto the fish's and the face front onto its nose (NOSE).
+const EYES = {
+  clownfish: [0.32, 0.16, 0.73],
+  "blue-tang": [0.235, 0.23, 0.7],
+  pufferfish: [0.39, 0.27, 0.67],
+  angelfish: [0.15, 0.2, 0.5],
+  goldfish: [0.38, 0.17, 0.62],
+  betta: [0.22, 0.15, 0.72],
+  butterflyfish: [0.19, 0.2, 0.49],
+  lionfish: [0.33, 0.18, 0.64],
+  wrasse: [0.225, 0.115, 0.79],
+  "royal-gramma": [0.235, 0.14, 0.73],
+  triggerfish: [0.245, 0.25, 0.62],
+  seahorse: [0.19, 0.77, 0.29],
+  "manta-ray": [0.265, 0.1, 0.6],
+  shark: [0.26, 0.12, 0.7],
+};
+// One size of gopher head for every fish, set by eye against a render of all
+// fourteen species wearing everything. The anchor puts the gopher's eye line at
+// the fish's eye height and the gopher's face front on the fish's nose, which
+// lands a hat on the crown behind the eyes and a mustache at the mouth on every
+// species without a per-species table - the eyewear is the one exception, below.
+const OUTFIT_SCALE = 1.6;
+const outfitPaint = new WeakMap();
+// A gopher's eyes look forward and a fish's look sideways, so glasses built to
+// sit across a face end up buried in a fish's forehead with its own eyes
+// bulging out past the frames. Each lens is moved onto the eye on its own side
+// instead, turned to face outward, a goggle per eye; the arms and bridge that
+// only make sense across a face are dropped, and so is the monocle's chain,
+// which hangs from a lens that is no longer where it was drawn from. All in
+// anchor-local units, hence the divide by OUTFIT_SCALE.
+function goggles(nodes, [width, eyeY, eyeZ], at) {
+  const local = (v, o) => (v - o) / OUTFIT_SCALE;
+  for (const id of ["sunglasses", "monocle"]) {
+    for (const mesh of nodes[id]?.getChildMeshes(false) ?? []) {
+      const lens = /frame|lens|rim/i.test(mesh.name);
+      if (!lens) {
+        mesh.dispose(false, false);
+        continue;
+      }
+      const side = Math.sign(mesh.position.x) || 1;
+      // Just proud of the pupil, which create_fish.py puts at width + 0.19.
+      mesh.position.set(
+        (side * (width + 0.26)) / OUTFIT_SCALE,
+        local(eyeY + 0.015, at.y),
+        local(eyeZ + 0.06, at.z),
+      );
+      // The rings were authored lying on their faces toward +Z (rotation.x a
+      // quarter turn); a quarter turn about Z instead faces them along X.
+      mesh.rotation.set(0, 0, Math.PI / 2);
+      mesh.scaling.setAll(1.2);
+    }
+  }
+}
+function dress(scene, swell, species) {
+  const selection = wardrobe.loadOutfit();
+  if (!Object.values(selection).some(Boolean)) return;
+  const [, eyeY] = EYES[species] ?? [0.3, 0.15, 0.7];
+  const nose = NOSE[species] ?? 1;
+  const anchor = new B.TransformNode("outfit", scene);
+  anchor.parent = swell;
+  anchor.scaling.setAll(OUTFIT_SCALE);
+  anchor.position.set(
+    0,
+    eyeY - 0.25 * OUTFIT_SCALE,
+    nose - 0.42 * OUTFIT_SCALE,
+  );
+  const outfit = wardrobe.makeAccessories(anchor, scene, null);
+  outfit.set(selection);
+  goggles(outfit.nodes, EYES[species] ?? [0.3, 0.15, 0.7], anchor.position);
+  // The wardrobe paints in PBR for the arcade's lighting; this tank is lit for
+  // StandardMaterial (point lamps a PBR surface reads with a different falloff),
+  // so every item is repainted in the tank's own material, one per colour per
+  // scene, and the PBR originals go. What is not worn goes too.
+  const paints = shared(outfitPaint, scene, () => new Map());
+  const originals = new Set();
+  for (const [id, node] of Object.entries(outfit.nodes)) {
+    const meshes = node.getChildMeshes(false);
+    for (const mesh of meshes) originals.add(mesh.material);
+    if (!selection[id]) {
+      node.dispose(false, false);
+      continue;
+    }
+    for (const mesh of meshes) {
+      const hex = mesh.material.albedoColor.toGammaSpace().toHexString();
+      if (!paints.has(hex))
+        paints.set(hex, material(scene, `outfit ${hex}`, hex, 0.15));
+      mesh.material = paints.get(hex);
+    }
+  }
+  for (const m of originals) m?.dispose();
+}
 function shared(map, scene, make) {
   if (!map.has(scene)) map.set(scene, make());
   return map.get(scene);
@@ -255,6 +366,8 @@ export function createFish(
     }
     crown.setEnabled(false);
   }
+  // Your own fish, and the menu's picture of it, wear what the gopher wears.
+  if ((own || preview) && wardrobe) dress(scene, swell, species);
   const { swim } = body;
   swim.start(true, 1);
   if (swim.isStarted)
