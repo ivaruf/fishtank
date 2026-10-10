@@ -68,7 +68,10 @@ export const CONFIG = Object.freeze({
 // 11: the roster carries each player's outfit as a seventh field. An old peer
 // would play on regardless and simply see nobody's hat - harmless, but the
 // rule above holds: two builds disagreeing about what is in the tank say so.
-export const PROTOCOL = 11;
+// 12: events carry ids and species instead of English sentences, so each
+// device can say them in its own language. An old guest would print
+// "Eaten by undefined" for a new host's meal - so the builds say they differ.
+export const PROTOCOL = 12;
 // Mass is a volume and a fish is a thing you look at, so the honest exponent
 // is a third - and a third is exactly why growing never read on screen: it
 // makes mass the cube of the only thing a player can see, so thirteen times
