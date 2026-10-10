@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="nb">
   <head>
     <meta charset="utf-8" />
     <meta
@@ -20,6 +20,21 @@
     <link rel="icon" href="assets/icons/favicon-32.png" sizes="32x32" />
     <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png" />
     <link rel="stylesheet" href="css/style.css" />
+    <!-- The language, before anything is painted. Bokmål unless the player
+         chose English somewhere in the arcade - the choice is one key for the
+         whole hub, arcade.lang.v1, and js/i18n.js owns it from here on. The
+         markup below is written in bokmål, so an English player is the one
+         who waits for i18n.js; it is loaded async ahead of the engine so that
+         wait is a small file and not eight megabytes of Babylon. -->
+    <script>
+      (function () {
+        var lang = "nb";
+        try {
+          if (localStorage.getItem("arcade.lang.v1") === "en") lang = "en";
+        } catch (e) {}
+        document.documentElement.lang = lang;
+      })();
+    </script>
     <!-- What quitting means here: back to the arcade when the arcade is what
        framed us, closing the window when we are installed, and an honest note
        when we are a tab no script may close. It draws nothing — the two
@@ -43,15 +58,46 @@
       // report the first fatal one on screen where it can actually be read.
       // Inline and before the modules, to catch their evaluation too.
       (function () {
-        var shown = false;
-        function report(what, hint) {
-          if (shown) return;
-          shown = true;
+        // Its own words in both languages: this runs before any module and
+        // must still speak when every one of them has failed to load. It reads
+        // <html lang>, set in the head, and repaints on `arcade:lang`.
+        var WORDS = {
+          nb: {
+            load: "Kunne ikke laste ",
+            graph: " eller en av filene den henter",
+            offline: "Det ser ut som du ikke er på nett.",
+            blocker:
+              "En innholdsblokkerer er den vanlige årsaken – prøv å slå den av for denne siden og last inn på nytt.",
+            unhandled: "Uventet feil: ",
+          },
+          en: {
+            load: "Could not load ",
+            graph: " or one of the files it imports",
+            offline: "You appear to be offline.",
+            blocker:
+              "A content blocker is the usual cause — try switching yours off for this page and reloading.",
+            unhandled: "Unhandled: ",
+          },
+        };
+        function words() {
+          return WORDS[document.documentElement.lang] || WORDS.en;
+        }
+        // What to say, kept as a function rather than a string so a language
+        // switch can say it again in the other one.
+        var shown = null;
+        function paint() {
           var box = document.getElementById("crash");
-          if (!box) return;
-          box.textContent = hint ? what + "\n" + hint : what;
+          if (!box || !shown) return;
+          var lines = shown(words());
+          box.textContent = lines[1] ? lines[0] + "\n" + lines[1] : lines[0];
           box.hidden = false;
         }
+        function report(say) {
+          if (shown) return;
+          shown = say;
+          paint();
+        }
+        document.addEventListener("arcade:lang", paint);
         function tail(url) {
           return String(url || "")
             .split("/")
@@ -68,19 +114,20 @@
         //
         // navigator.onLine is worth believing only when it says no, which is
         // the one thing it is asked here.
-        function why() {
-          return navigator.onLine === false
-            ? "You appear to be offline."
-            : "A content blocker is the usual cause — try switching yours off for this page and reloading.";
+        function why(w) {
+          return navigator.onLine === false ? w.offline : w.blocker;
         }
         addEventListener(
           "error",
           function (e) {
             // Script errors carry a message; a failed <script> tag does not,
             // and is equally fatal. Other failed subresources are not.
-            if (e.message)
-              report(e.message + " — " + tail(e.filename) + ":" + e.lineno);
-            else if (e.target && e.target.tagName === "SCRIPT") {
+            if (e.message) {
+              var where = e.message + " — " + tail(e.filename) + ":" + e.lineno;
+              report(function () {
+                return [where];
+              });
+            } else if (e.target && e.target.tagName === "SCRIPT") {
               // Scripts that already answer for themselves — the two CDN
               // bundles with a local copy behind them, and the broker, which
               // tells the player on the lobby's own reach line. Their failing
@@ -90,24 +137,29 @@
               // so this name is the entry point and the file that actually
               // failed may be any of its imports. Saying so is the difference
               // between a lead and a wild goose chase.
-              report(
-                "Could not load " +
-                  tail(e.target.src) +
-                  (e.target.type === "module"
-                    ? " or one of the files it imports"
-                    : ""),
-                why(),
-              );
+              var file = tail(e.target.src),
+                graph = e.target.type === "module";
+              report(function (w) {
+                return [w.load + file + (graph ? w.graph : ""), why(w)];
+              });
             }
           },
           true,
         );
         addEventListener("unhandledrejection", function (e) {
-          report("Unhandled: " + ((e.reason && e.reason.message) || e.reason));
+          var reason = (e.reason && e.reason.message) || e.reason;
+          report(function (w) {
+            return [w.unhandled + reason];
+          });
         });
       })();
     </script>
-    <canvas id="game" tabindex="0" aria-label="3D aquarium"></canvas>
+    <canvas
+      id="game"
+      tabindex="0"
+      aria-label="3D-akvarium"
+      data-i18n-aria="tank.label"
+    ></canvas>
     <div class="vignette"></div>
     <header>
       <!-- The corner logo is the painting's own wordmark, cut from the same
@@ -151,8 +203,10 @@
             id="game-menu"
             class="game-menu secondary"
             type="button"
-            aria-label="Open game menu"
-            title="Game menu (Esc)"
+            aria-label="Åpne menyen"
+            title="Meny (Esc)"
+            data-i18n-aria="menu.open"
+            data-i18n-title="menu.title"
           >
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M4 7h16M4 12h16M4 17h16" />
@@ -168,9 +222,9 @@
             id="mute"
             class="secondary sound-toggle"
             type="button"
-            aria-label="Mute sound"
+            aria-label="Slå av lyden"
             aria-pressed="false"
-            title="Mute sound"
+            title="Slå av lyden"
           >
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M11 5 6 9H3v6h3l5 4Z" />
@@ -194,9 +248,9 @@
             id="fullscreen"
             class="secondary fullscreen-toggle"
             type="button"
-            aria-label="Enter fullscreen"
+            aria-label="Fullskjerm"
             aria-pressed="false"
-            title="Enter fullscreen"
+            title="Fullskjerm"
             hidden
           >
             <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -224,7 +278,9 @@
          itself is in-play: there is nothing to rank before a round. -->
     <div class="tank-corner">
       <aside class="glass roster in-play">
-        <div class="eyebrow">PLAYERS <span id="count"></span></div>
+        <div class="eyebrow">
+          <span data-i18n="hud.players">SPILLERE</span> <span id="count"></span>
+        </div>
         <ol id="leaders"></ol>
       </aside>
       <div class="connection" id="connection"></div>
@@ -234,9 +290,10 @@
     <div
       id="fish-preview"
       role="img"
-      aria-label="Selected fish preview. Drag to turn it, scroll or pinch to zoom."
+      aria-label="Fisken du har valgt. Dra for å snu den, rull eller klyp for å zoome."
+      data-i18n-aria="preview.label"
     >
-      <span>Your fish · drag to turn</span>
+      <span>Fisken din · dra for å snu</span>
     </div>
     <main id="menu" class="panel">
       <!-- The title is painted art, not type: assets/brand/ holds the source
@@ -257,15 +314,19 @@
            The die beside the field rolls another. It writes into the field
            rather than into the placeholder, because a name you asked for is a
            name you chose, and grey suggestion text would say otherwise. -->
-      <label class="sr-only" for="name">Your name</label>
+      <label class="sr-only" for="name" data-i18n="name.label"
+        >Navnet ditt</label
+      >
       <div class="name-row">
         <input id="name" maxlength="18" autocomplete="nickname" />
         <button
           id="reroll-name"
           class="reroll secondary"
           type="button"
-          aria-label="Roll a new name"
-          title="Roll another fishy name"
+          aria-label="Trill et nytt navn"
+          title="Trill et nytt fiskenavn"
+          data-i18n-aria="name.roll"
+          data-i18n-title="name.rollTitle"
         >
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <rect x="4" y="4" width="16" height="16" rx="4.5" />
@@ -275,13 +336,20 @@
           </svg>
         </button>
       </div>
-      <div class="group-label sr-only" id="species-label">Pick your fish</div>
+      <div
+        class="group-label sr-only"
+        id="species-label"
+        data-i18n="species.pick"
+      >
+        Velg fisk
+      </div>
       <div class="species-strip">
         <button
           class="species-nav"
           type="button"
           data-dir="-1"
-          aria-label="Previous fish"
+          aria-label="Forrige fisk"
+          data-i18n-aria="species.prev"
         >
           ‹
         </button>
@@ -295,14 +363,18 @@
           class="species-nav"
           type="button"
           data-dir="1"
-          aria-label="Next fish"
+          aria-label="Neste fisk"
+          data-i18n-aria="species.next"
         >
           ›
         </button>
       </div>
       <div class="buttons">
-        <button id="dive">Dive in <span>↗</span></button
-        ><button id="join" class="secondary">Join game <span>→</span></button>
+        <button id="dive">
+          <b data-i18n="menu.play">Spill</b> <span>↗</span></button
+        ><button id="join" class="secondary">
+          <b data-i18n="menu.join">Bli med</b> <span>→</span>
+        </button>
       </div>
       <!-- The way out, on the screen the player actually lands on rather than
            two taps deep behind the menu plate. It is the same door as
@@ -322,7 +394,7 @@
            aquarium does the talking everywhere else. -->
       <div class="menu-tools">
         <button id="menu-quit" class="menu-quit" type="button" hidden>
-          Back to arcade
+          Tilbake til arkaden
         </button>
       </div>
       <!-- One line of advice, and two versions of it, because this line had
@@ -332,17 +404,28 @@
            the menu cannot describe controls this device is not getting. -->
       <div class="menu-instructions">
         <div class="keys-only">
-          <span class="key">W</span><span class="key">S</span> forward / back
-          <span class="key">A</span><span class="key">D</span> strafe
-          <span class="divider">/</span> Mouse to aim · Click to capture · Esc
-          for menu
+          <span class="key">W</span><span class="key">S</span>
+          <i data-i18n="keys.move">fram / bak</i>
+          <span class="key">A</span><span class="key">D</span>
+          <i data-i18n="keys.strafe">til siden</i>
+          <span class="divider">/</span>
+          <i data-i18n="keys.mouse"
+            >Musa sikter · Klikk for å låse musa · Esc for meny</i
+          >
         </div>
         <div class="touch-only">
-          Left thumb pushes to swim, let go to stop
-          <span class="divider">/</span> drag the right half to look
-          <span class="divider">/</span> you swim where you look
+          <i data-i18n="touch.push"
+            >Venstre tommel skyver deg fram, slipp for å stoppe</i
+          >
+          <span class="divider">/</span>
+          <i data-i18n="touch.look">dra på høyre side for å se deg rundt</i>
+          <span class="divider">/</span>
+          <i data-i18n="touch.where">du svømmer dit du ser</i>
         </div>
-        <span id="version" class="version" title="Checking the running build…"
+        <span
+          id="version"
+          class="version"
+          title="Sjekker hvilken versjon som kjører …"
           >…</span
         >
       </div>
@@ -350,9 +433,9 @@
     </main>
     <section id="hud" hidden>
       <div class="stats glass">
-        <div><small>MASS</small><b id="mass">8.0</b></div>
-        <div><small>SCORE</small><b id="score">0</b></div>
-        <div><small>ROUND</small><b id="timer">5:00</b></div>
+        <div><small data-i18n="hud.mass">MASSE</small><b id="mass">8.0</b></div>
+        <div><small data-i18n="hud.score">POENG</small><b id="score">0</b></div>
+        <div><small data-i18n="hud.time">TID</small><b id="timer">5:00</b></div>
       </div>
       <div id="labels" class="labels"></div>
       <div id="toast" aria-live="polite"></div>
@@ -363,10 +446,12 @@
          below is the code, the keys write into it, and the slots draw what it
          currently says. -->
     <section id="games" class="glass games" hidden>
-      <div class="eyebrow">JOIN A GAME</div>
+      <div class="eyebrow" data-i18n="games.title">BLI MED I ET SPILL</div>
       <b id="dialpad-picked" class="dialpad-slots" aria-live="polite"></b>
       <div id="dialpad-keys" class="dialpad-keys"></div>
-      <label class="sr-only" for="peer-code">Game code</label>
+      <label class="sr-only" for="peer-code" data-i18n="games.code"
+        >Spillkode</label
+      >
       <input
         id="peer-code"
         maxlength="32"
@@ -377,9 +462,23 @@
       />
       <p class="games-hint" id="peer-hint"></p>
       <div class="buttons">
-        <button id="join-peer" type="button">Join <span>→</span></button
-        ><button id="dialpad-back" class="secondary" type="button">Undo</button
-        ><button id="games-back" class="secondary" type="button">Back</button>
+        <button id="join-peer" type="button">
+          <b data-i18n="games.join">Bli med</b> <span>→</span></button
+        ><button
+          id="dialpad-back"
+          class="secondary"
+          type="button"
+          data-i18n="games.undo"
+        >
+          Angre</button
+        ><button
+          id="games-back"
+          class="secondary"
+          type="button"
+          data-i18n="back"
+        >
+          Tilbake
+        </button>
       </div>
     </section>
     <!-- Two groups, and on a desktop you cannot tell they are there: the
@@ -396,13 +495,18 @@
              the one piece of it that was worth reading, the number of fish in
              here, belongs to the list of them. It is the roster's own label
              now, and names it for a screen reader too. -->
-        <h2 id="lobby-title">Waiting for the shoal</h2>
+        <h2 id="lobby-title">Venter på stimen</h2>
         <p class="lobby-invite" id="lobby-invite" hidden>
-          <span>SHARE THIS CODE</span>
+          <span data-i18n="lobby.share">DEL DENNE KODEN</span>
           <b id="lobby-icons" class="lobby-icons" data-selectable></b>
           <b id="lobby-code" data-selectable></b>
-          <button id="copy-code" class="secondary" type="button">
-            Copy the code
+          <button
+            id="copy-code"
+            class="secondary"
+            type="button"
+            data-i18n="lobby.copy"
+          >
+            Kopier koden
           </button>
           <small id="lobby-reach"></small>
         </p>
@@ -411,7 +515,10 @@
       </div>
       <div class="lobby-col">
         <label class="lobby-setting" for="lobby-slider"
-          ><span>MATCH LENGTH · <b id="lobby-minutes">2 min</b></span>
+          ><span
+            ><span data-i18n="lobby.length">SPILLETID</span> ·
+            <b id="lobby-minutes">2 min</b></span
+          >
           <input
             id="lobby-slider"
             type="range"
@@ -419,7 +526,8 @@
             max="5"
             step="1"
             value="2"
-            aria-label="Match length in minutes"
+            aria-label="Spilletid i minutter"
+            data-i18n-aria="lobby.lengthAria"
           />
         </label>
         <!-- How many wild fish there are and how big the biggest get, and
@@ -428,7 +536,10 @@
              aria-valuetext carries the name because "3 of 5" is not the thing
              a player is picking. -->
         <label class="lobby-setting" for="lobby-difficulty"
-          ><span>DIFFICULTY · <b id="lobby-level">Open water</b></span>
+          ><span
+            ><span data-i18n="lobby.level">NIVÅ</span> ·
+            <b id="lobby-level">Middels</b></span
+          >
           <input
             id="lobby-difficulty"
             type="range"
@@ -436,18 +547,26 @@
             max="5"
             step="1"
             value="3"
-            aria-label="Difficulty"
+            aria-label="Vanskelighetsgrad"
+            data-i18n-aria="lobby.levelAria"
           />
           <small id="lobby-level-note"></small>
         </label>
         <p class="lobby-hint" id="lobby-hint"></p>
         <div class="buttons">
-          <button id="ready" class="secondary" type="button">I'm ready</button>
-          <button id="start" type="button" hidden>
-            Start the game <span>→</span>
+          <button id="ready" class="secondary" type="button">
+            Jeg er klar
           </button>
-          <button id="lobby-leave" class="secondary" type="button">
-            Leave
+          <button id="start" type="button" hidden>
+            <b data-i18n="lobby.start">Start</b> <span>→</span>
+          </button>
+          <button
+            id="lobby-leave"
+            class="secondary"
+            type="button"
+            data-i18n="lobby.leave"
+          >
+            Gå ut
           </button>
         </div>
       </div>
@@ -463,17 +582,24 @@
       <p id="overlay-text"></p>
       <div class="buttons" id="overlay-actions" hidden>
         <button id="next-round" type="button">
-          Start a new game <span>→</span></button
-        ><button id="overlay-leave" class="secondary" type="button">
-          Leave
+          <b data-i18n="over.new">Nytt spill</b> <span>→</span></button
+        ><button
+          id="overlay-leave"
+          class="secondary"
+          type="button"
+          data-i18n="over.leave"
+        >
+          Gå ut
         </button>
       </div>
     </section>
-    <dialog id="leave-dialog" aria-label="Game menu">
+    <dialog id="leave-dialog" aria-label="Meny" data-i18n-aria="dialog.label">
       <!-- Says PAUSED only when the tank really has stopped, which is when you
            are the only fish in it. main.js sets it. -->
-      <div class="eyebrow" id="pause-tag">FISHTANK</div>
-      <div class="group-label" id="graphics-label">GRAPHICS</div>
+      <div class="eyebrow" id="pause-tag">MENY</div>
+      <div class="group-label" id="graphics-label" data-i18n="graphics">
+        GRAFIKK
+      </div>
       <div class="quality-slot" id="quality-play"></div>
       <!-- Two volumes, not the one the header's button already covers. Mute is
            a tap for the moment someone walks into the room; these are the mix,
@@ -484,10 +610,13 @@
            not belong permanently in front of the game.
            Label above the slider, which is the shape this game already uses for
            MATCH LENGTH and DIFFICULTY in the lobby. -->
-      <div class="group-label" id="sound-label">SOUND</div>
+      <div class="group-label" id="sound-label" data-i18n="sound">LYD</div>
       <div class="sound-slot">
         <label class="sound-setting" for="vol-music"
-          ><span>MUSIC · <b id="vol-music-val">55</b></span>
+          ><span
+            ><span data-i18n="music">MUSIKK</span> ·
+            <b id="vol-music-val">55</b></span
+          >
           <input
             id="vol-music"
             type="range"
@@ -495,11 +624,15 @@
             max="100"
             step="5"
             value="55"
-            aria-label="Music volume"
+            aria-label="Musikkvolum"
+            data-i18n-aria="music.aria"
           />
         </label>
         <label class="sound-setting" for="vol-sfx"
-          ><span>EFFECTS · <b id="vol-sfx-val">90</b></span>
+          ><span
+            ><span data-i18n="effects">EFFEKTER</span> ·
+            <b id="vol-sfx-val">90</b></span
+          >
           <input
             id="vol-sfx"
             type="range"
@@ -507,17 +640,81 @@
             max="100"
             step="5"
             value="90"
-            aria-label="Effects volume"
+            aria-label="Effektvolum"
+            data-i18n-aria="effects.aria"
           />
         </label>
+      </div>
+      <!-- LANGUAGE, in the panel behind the three bars, which is also the one
+           the start screen opens - so a stranger who cannot read the bokmål the
+           game opened in can find English before a round, and switch back
+           mid-round without anything pausing, restarting or closing. Two equal
+           buttons, Norsk first, each with its flag and its own name written in
+           its own language whatever the current one is, with `lang` so a
+           screen reader says it right. The flags are the hub's drawing, copied
+           from kitchens/index.html as they are; the Union Jack's clipPath ids
+           are page-global, so they carry this page's own prefix. js/i18n.js
+           wires the clicks and writes aria-pressed. -->
+      <div class="group-label" id="language-label" data-i18n="language">
+        SPRÅK
+      </div>
+      <div
+        class="lang-row"
+        role="group"
+        aria-labelledby="language-label"
+        id="language-row"
+      >
+        <button
+          type="button"
+          class="lang-option"
+          data-lang="nb"
+          aria-pressed="true"
+          lang="nb"
+        >
+          <svg viewBox="0 0 22 16" aria-hidden="true">
+            <rect width="22" height="16" fill="#ba0c2f" />
+            <path d="M6 0h4v16H6zM0 6h22v4H0z" fill="#fff" />
+            <path d="M7 0h2v16H7zM0 7h22v2H0z" fill="#00205b" />
+          </svg>
+          Norsk
+        </button>
+        <button
+          type="button"
+          class="lang-option"
+          data-lang="en"
+          aria-pressed="false"
+          lang="en"
+        >
+          <svg viewBox="0 0 60 30" aria-hidden="true">
+            <clipPath id="fishtank-uk-clip">
+              <path d="M0 0v30h60V0z" />
+            </clipPath>
+            <clipPath id="fishtank-uk-diag">
+              <path d="M30 15h30v15zv15H0zH0V0zV0h30z" />
+            </clipPath>
+            <g clip-path="url(#fishtank-uk-clip)">
+              <path d="M0 0v30h60V0z" fill="#012169" />
+              <path d="M0 0l60 30m0-30L0 30" stroke="#fff" stroke-width="6" />
+              <path
+                d="M0 0l60 30m0-30L0 30"
+                clip-path="url(#fishtank-uk-diag)"
+                stroke="#c8102e"
+                stroke-width="4"
+              />
+              <path d="M30 0v30M0 15h60" stroke="#fff" stroke-width="10" />
+              <path d="M30 0v30M0 15h60" stroke="#c8102e" stroke-width="6" />
+            </g>
+          </svg>
+          English
+        </button>
       </div>
       <!-- Both labels are set by main.js: one always goes back to whatever you
            were doing, the other always takes you one step out - out of the
            round, out of the lobby, or out of the game. -->
       <div class="dialog-actions">
-        <button id="continue" type="button" autofocus>Continue</button>
+        <button id="continue" type="button" autofocus>Fortsett</button>
         <button id="confirm-leave" class="secondary" type="button">
-          Leave game
+          Avslutt spillet
         </button>
       </div>
       <!-- Only ever seen if the browser refuses to close its own tab. -->
@@ -534,15 +731,29 @@
          over there says so: it is the one fact about swimming here that
          neither zone can demonstrate on its own. -->
     <div id="touch" hidden>
-      <div id="move-zone" class="touch-zone steer-zone" aria-label="Swim">
+      <div
+        id="move-zone"
+        class="touch-zone steer-zone"
+        aria-label="Svøm"
+        data-i18n-aria="zone.swim"
+      >
         <div id="move-stick" class="joystick floating" hidden>
           <div class="knob"></div>
         </div>
-        <span class="zone-hint">PUSH TO SWIM · LET GO TO STOP</span>
+        <span class="zone-hint" data-i18n="zone.swimHint"
+          >SKYV FOR Å SVØMME · SLIPP FOR Å STOPPE</span
+        >
       </div>
       <!-- No widget on this side: the camera turning is the feedback. -->
-      <div id="depth-zone" class="touch-zone depth-zone" aria-label="Look">
-        <span class="zone-hint">DRAG TO LOOK · YOU SWIM WHERE YOU LOOK</span>
+      <div
+        id="depth-zone"
+        class="touch-zone depth-zone"
+        aria-label="Se"
+        data-i18n-aria="zone.look"
+      >
+        <span class="zone-hint" data-i18n="zone.lookHint"
+          >DRA FOR Å SE · DU SVØMMER DIT DU SER</span
+        >
       </div>
     </div>
     <div id="rotate" class="rotate" role="dialog" aria-live="polite">
@@ -571,13 +782,19 @@
           <circle cx="120" cy="160" r="4" fill="#8fb3a8" />
         </g>
       </svg>
-      <h2>Turn your phone sideways</h2>
-      <p>Fishtank swims in landscape only.</p>
+      <h2 data-i18n="rotate.title">Snu telefonen på siden</h2>
+      <p data-i18n="rotate.body">
+        Fishtank kan bare spilles med telefonen på tvers.
+      </p>
       <button id="rotate-fullscreen" class="rotate-go" type="button" hidden>
-        <b id="rotate-go-label">Or play fullscreen</b> <span>→</span>
+        <b id="rotate-go-label">Eller spill i fullskjerm</b> <span>→</span>
       </button>
       <p class="rotate-note" id="rotate-note" hidden></p>
     </div>
+    <!-- Ahead of the engine and async, so the page is in the player's language
+         while Babylon is still downloading. main.js imports the same URL and
+         gets this one evaluation back rather than a second. -->
+    <script type="module" src="js/i18n.js" async></script>
     <!--
       Babylon comes from jsDelivr, pinned to the exact version in package.json
       and locked with an integrity hash: 7.9 MB the host no longer serves, and

@@ -62,7 +62,7 @@ test("PvP death and respawn restore small size and protect spawn", () => {
   Object.assign(victim, { x: 0, y: 15, z: 2, yaw: 0, pitch: 0, protection: 0 });
   w.tick(0);
   assert.equal(victim.alive, false);
-  assert.equal(victim.killedBy, "One");
+  assert.equal(victim.killedBy, "one", "the predator's id, never a phrase");
   w.tick(C.respawnDelay + 0.1);
   assert.equal(victim.alive, true);
   assert.equal(victim.mass, C.startMass);
@@ -285,7 +285,7 @@ test("a wild fish big enough to eat a player does so, is named, and the player r
   w.npcs = [giant];
   w.tick(0);
   assert.equal(p.alive, false);
-  assert.equal(p.killedBy, "a wild pufferfish");
+  assert.equal(p.killedBy, "giant", "the predator's id, never a phrase");
   // The bite cap applies to wild fish as well: this pufferfish takes a
   // mouthful of its own mass times bite, not the whole eight-mass player.
   const mouthful = Math.min(C.startMass, 20 * C.bite) * C.growth;
@@ -297,7 +297,7 @@ test("a wild fish big enough to eat a player does so, is named, and the player r
         type: "PLAYER_EATEN",
         predator: "giant",
         prey: "one",
-        label: "One",
+        name: "One",
         grew: +mouthful.toFixed(1),
       },
     ],

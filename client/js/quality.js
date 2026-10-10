@@ -14,14 +14,21 @@
 // pause panel during play - so the header carried a settings control at all
 // times and the setting had two looks. Mounting it more than once is still
 // safe: every mounted group redraws from here, so views cannot disagree.
+import { t } from "./i18n.js";
 // Ordered cheapest first, which is the order they are drawn in.
+//
+// The words here are the English reference and what the tests read; what a
+// player sees comes from i18n.js as `quality.<id>`, `.note` and `.long`, in
+// whichever language is chosen. "Potato" became "Simplest" on 2026-10-10 when
+// the arcade's menus went plain: a setting is something you read to find, and
+// a joke in front of it is read twice - in a language that may not be yours.
 export const TIERS = Object.freeze(
   [
     // The note is one short line because it has to sit under the label in a
     // dropdown row; the long version is the title, for a hover on a desktop.
     {
       id: "potato",
-      label: "Potato",
+      label: "Simplest",
       note: "Wireframe and flat colour, like week one",
       long: "The tank as it looked in its first week: a wireframe frame, a grid on the sand, flat colours and no room beyond the glass. For an old tablet, or for a laugh.",
     },
@@ -94,6 +101,20 @@ export const quality = new Quality();
 // Every mounted row group, so all of them redraw when the value changes and
 // two views cannot drift apart.
 const lists = new Set();
+// Words, separately from state, because a language switch changes the one and
+// not the other.
+function label(list) {
+  list.setAttribute("aria-label", t("quality.aria"));
+  for (const option of list.children) {
+    const id = option.dataset.tier;
+    option.title = t(`quality.${id}.long`);
+    option.children[0].textContent = t(`quality.${id}`);
+    option.children[1].textContent = t(`quality.${id}.note`);
+  }
+}
+globalThis.document?.addEventListener?.("arcade:lang", () => {
+  for (const list of lists) label(list);
+});
 function draw(list) {
   for (const option of list.children)
     option.setAttribute(
@@ -124,19 +145,13 @@ export function mountQuality(container, onPick = () => {}) {
   // A radio group, not a menu: the reader should say "2 of 5" rather than
   // announce a popup that does not exist.
   list.setAttribute("role", "radiogroup");
-  list.setAttribute("aria-label", "Graphics quality");
   for (const tier of TIERS) {
     const option = document.createElement("button");
     option.type = "button";
     option.className = "picker-option";
     option.dataset.tier = tier.id;
     option.setAttribute("role", "radio");
-    option.title = tier.long;
-    const name = document.createElement("b");
-    name.textContent = tier.label;
-    const note = document.createElement("small");
-    note.textContent = tier.note;
-    option.append(name, note);
+    option.append(document.createElement("b"), document.createElement("small"));
     option.onclick = () => {
       onPick();
       quality.set(tier.id);
@@ -159,6 +174,7 @@ export function mountQuality(container, onPick = () => {}) {
   });
   container.replaceChildren(list);
   lists.add(list);
+  label(list);
   draw(list);
   return list;
 }

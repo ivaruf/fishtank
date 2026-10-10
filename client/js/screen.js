@@ -20,6 +20,30 @@
 // no orientation lock at all, so if either is missing the buttons stay hidden
 // and the overlay's instruction stands on its own, which is what happened
 // before this existed.
+//
+// Its own words, in both languages, rather than an import of i18n.js: the one
+// control that makes the game bigger must not depend on anything else in the
+// module graph. It reads <html lang>, which the head sets before first paint
+// and i18n.js keeps current, and repaints on `arcade:lang`.
+const WORDS = {
+  nb: {
+    enter: "Fullskjerm",
+    exit: "Avslutt fullskjerm",
+    landscape: "Spill på tvers",
+    orFullscreen: "Eller spill i fullskjerm",
+    noLock: "Denne telefonen vil ikke låse seg på tvers – snu den selv.",
+    failed: "Fikk ikke byttet fullskjerm. Prøv igjen.",
+  },
+  en: {
+    enter: "Fullscreen",
+    exit: "Exit fullscreen",
+    landscape: "Play in landscape",
+    orFullscreen: "Or play fullscreen",
+    noLock: "This phone will not lock sideways — please turn it.",
+    failed: "Fullscreen could not be changed. Please try again.",
+  },
+};
+const words = () => WORDS[document.documentElement.lang] || WORDS.en;
 export function setupFullscreen(onResize) {
   const button = document.getElementById("fullscreen");
   const status = document.getElementById("fullscreen-status");
@@ -35,12 +59,23 @@ export function setupFullscreen(onResize) {
   // fullscreen is still worth having once the phone is turned. Only the label
   // changes, so it never claims something it cannot do.
   const canPin = typeof screen.orientation?.lock === "function";
-  if (rotateButton) {
-    document.getElementById("rotate-go-label").textContent = canPin
-      ? "Play in landscape"
-      : "Or play fullscreen";
-    rotateButton.hidden = false;
+  // The two notes are remembered by kind rather than by sentence, so a
+  // language switch while one is showing can say it again in the other.
+  let noteKind = null,
+    statusKind = null;
+  function paint() {
+    const w = words(),
+      label = document.fullscreenElement ? w.exit : w.enter;
+    button.setAttribute("aria-label", label);
+    button.title = label;
+    if (rotateButton)
+      document.getElementById("rotate-go-label").textContent = canPin
+        ? w.landscape
+        : w.orFullscreen;
+    if (rotateNote && noteKind) rotateNote.textContent = w[noteKind];
+    if (statusKind) status.textContent = w[statusKind];
   }
+  if (rotateButton) rotateButton.hidden = false;
 
   let pinned = false;
   async function pin(active) {
@@ -60,8 +95,8 @@ export function setupFullscreen(onResize) {
       // physically held the other way. The overlay still says which way round.
       pinned = false;
       if (active && rotateNote) {
-        rotateNote.textContent =
-          "This phone will not lock sideways — please turn it.";
+        noteKind = "noLock";
+        paint();
         rotateNote.hidden = false;
       }
     }
@@ -69,10 +104,8 @@ export function setupFullscreen(onResize) {
 
   function sync() {
     const active = !!document.fullscreenElement;
-    const label = active ? "Exit fullscreen" : "Enter fullscreen";
-    button.setAttribute("aria-label", label);
     button.setAttribute("aria-pressed", String(active));
-    button.title = label;
+    paint();
 
     status.hidden = true;
     // After the state has actually changed, which is the only point a lock is
@@ -90,12 +123,13 @@ export function setupFullscreen(onResize) {
       if (document.fullscreenElement) await document.exitFullscreen();
       else await root.requestFullscreen();
     } catch {
-      const message = "Fullscreen could not be changed. Please try again.";
       if (trigger === rotateButton && rotateNote) {
-        rotateNote.textContent = message;
+        noteKind = "failed";
+        paint();
         rotateNote.hidden = false;
       } else {
-        status.textContent = message;
+        statusKind = "failed";
+        paint();
         status.hidden = false;
       }
     } finally {
@@ -105,5 +139,6 @@ export function setupFullscreen(onResize) {
   button.addEventListener("click", () => toggle(button));
   rotateButton?.addEventListener("click", () => toggle(rotateButton));
   document.addEventListener("fullscreenchange", sync);
+  document.addEventListener("arcade:lang", paint);
   sync();
 }

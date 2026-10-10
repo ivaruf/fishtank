@@ -8,7 +8,6 @@ import {
   PREDATORS,
   DIFFICULTY,
   tier,
-  speciesLabel,
   inCover,
   outweighs,
   FILTER,
@@ -279,15 +278,21 @@ export class World {
     prey.alive = false;
     if (prey.chunk) prey.gone = true;
     prey.respawn = prey.npc ? 2 + this.random() * 3 : C.respawnDelay;
-    prey.killedBy = predator.npc
-      ? `a wild ${speciesLabel(predator.species)}`
-      : predator.name;
+    // Who did it, as an id and never as a sentence. It used to be the words
+    // "a wild pufferfish", which had two faults: it was English on every
+    // device whatever language the player chose, and the snapshot codec
+    // packs this field as a fish's SLOT - it looks the value up as an id - so
+    // a guest never received it at all and read "Eaten by undefined". Each
+    // device now names the fish itself, in its own language.
+    prey.killedBy = predator.id;
     this.events.push({
       type: prey.npc ? "NPC_EATEN" : "PLAYER_EATEN",
       predator: predator.id,
       prey: prey.id,
-      // What was eaten and how much the eater grew, for the eater's toast.
-      label: prey.npc ? speciesLabel(prey.species) : prey.name,
+      // What was eaten and how much the eater grew, for the eater's toast:
+      // a species for a wild fish and a name for a player, never a phrase, so
+      // the eater can say it in its own language.
+      ...(prey.npc ? { species: prey.species } : { name: prey.name }),
       grew: +(predator.mass - before).toFixed(1),
     });
   }

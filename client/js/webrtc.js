@@ -231,7 +231,14 @@ export async function joinOverWebRTC(signalling, { timeout = 15000 } = {}) {
       Promise.all([open(reliable), open(fast)]),
       new Promise((_, reject) =>
         setTimeout(
-          () => reject(new Error("No answer from the host. Check the code.")),
+          () =>
+            reject(
+              // The same shape rendezvous.js gives its errors: a key for the
+              // player's language, English for the console.
+              Object.assign(new Error("No answer from the host."), {
+                i18n: ["net.hostSilent"],
+              }),
+            ),
           timeout,
         ),
       ),

@@ -32,6 +32,13 @@ const PEERJS = {
 // than an expectation.
 const brokerId = (code) => `fishtank-v1-${code}`;
 
+// Every failure here is shown to a player, in whichever language they chose -
+// and may still be on screen when they choose the other one. So an error
+// carries what happened as an i18n key and its arguments, `error.i18n`, which
+// main.js renders and re-renders; the English message is for the console.
+export const fail = (english, key, ...args) =>
+  Object.assign(new Error(english), { i18n: [key, ...args] });
+
 let loading = null;
 function loadBroker() {
   if (window.Peer) return Promise.resolve(window.Peer);
@@ -48,7 +55,7 @@ function loadBroker() {
     script.onload = () =>
       window.Peer
         ? resolve(window.Peer)
-        : reject(new Error("Broker script loaded but is unusable."));
+        : reject(fail("Broker script loaded but is unusable.", "net.broken"));
     // A blocked script and a dead network are the same event here, and which
     // one it was is the whole of what the player should do next. The old
     // wording blamed the network for both, so the one cause somebody can
@@ -56,11 +63,15 @@ function loadBroker() {
     // with nothing for it to catch. onLine is trusted only when it says no.
     script.onerror = () =>
       reject(
-        new Error(
-          navigator.onLine === false
-            ? "You are offline, so matchmaking is out of reach."
-            : "A content blocker is stopping the matchmaking code from loading — allow this page and try again.",
-        ),
+        navigator.onLine === false
+          ? fail(
+              "You are offline, so matchmaking is out of reach.",
+              "net.offline",
+            )
+          : fail(
+              "A content blocker is stopping the matchmaking code from loading.",
+              "net.blocked",
+            ),
       );
     document.head.appendChild(script);
   }).catch((error) => {
@@ -115,7 +126,7 @@ export async function hostRendezvous(code, onPeer) {
     const rtc = hostOverWebRTC(signalling, onPeer);
     return {
       mode: "relay",
-      detail: "through your own relay",
+      detail: ["net.relay"],
       close: rtc.close,
     };
   }
@@ -126,14 +137,19 @@ export async function hostRendezvous(code, onPeer) {
       peer.on("open", resolve);
       peer.on("error", (error) =>
         reject(
-          new Error(
-            error.type === "unavailable-id"
-              ? "That code is already in use. Try hosting again."
-              : `Matchmaking failed (${error.type}).`,
-          ),
+          error.type === "unavailable-id"
+            ? fail("That code is already in use.", "net.taken")
+            : fail(
+                `Matchmaking failed (${error.type}).`,
+                "net.failed",
+                error.type,
+              ),
         ),
       );
-      setTimeout(() => reject(new Error("Matchmaking timed out.")), 20000);
+      setTimeout(
+        () => reject(fail("Matchmaking timed out.", "net.timeout")),
+        20000,
+      );
     });
     peer.on("connection", (connection) =>
       connection.on("open", () =>
@@ -152,14 +168,15 @@ export async function hostRendezvous(code, onPeer) {
     // cannot get out — so a slow beat and the return to visibility both look
     // again. reconnect() asks for the same id back, so the code survives.
     let watchers = new Set();
-    let health = { reachable: true, note: "" };
+    // `note` is an i18n key and its arguments, or null when all is well.
+    let health = { reachable: true, note: null };
     const report = (reachable, note) => {
       health = { reachable, note };
       for (const watcher of watchers) watcher(health);
     };
     const revive = () => {
       if (peer.destroyed || !peer.disconnected) return;
-      report(false, "Reopening the tank — the code may not work just now.");
+      report(false, ["net.reopening"]);
       try {
         peer.reconnect();
       } catch {
@@ -168,20 +185,20 @@ export async function hostRendezvous(code, onPeer) {
     };
     peer.on("disconnected", revive);
     // Emitted again each time reconnect() succeeds, so this is the all-clear.
-    peer.on("open", () => report(true, ""));
+    peer.on("open", () => report(true, null));
     peer.on("error", (error) =>
       report(
         false,
         error.type === "unavailable-id"
-          ? "Something else took this code. Host again for a fresh one."
-          : `Matchmaking trouble (${error.type}).`,
+          ? ["net.stolen"]
+          : ["net.trouble", error.type],
       ),
     );
     const beat = setInterval(revive, 5000);
     document.addEventListener("visibilitychange", revive);
     return {
       mode: "broker",
-      detail: "no server needed",
+      detail: ["net.broker"],
       // Lets the lobby say whether the code is actually live, rather than
       // assume it stayed live because it once was.
       watch(fn) {
@@ -203,14 +220,14 @@ export async function hostRendezvous(code, onPeer) {
     const rtc = hostOverWebRTC(signalling, onPeer);
     return {
       mode: "tabs",
-      detail: error.message,
+      detail: error.i18n ?? ["raw", error.message],
       close: rtc.close,
     };
   }
 }
 
-// Join the tank behind a code. Resolves with a channel, or throws with a
-// message worth showing.
+// Join the tank behind a code. Resolves with a channel, or throws an error
+// whose `i18n` is worth showing.
 export async function joinRendezvous(code) {
   const relay = configured();
   if (relay) {
@@ -223,9 +240,14 @@ export async function joinRendezvous(code) {
   await new Promise((resolve, reject) => {
     peer.on("open", resolve);
     peer.on("error", (error) =>
-      reject(new Error(`Matchmaking failed (${error.type}).`)),
+      reject(
+        fail(`Matchmaking failed (${error.type}).`, "net.failed", error.type),
+      ),
     );
-    setTimeout(() => reject(new Error("Matchmaking timed out.")), 20000);
+    setTimeout(
+      () => reject(fail("Matchmaking timed out.", "net.timeout")),
+      20000,
+    );
   });
   const connection = peer.connect(brokerId(code), { reliable: true });
   await new Promise((resolve, reject) => {
@@ -236,14 +258,19 @@ export async function joinRendezvous(code) {
     // is the player's own fault.
     peer.on("error", (error) =>
       reject(
-        new Error(
-          error.type === "peer-unavailable"
-            ? `No tank found with code ${code}. Check the code, and that your friend still has the lobby open with their screen awake.`
-            : `Could not reach the tank (${error.type}).`,
-        ),
+        error.type === "peer-unavailable"
+          ? fail(`No tank found with code ${code}.`, "net.noTank", code)
+          : fail(
+              `Could not reach the tank (${error.type}).`,
+              "net.unreachable",
+              error.type,
+            ),
       ),
     );
-    setTimeout(() => reject(new Error("The tank did not answer.")), 20000);
+    setTimeout(
+      () => reject(fail("The tank did not answer.", "net.noAnswer")),
+      20000,
+    );
   });
   return {
     mode: "broker",

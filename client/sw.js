@@ -31,6 +31,9 @@ const SHELL = [
   "assets/brand/fishtank-title.webp",
   "assets/brand/fishtank-wordmark.webp",
   "js/main.js",
+  // Every word the tank says, in both languages. Without it offline the
+  // module graph would fail to load at all, not merely fall back to English.
+  "js/i18n.js",
   "js/build.js",
   "js/codes.js",
   "js/names.js",

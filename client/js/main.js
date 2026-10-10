@@ -1,4 +1,5 @@
 import { setupFullscreen } from "./screen.js";
+import { t, locale, speciesName } from "./i18n.js";
 import { createAquarium } from "./world.js";
 import { createFish, loadFishModels, wornOutfit } from "./fish.js";
 import { mountQuality, quality, modelDetail, reliefStep } from "./quality.js";
@@ -28,18 +29,35 @@ import {
   direction,
   clamp,
   wrap,
-  speciesLabel,
   outweighs,
   FILTER,
 } from "../../shared/config.js";
 const B = window.BABYLON,
   $ = (id) => document.getElementById(id);
+// Every line this file writes into the page goes through say(), which keeps
+// how to write it - an i18n key and its arguments, or a function that builds
+// the words - beside the element. A language switch then says every one of
+// them again in the other language, wherever it is on screen and however
+// long ago it was written: the lobby's reach line, a join error, the toast
+// that is still fading, the build line. Nothing is stored as a finished
+// sentence, which is also why nothing here ever sends one to a peer.
+const said = new Map();
+function say(id, what, ...args) {
+  const el = typeof id === "string" ? $(id) : id;
+  if (what == null || what === "") {
+    said.delete(el);
+    el.textContent = "";
+    return;
+  }
+  const words = typeof what === "function" ? what : () => t(what, ...args);
+  said.set(el, words);
+  el.textContent = words();
+}
 let aquarium;
 try {
   aquarium = createAquarium($("game"));
 } catch (e) {
-  $("error").textContent =
-    "This aquarium needs WebGL. Please enable hardware acceleration or try another browser.";
+  say("error", "error.webgl");
   throw e;
 }
 const { engine, scene, camera } = aquarium,
@@ -58,7 +76,7 @@ for (const type of ["pointerdown", "keydown"])
   window.addEventListener(type, () => audio.unlock(), { capture: true });
 function syncMute() {
   const on = audio.muted,
-    label = on ? "Unmute sound" : "Mute sound";
+    label = t(on ? "mute.off" : "mute.on");
 
   $("mute").setAttribute("aria-pressed", String(on));
   $("mute").setAttribute("aria-label", label);
@@ -164,6 +182,30 @@ const ask = (url) =>
 // tools/build-static.mjs writes version.json beside the page. Serving the
 // repo directly for development has no such file, which is why "build unknown"
 // below is a normal thing to see rather than a fault.
+// What the build line knows, kept so a language switch can say it again.
+let served = null;
+function paintVersion() {
+  const line = $("version");
+  if (!served) return;
+  if (served.unknown) {
+    line.textContent = t("build.unknown");
+    line.title = t("build.unknownTitle");
+    return;
+  }
+  const { version, started, protocol, stale } = served;
+  line.textContent = stale
+    ? t("build.stale", BUILD)
+    : t("build.label", version);
+  const when = new Date(started);
+  line.title = stale
+    ? t("build.staleTitle", BUILD, version)
+    : t(
+        "build.title",
+        version,
+        protocol,
+        isNaN(when) ? started : when.toLocaleString(locale()),
+      );
+}
 ask("version.json")
   .then(({ version, started, protocol }) => {
     // `version` is the build being served; BUILD is the build this page is
@@ -172,15 +214,9 @@ ask("version.json")
     // reporting the served number would be a straight lie: it is the case the
     // line exists to catch.
     const stale = BUILD !== "dev" && version !== BUILD;
-    $("version").textContent = stale
-      ? `build ${BUILD} · TAP FOR THE NEW ONE`
-      : `build ${version}`;
+    served = { version, started, protocol, stale };
+    paintVersion();
     $("version").classList.toggle("stale", stale);
-    const when = new Date(started);
-    $("version").title = stale
-      ? `This page is running build ${BUILD}, but build ${version} is deployed. Tap to reload.`
-      : `Build ${version}, protocol ${protocol}, running since ` +
-        (isNaN(when) ? started : when.toLocaleString());
     if (stale)
       $("version").onclick = () =>
         // Drop the worker's copy too, and wait for it: a reload that overtakes
@@ -196,8 +232,8 @@ ask("version.json")
   })
   .catch(() => {
     // Say it is unknown rather than show a stale or invented version.
-    $("version").textContent = "build unknown";
-    $("version").title = "Could not find a build number to report.";
+    served = { unknown: true };
+    paintVersion();
   });
 // How long the camera lingers on the predator before the banner appears.
 const DEATH_CAM_SECONDS = 2.2;
@@ -287,15 +323,21 @@ $("species").replaceChildren(
     thumb.width = 58;
     thumb.height = 48;
     const name = document.createElement("span");
-    // Long single-word names may break before "fish" on narrow cards.
-    name.textContent = speciesLabel(species).replace(
-      /^(.{6,})fish$/,
-      "$1\u00adfish",
-    );
+    name.dataset.species = species;
     option.append(input, thumb, name);
     return option;
   }),
 );
+// The cards' names, in the current language. Long single-word names may
+// break before "fish" - or "fisk" - on narrow cards.
+function paintSpecies() {
+  for (const name of document.querySelectorAll("#species [data-species]"))
+    name.textContent = speciesName(name.dataset.species).replace(
+      /^(.{6,})(fish|fisk)$/,
+      "$1\u00ad$2",
+    );
+}
+paintSpecies();
 // After layout, and again if the phone turns, bring the chosen fish into view.
 const revealChosen = () =>
   revealSpecies(
@@ -303,9 +345,11 @@ const revealChosen = () =>
   );
 requestAnimationFrame(revealChosen);
 carousel.addEventListener("change", () => requestAnimationFrame(revealChosen));
-function toast(text, ms = 1400) {
+// A toast is said like everything else, so one still fading when the language
+// changes finishes in the new one.
+function toast(ms, what, ...args) {
   toastUntil = performance.now() + ms;
-  $("toast").textContent = text;
+  say("toast", what, ...args);
 }
 function clearFish() {
   for (const v of visuals.values()) v.dispose();
@@ -326,9 +370,7 @@ const syncPreview = () => {
   const touch = mobilePreview.matches;
   previewLight.intensity = touch ? 2.1 : 1.5;
   // The gesture worth naming is the one this device has.
-  previewHint.textContent = touch
-    ? "Your fish · drag to turn · pinch to zoom"
-    : "Your fish · drag to turn · scroll to zoom";
+  previewHint.textContent = t(touch ? "preview.touch" : "preview.mouse");
 };
 mobilePreview.addEventListener("change", syncPreview);
 syncPreview();
@@ -511,11 +553,14 @@ const framed = () => {
 // control a player reaches for when they have stopped wanting to play, and
 // "Leave fish tank" made them read a joke to find the handle. The aquarium
 // does the talking everywhere else.
+//
+// Asked again on every language switch: verb() hands back one of the two
+// words it is given, so it has to be given them in the language of the day.
 const exitWords = () =>
   window.ArcadeExit?.verb({
-    arcade: "Back to arcade",
-    app: "Close",
-  }) ?? (framed() ? "Back to arcade" : "Close");
+    arcade: t("exit.arcade"),
+    app: t("exit.close"),
+  }) ?? t(framed() ? "exit.arcade" : "exit.close");
 // `refused` is the one outcome we are still alive to see, and it now only
 // happens to an installed app whose window the browser will not close - iOS,
 // in practice. Framed hands back to the launcher and a tab navigates to the
@@ -551,19 +596,21 @@ function openGameMenu() {
   // still hunting you is worse than one that never claimed to be.
   if (inRound) network?.request("PAUSE", { on: true });
   const alone = state?.players.length === 1;
-  $("pause-tag").textContent = inRound && alone ? "PAUSED" : "FISHTANK";
-  $("continue").textContent = inRound ? "Continue" : "Back";
+  // MENU over a panel that has not stopped anything, PAUSE over one that has.
+  // It said the game's own name until 2026-10-10, when the arcade's menus
+  // went plain: a panel is named for what it is.
+  say("pause-tag", inRound && alone ? "pause.paused" : "pause.menu");
+  say("continue", inRound ? "resume" : "back");
   // On the menu there is no tank to leave, so the corner leaves the GAME - and
   // what that means is exit.js's question, not ours, asked through exitWords()
   // so this and the menu screen's own button cannot come to disagree. It says
   // "back to arcade" for a framed game AND for an ordinary tab, because a tab
   // has nowhere to close to but somewhere to go; only an installed window
   // closes.
-  $("confirm-leave").textContent = !state
-    ? exitWords()
-    : inRound
-      ? "Leave game"
-      : "Leave lobby";
+  say(
+    "confirm-leave",
+    !state ? exitWords : inRound ? "leave.game" : "leave.lobby",
+  );
   $("pause-note").hidden = true;
   $("leave-dialog").showModal();
 }
@@ -615,7 +662,8 @@ document.querySelector(".brand").addEventListener("click", (event) => {
     openGameMenu();
   }
 });
-function leave(message = "") {
+// `message` is an i18n key for the menu's error line, or nothing.
+function leave(message = null) {
   leavePromptOpen = false;
   $("leave-dialog").close();
   controls.setActive(false);
@@ -632,15 +680,15 @@ function leave(message = "") {
   deathCam = null;
   clearFish();
   stopSignalling();
-  $("peer-hint").textContent = "";
+  say("peer-hint", null);
   $("menu").hidden = false;
   $("hud").hidden = true;
   $("games").hidden = true;
   $("lobby").hidden = true;
   $("overlay").hidden = true;
   $("touch").hidden = true;
-  $("error").textContent = message;
-  $("connection").textContent = "";
+  say("error", message);
+  say("connection", null);
   audio.music("menu");
 }
 // mode "single" plays immediately; "multiplayer" needs a tank, either the one
@@ -660,7 +708,7 @@ function handlers(current, kind) {
       $("menu").hidden = true;
       $("games").hidden = true;
       $("hud").hidden = false;
-      $("error").textContent = "";
+      say("error", null);
       touchMode = matchMedia("(pointer:coarse)").matches;
       // The zones themselves are put up by syncControls, on the first snapshot
       // that says a round is actually running - welcome lands in the lobby,
@@ -671,11 +719,11 @@ function handlers(current, kind) {
       // be joined mid-round, so it stays on screen once the lobby is gone -
       // and it is the thing someone reads out loud, which "YOUR TANK · CODE"
       // in front of it did nothing for but wrap it onto two lines.
-      $("connection").textContent = invite
-        ? `Code: ${spellCode(invite.code)}`
-        : solo
-          ? "Solo aquarium"
-          : (roomName ?? "A friend's tank");
+      //
+      // The transport's own room label is English and stays in the console:
+      // a guest is always in a friend's tank, and says so in its own words.
+      if (invite) say("connection", "conn.code", spellCode(invite.code));
+      else say("connection", solo ? "conn.solo" : "conn.friend");
       // Host and guest are two browsers with two copies of this code, so a
       // mismatch means one of them has not reloaded. It is the guest that can
       // see both numbers, so it is the guest that says so.
@@ -683,7 +731,7 @@ function handlers(current, kind) {
         console.warn(
           `The host speaks protocol ${protocol}, this tank expects ${PROTOCOL}. One of you is on an older build; reload both.`,
         );
-        $("connection").textContent = "Different builds — reload both";
+        say("connection", "conn.mismatch");
       }
     },
     onState(next) {
@@ -707,10 +755,7 @@ function handlers(current, kind) {
         if (e.type === "ROUND_END") audio.play("round-end");
         if (e.type === "FILTER_ARMED") {
           audio.play("pad");
-          toast(
-            "⚡ The filter is sparking. Hit its red button to zap the biggest fish.",
-            3500,
-          );
+          toast(3500, "toast.filter");
         }
         if (e.type === "BUZZ" && e.by === myId) audio.play("buzz");
         if (e.type === "ZAP") {
@@ -718,11 +763,23 @@ function handlers(current, kind) {
           const victim = [...next.players, ...next.npcs].find(
             (f) => f.id === e.target,
           );
-          const who =
-            e.target === myId
-              ? "You got zapped"
-              : `${victim?.npc ? `A wild ${speciesLabel(victim.species)}` : (victim?.name ?? "The big fish")} got zapped`;
-          toast(`⚡ ${who}! ${e.lost} mass scattered as snacks`, 2600);
+          // Who, decided now; the sentence, decided whenever it is said -
+          // so a switch mid-toast says the same news in the other language.
+          const self = e.target === myId,
+            wild = victim?.npc ? victim.species : null,
+            name = victim?.name,
+            lost = e.lost;
+          toast(2600, () =>
+            t(
+              "toast.zapped",
+              self
+                ? t("toast.you")
+                : wild
+                  ? t("toast.wild", speciesName(wild))
+                  : (name ?? t("toast.bigFish")),
+              lost,
+            ),
+          );
           const at = visuals.get(e.target)?.root.position;
           if (at) filter.zap(at);
         }
@@ -754,21 +811,35 @@ function handlers(current, kind) {
           prey.die(e.predator, e.prey === myId ? 1.6 : undefined);
           puffs.burst(prey.root.position, prey.root.scaling.x);
         }
-        if (e.predator === myId)
-          toast(
-            `Ate ${e.label ?? "a snack"}, grew ${(e.grew ?? 0).toFixed(1)}`,
+        if (e.predator === myId) {
+          // The host sends what was eaten - a species or a player's name -
+          // and never the phrase, which is this device's to build.
+          const { species, name } = e,
+            grew = (e.grew ?? 0).toFixed(1);
+          toast(1400, () =>
+            t(
+              "toast.ate",
+              species
+                ? t("toast.meal", speciesName(species))
+                : (name ?? t("toast.snack")),
+              grew,
+            ),
           );
+        }
       }
     },
-    onError(message) {
-      $("error").textContent = message;
+    // A host's refusal carries a key beside its English, so it is said in
+    // this player's language rather than the host's.
+    onError(message, key) {
+      if (key) say("error", `error.${key}`);
+      else say("error", "raw", message);
     },
     onClose() {
       if (network !== current()) return;
       // The only thing that can close now is the peer link: the host closed
       // its tab, or the connection died. Either way there is nothing to
       // reconnect to, so send them back to the menu rather than imply there is.
-      leave("The tank closed. Host one, or join a friend again.");
+      leave("error.closed");
     },
   };
 }
@@ -779,7 +850,7 @@ $("join").onclick = () => {
   audio.play("click");
   if (network) return;
   $("games").hidden = false;
-  peerNote("");
+  peerNote(null);
   drawPicked();
 };
 // Peer to peer, which is now the only kind of multiplayer there is. One player
@@ -816,9 +887,13 @@ function stopSignalling() {
   signalling = null;
   invite = null;
 }
-function peerNote(text) {
-  $("peer-hint").textContent = text;
+// The join pad's one line: an i18n key and its arguments, or nothing.
+function peerNote(key, ...args) {
+  say("peer-hint", key, ...args);
 }
+// What a failed matchmaking step says: its own key where it has one, and its
+// English message where it is something nobody anticipated.
+const failure = (error) => error?.i18n ?? ["raw", error?.message ?? error];
 // Dive in: host a tank and wait in the lobby. There is no separate solo path
 // any more, and there does not need to be - a tank with nobody in it is a solo
 // run, and one that a friend joins is not, which is the same tank either way.
@@ -829,7 +904,7 @@ $("dive").onclick = async () => {
   if (network || joining) return;
   closePanel();
   const code = newCode();
-  invite = { code, mode: "opening", detail: "" };
+  invite = { code, mode: "opening", detail: null };
   const host = hostGame({
     // A tank you host is a tank you are inviting people to, so it waits in the
     // lobby like a server tank rather than dropping you into a round alone —
@@ -850,7 +925,7 @@ $("dive").onclick = async () => {
       code,
       mode: signalling.mode,
       detail: signalling.detail,
-      note: "",
+      note: null,
     };
     // Holding a code is not the same as still holding it: the rendezvous tells
     // us when it drops, so the lobby can stop claiming the code works.
@@ -863,19 +938,19 @@ $("dive").onclick = async () => {
     if (state) updateUI();
   } catch (error) {
     // The lobby's own reach line says this, and says it where the code is.
-    invite = { code, mode: "failed", detail: error.message, note: "" };
+    invite = { code, mode: "failed", detail: failure(error), note: null };
     if (state) updateUI();
   }
 };
 async function joinPeer(code) {
   if (network || joining) return;
   joining = true;
-  peerNote(`Looking for ${spellCode(code)}…`);
+  peerNote("peer.looking", spellCode(code));
   try {
     const found = await joinRendezvous(code);
     signalling = found;
     joining = false;
-    peerNote(`Joined ${spellCode(code)}.`);
+    peerNote("peer.joined", spellCode(code));
     const guest = joinGame({
       join: {
         name: playerName(),
@@ -889,7 +964,7 @@ async function joinPeer(code) {
   } catch (error) {
     joining = false;
     stopSignalling();
-    peerNote(error.message);
+    peerNote(...failure(error));
     // A wrong code has to be cheap to recover from, so clear it and leave the
     // pad ready rather than making them undo every tap.
     field.value = "";
@@ -947,7 +1022,7 @@ $("join-peer").onclick = () => {
   audio.play("click");
   if (network || joining) return;
   const code = parseCode(field.value);
-  if (!code) return peerNote("Three pictures, or their words.");
+  if (!code) return peerNote("peer.need");
   joinPeer(code);
 };
 drawPicked();
@@ -957,13 +1032,13 @@ $("copy-code").onclick = async () => {
   if (!text) return;
   try {
     await navigator.clipboard.writeText(text);
-    $("copy-code").textContent = "Copied!";
+    say("copy-code", "lobby.copied");
   } catch {
     // No clipboard permission, or an insecure context on the LAN. The code is
     // selectable on screen either way, so say that rather than fail silently.
-    $("copy-code").textContent = "Select it above to copy";
+    say("copy-code", "lobby.select");
   }
-  setTimeout(() => ($("copy-code").textContent = "Copy the code"), 2000);
+  setTimeout(() => say("copy-code", "lobby.copy"), 2000);
 };
 $("games-back").onclick = () => {
   audio.play("click");
@@ -980,8 +1055,7 @@ $("confirm-leave").onclick = () => {
       // The panel has a line of its own for this, and it is only worth writing
       // if the panel is still up to read it in.
       if (!leavePromptOpen) return;
-      $("pause-note").textContent =
-        "Your browser will not let this window close itself — close it yourself to finish.";
+      say("pause-note", "exit.refused");
       $("pause-note").hidden = false;
     });
 };
@@ -1006,14 +1080,14 @@ $("confirm-leave").onclick = () => {
   const exit = window.ArcadeExit;
   if (exit && (exit.framed() || exit.standalone())) {
     const button = $("menu-quit");
-    button.textContent = exitWords();
+    say(button, exitWords);
     button.hidden = false;
     button.onclick = () => {
       audio.play("click");
       quitGame(() => {
         // There is no note line on this screen, so the button says it itself
         // rather than leaving a control that looks like it did nothing.
-        button.textContent = "Close this tab yourself";
+        say(button, "exit.yourself");
         button.disabled = true;
       });
     };
@@ -1047,7 +1121,7 @@ $("lobby-leave").onclick = () => {
 $("lobby-slider").addEventListener("pointerdown", () => (dragging = true));
 $("lobby-slider").addEventListener("pointerup", () => (dragging = false));
 $("lobby-slider").addEventListener("input", () => {
-  $("lobby-minutes").textContent = `${$("lobby-slider").value} min`;
+  say("lobby-minutes", "lobby.minutes", $("lobby-slider").value);
   network?.request("SETTINGS", {
     duration: Number($("lobby-slider").value) * 60,
   });
@@ -1067,11 +1141,15 @@ $("lobby-difficulty").addEventListener("input", () => {
 });
 // Named, described, and announced by name: a slider reading "3 of 5" tells a
 // player nothing about what they just chose.
+//
+// The words come from i18n.js by the tier's number, not from shared/config.js:
+// the table's own names were places ("The trench"), and since 2026-10-10 the
+// setting says plainly how hard it is while the line under it keeps the place.
 function showDifficulty(level) {
-  const chosen = tier(level);
-  $("lobby-level").textContent = chosen.name;
-  $("lobby-level-note").textContent = chosen.blurb;
-  $("lobby-difficulty").setAttribute("aria-valuetext", chosen.name);
+  const n = DIFFICULTY.indexOf(tier(level)) + 1;
+  say("lobby-level", `difficulty.${n}`);
+  say("lobby-level-note", `difficulty.${n}.blurb`);
+  $("lobby-difficulty").setAttribute("aria-valuetext", t(`difficulty.${n}`));
 }
 // Lobby panel: who is in, who is ready, the host's match length and
 // difficulty, and start.
@@ -1085,7 +1163,7 @@ function updateLobby(me) {
     ready = new Set(lobby.ready),
     allReady = state.players.every((p) => ready.has(p.id));
   // The roster's label, and the only count on this screen.
-  $("lobby-count").textContent = `${state.players.length} IN`;
+  $("lobby-count").textContent = t("lobby.count", state.players.length);
   $("lobby-players").replaceChildren(
     ...state.players.map((p) => {
       const li = document.createElement("li"),
@@ -1093,10 +1171,9 @@ function updateLobby(me) {
         flag = document.createElement("span");
       name.textContent =
         (p.id === lobby.host ? "👑 " : "") +
-        p.name +
-        (p.id === myId ? " (you)" : "");
+        (p.id === myId ? t("you", p.name) : p.name);
       flag.className = "state" + (ready.has(p.id) ? " ready" : "");
-      flag.textContent = ready.has(p.id) ? "READY ✓" : "NOT READY";
+      flag.textContent = t(ready.has(p.id) ? "lobby.ready" : "lobby.notReady");
       li.append(name, flag);
       return li;
     }),
@@ -1112,19 +1189,20 @@ function updateLobby(me) {
       .map((s) => s?.icon ?? "?")
       .join("");
     $("lobby-code").textContent = spellCode(invite.code);
+    const detail = invite.detail ? t(...invite.detail) : "";
     $("lobby-reach").textContent =
       invite.mode === "tabs"
-        ? `⚠ This code only reaches other tabs in this browser — ${invite.detail}`
+        ? t("lobby.reachTabs", detail)
         : invite.mode === "failed"
-          ? `⚠ ${invite.detail} Nobody can join with this code.`
+          ? t("lobby.reachFailed", detail)
           : invite.mode === "opening"
-            ? "Opening the tank…"
-            : "They tap these three under Join game.";
+            ? t("lobby.opening")
+            : t("lobby.howTo");
   }
   const minutes = Math.round(lobby.duration / 60);
   if (!dragging) $("lobby-slider").value = String(minutes);
   $("lobby-slider").disabled = !iAmHost;
-  $("lobby-minutes").textContent = `${minutes} min`;
+  say("lobby-minutes", "lobby.minutes", minutes);
   // Everyone sees what they are about to swim into, host or not; only the host
   // can move it. Not while a thumb is on it, or the host's own drag fights the
   // snapshot coming back.
@@ -1141,7 +1219,7 @@ function updateLobby(me) {
   const alone = state.players.length === 1 && iAmHost;
   if (alone && !mine) network?.request("READY", { ready: true });
   $("ready").hidden = alone;
-  $("ready").textContent = mine ? "Ready ✓" : "I'm ready";
+  $("ready").textContent = t(mine ? "lobby.readyMine" : "lobby.imReady");
   $("ready").setAttribute("aria-pressed", String(mine));
   $("start").hidden = !iAmHost;
   $("start").disabled = !allReady;
@@ -1149,24 +1227,24 @@ function updateLobby(me) {
   // tank", which is a label for the screen you are looking at rather than news
   // about it - and the hint below already says what to do about being alone.
   // Hidden rather than blank: an empty h2 still takes its line.
-  const title = alone
-    ? ""
-    : allReady
-      ? "Everyone is ready"
-      : "Waiting for the shoal";
+  const title = alone ? "" : t(allReady ? "lobby.allReady" : "lobby.waiting");
   $("lobby-title").textContent = title;
   $("lobby-title").hidden = !title;
   // The lobby already shows who is in, who is ready and the code to share, so
   // this line only says the thing the buttons cannot.
   $("lobby-hint").textContent = alone
-    ? "Start now, or share the code and wait."
+    ? t("lobby.hintAlone")
     : iAmHost
       ? allReady
         ? ""
-        : "Start once everyone is ready."
+        : t("lobby.hintHost")
       : allReady
-        ? `Waiting for ${state.players.find((p) => p.id === lobby.host)?.name ?? "the host"}.`
-        : "Mark yourself ready.";
+        ? t(
+            "lobby.hintWaitHost",
+            state.players.find((p) => p.id === lobby.host)?.name ??
+              t("lobby.theHost"),
+          )
+        : t("lobby.hintMark");
 }
 // Alone in the tank is the one case with a goal of its own, because "you win"
 // is true whatever you did: be the biggest thing in the water when the clock
@@ -1207,7 +1285,7 @@ function updateUI() {
   $("leaders").replaceChildren(
     ...ranked.slice(0, 8).map((p) => {
       const li = document.createElement("li");
-      li.textContent = p.name + (p.id === myId ? " (you)" : "");
+      li.textContent = p.id === myId ? t("you", p.name) : p.name;
       const score = document.createElement("span");
       score.textContent = p.score;
       li.append(score);
@@ -1222,7 +1300,7 @@ function updateUI() {
     me.alive &&
     me.mass >= biggestWild(state).mass;
   if (onTop && !wasBiggest) {
-    toast("Biggest fish in the tank — now hold it to the clock.", 3200);
+    toast(3200, "toast.biggest");
     audio.play("pad");
   }
   wasBiggest = onTop;
@@ -1231,37 +1309,61 @@ function updateUI() {
     (me.alive && state.phase === "playing") ||
     !!(deathCam && !deathCam.done);
   if (state.phase === "results") {
-    $("overlay-tag").textContent = `ROUND ${state.round} COMPLETE`;
+    $("overlay-tag").textContent = t("over.round", state.round);
     if (solo(state)) {
       // Alone, "you win" was true whatever you did, which is not a result.
       // The tank sets the bar instead: be the biggest thing in it when the
       // clock runs out.
       const rival = biggestWild(state);
       const won = me.mass >= rival.mass;
-      $("overlay-title").textContent = won
-        ? "You are the biggest fish!"
-        : "Out-grown.";
+      $("overlay-title").textContent = t(
+        won ? "over.biggest" : "over.outgrown",
+      );
       $("overlay-text").textContent = won
-        ? `Nothing left in the tank could take you.\n` +
-          `${me.mass.toFixed(1)} mass · score ${me.score}`
-        : `A ${speciesLabel(rival.species)} finished bigger, at ${rival.mass.toFixed(1)} mass.\n` +
-          `You reached ${me.mass.toFixed(1)} · score ${me.score}`;
+        ? t("over.won", me.mass.toFixed(1), me.score)
+        : t(
+            "over.lost",
+            speciesName(rival.species),
+            rival.mass.toFixed(1),
+            me.mass.toFixed(1),
+            me.score,
+          );
     } else {
-      $("overlay-title").textContent = `${ranked[0]?.name || "Nobody"} wins!`;
+      $("overlay-title").textContent = t(
+        "over.wins",
+        ranked[0]?.name || t("over.nobody"),
+      );
       const largest = [...state.players].sort((a, b) => b.mass - a.mass)[0];
-      $("overlay-text").textContent =
-        `Largest fish: ${largest.name} · ${largest.mass.toFixed(1)} mass\nYour score: ${me.score}`;
+      $("overlay-text").textContent = t(
+        "over.multi",
+        largest.name,
+        largest.mass.toFixed(1),
+        me.score,
+      );
     }
     $("overlay-actions").hidden = false;
   } else if (!me.alive) {
     // Being eaten is not the end of anything: the respawn counter is already
     // running, so this card offers nothing to press.
     $("overlay-actions").hidden = true;
-    $("overlay-tag").textContent = "THERE’S ALWAYS A BIGGER FISH";
-    $("overlay-title").textContent = "You became lunch.";
-    $("overlay-text").textContent =
-      `Eaten by ${me.killedBy}\nBack in the water in ${Math.ceil(me.respawn)}s`;
+    $("overlay-tag").textContent = t("over.deathTag");
+    $("overlay-title").textContent = t("over.lunch");
+    $("overlay-text").textContent = t(
+      "over.eaten",
+      killerName(me.killedBy),
+      Math.ceil(me.respawn),
+    );
   }
+}
+// Who ate you, from the id the host sends: a player by their own name, a wild
+// fish by its species in this device's language. A predator who has since
+// left the tank has no name to give, and gets an honest shrug.
+function killerName(id) {
+  const fish =
+    state?.players.find((p) => p.id === id) ??
+    state?.npcs.find((n) => n.id === id);
+  if (!fish) return t("killer.unknown");
+  return fish.npc ? t("killer.wild", speciesName(fish.species)) : fish.name;
 }
 // Where a fish's mouth is right now, or null if it is not being shown.
 function mouth(v) {
@@ -1425,6 +1527,25 @@ function adaptResolution(now) {
     relief = next;
   }
 }
+// A language switch, from the row in the menu panel. Everything is said again
+// where it stands: no reload, nothing restarted, the panel left open, and a
+// round in progress left exactly as it was - a networked one never stopped,
+// and a solo one stays paused until Resume. i18n.js has already repainted the
+// markup's own words; this is the part built at runtime.
+document.addEventListener("arcade:lang", () => {
+  audio.play("click");
+  syncMute();
+  syncPreview();
+  paintVersion();
+  paintSpecies();
+  for (const [el, words] of said) el.textContent = words();
+  // A suggested name is offered in the player's language. One they typed or
+  // rolled is theirs, and is left alone.
+  if (!$("name").value) $("name").placeholder = fishName();
+  // The lobby, the HUD, the roster and the end-of-round card are all drawn
+  // from the last snapshot, so drawing them again is the whole repaint.
+  if (state) updateUI();
+});
 engine.runRenderLoop(() => {
   if (portrait.matches) return;
   const dt = Math.min(engine.getDeltaTime() / 1000, 0.05);

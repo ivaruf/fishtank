@@ -205,7 +205,13 @@ export function hostGame({
         // it: a peer that has connected but not asked for a seat holds none,
         // and refusing before its JOIN arrives would race its own message.
         if (sim.count() >= C.maxPlayers) {
-          channel.send({ type: "ERROR", message: "This tank is full." });
+          // A key as well as the English: the guest says it in its own
+          // language, which is not necessarily the host's.
+          channel.send({
+            type: "ERROR",
+            key: "full",
+            message: "This tank is full.",
+          });
           return;
         }
         // Welcome only once the simulation confirms the seat, since a worker
@@ -322,7 +328,7 @@ export function joinGame({
       onWelcome(message.id, message.protocol, "Their tank");
     } else if (message.type === "ROSTER") unpacker.roster(message);
     else if (message.type === "EVENTS") pending.push(...message.events);
-    else if (message.type === "ERROR") onError?.(message.message);
+    else if (message.type === "ERROR") onError?.(message.message, message.key);
     else if (message.type === "HOST_LEFT") {
       // Not a network fault: the person running the game left.
       closed = true;
