@@ -72,7 +72,13 @@ self.addEventListener("install", (event) => {
       // One miss must not fail the whole install, or a single renamed file
       // would leave the game with no offline support at all.
       await Promise.all(
-        SHELL.map((url) => cache.add(url).catch(() => undefined)),
+        // cache: "reload" so the install reads past the browser's HTTP
+        // cache and never files a stale copy under a new version (hub §3).
+        SHELL.map((url) =>
+          cache
+            .add(new Request(url, { cache: "reload" }))
+            .catch(() => undefined),
+        ),
       );
       await self.skipWaiting();
     }),
