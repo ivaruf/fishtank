@@ -376,25 +376,29 @@
           <b data-i18n="menu.join">Bli med</b> <span>→</span>
         </button>
       </div>
-      <!-- The way out, on the screen the player actually lands on rather than
-           two taps deep behind the menu plate. It is the same door as
-           #confirm-leave in that panel - main.js labels both from the one
-           verb() call so the two can never come to disagree - but this is
-           where somebody who has stopped wanting to play goes looking.
+      <!-- The way out, on the screen the player actually lands on. It is the
+           same door as #dialog-quit in the panel behind the three bars -
+           main.js labels both from the one verb() call so the two can never
+           come to disagree.
            Hidden in the markup, and only ever shown when ../../arcade/exit.js
            says there is somewhere to go: it is another repository's file and
            is allowed to be missing, and a door that leads nowhere is worse
            than no door. Not a third option beside the two above it, either -
            those are a choice between swimming alone and swimming with someone,
-           and leaving is not one of them, so it stands under them quietly
-           rather than in their row.
-           Plain words, deliberately not this game's own. A way out is the one
-           control a player reaches for when they have stopped wanting to play,
-           and "Leave fish tank" made them read a joke to find the handle. The
-           aquarium does the talking everywhere else. -->
+           and leaving is not one of them, so it stands under them, the last
+           row of the form, a little further off, outlined rather than filled.
+           ONE BUTTON IN EVERY CABINET (hub §2, 2026-10-11): the same back
+           arrow, the same sentence-case words and the same place - last in
+           the column, full width - in all of them, so a player crossing from
+           one game to the next finds the way out without reading for it. The
+           words live in the <span> so main.js can rewrite them per language
+           without taking the drawing with them. -->
       <div class="menu-tools">
         <button id="menu-quit" class="menu-quit" type="button" hidden>
-          Tilbake til arkaden
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M19 12H5m6-6-6 6 6 6" />
+          </svg>
+          <span id="menu-quit-label">Tilbake til arkaden</span>
         </button>
       </div>
       <!-- One line of advice, and two versions of it, because this line had
@@ -709,15 +713,33 @@
         </button>
       </div>
       <!-- Both labels are set by main.js: one always goes back to whatever you
-           were doing, the other always takes you one step out - out of the
-           round, out of the lobby, or out of the game. -->
+           were doing, the other takes you one step out - out of the round or
+           out of the lobby. Opened from the menu screen there is nothing to
+           step out of, so the second is hidden there and this panel is
+           Settings with a Back. -->
       <div class="dialog-actions">
         <button id="continue" type="button" autofocus>Fortsett</button>
         <button id="confirm-leave" class="secondary" type="button">
           Avslutt spillet
         </button>
       </div>
-      <!-- Only ever seen if the browser refuses to close its own tab. -->
+      <!-- The way out of the GAME, at the top level of the in-play menu. It
+           used to live one layer further in: leave the round, land on the menu
+           screen, find the button there - and the owner found that confusing,
+           because a player who has stopped wanting to play should not have to
+           take two exits to reach the one they meant. Shown only mid-session
+           (lobby or round) and only when exit.js says there is somewhere to
+           go; on the menu screen this panel is a settings panel, and the way
+           out is on the screen itself rather than inside a second layer.
+           Same drawing, words and place as #menu-quit: last, full width, a
+           little further off, outlined. -->
+      <button id="dialog-quit" class="menu-quit" type="button" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M19 12H5m6-6-6 6 6 6" />
+        </svg>
+        <span id="dialog-quit-label">Tilbake til arkaden</span>
+      </button>
+      <!-- Only ever seen if the browser refuses to close its own window. -->
       <p class="pause-note" id="pause-note" hidden></p>
     </dialog>
 

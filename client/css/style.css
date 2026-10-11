@@ -357,29 +357,58 @@ input:focus {
    does not take their weight: Dive in and Join game are a choice between
    swimming alone and swimming with someone, and leaving is not a third of
    those. Same column, quieter colour, which is the hub's rule for a group
-   whose members are not peers. */
+   whose members are not peers.
+   And since 2026-10-11 it is ONE BUTTON IN EVERY CABINET (hub §2): last in
+   the column, the column's full width, a little more room above it than
+   between the rows it follows, and outlined rather than filled - leaving is
+   never the recommended action, so it never wears the lime. Sentence case,
+   the back arrow before the words. The same rule draws #menu-quit on the menu
+   screen and #dialog-quit at the foot of the panel. */
 .menu-tools {
   display: flex;
-  margin-top: 10px;
+  margin-top: 22px;
   max-width: var(--menu-col);
 }
 .menu-quit {
-  padding: 10px 16px;
-  border: 1px solid #83afa33d;
-  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 11px 16px;
+  border: 1px solid #83afa35c;
+  border-radius: 12px;
   background: transparent;
-  color: #b9ceca;
-  font-size: 11px;
+  color: #d7e7e0;
+  font-size: 13px;
   font-weight: 600;
-  letter-spacing: 0.6px;
+  letter-spacing: 0.2px;
 }
 .menu-quit:hover {
   color: #edf8ef;
   border-color: #83afa38f;
 }
+/* The global `button span` gap is for the arrows trailing the two doors;
+   here the drawing leads and the gap is the flex gap's. */
+.menu-quit span {
+  margin-left: 0;
+}
+.menu-quit svg {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+#dialog-quit {
+  margin-top: 18px;
+}
 /* [hidden] is only a presentation hint and loses to any rule that sets
-   `display`. Nothing here sets one on this button today, and stating it anyway
-   costs a line and survives whoever gives it a display later. */
+   `display` - which `.menu-quit` now does, so without this the way out would
+   appear on exactly the pages it is hidden from. */
 .menu-quit[hidden] {
   display: none;
 }
@@ -1476,7 +1505,7 @@ dialog:not([open]) {
   .panel .menu-tools {
     grid-column: 2;
     grid-row: 4;
-    margin-top: 8px;
+    margin-top: 14px;
   }
   /* Down to the height of the two doors above it: the last thirty pixels on a
      sideways phone are bought back from control heights, and a finger is still
@@ -1943,7 +1972,7 @@ a:focus-visible {
       max(24px, env(safe-area-inset-right));
     display: grid;
     grid-template-columns: 1fr 1fr;
-    grid-template-rows: auto auto auto auto auto auto;
+    grid-template-rows: auto auto auto auto auto auto auto;
     align-content: center;
     column-gap: 26px;
   }
@@ -1967,7 +1996,7 @@ a:focus-visible {
      stand side by side here, one row instead of two - they are the same kind
      of thing, a way back and a way out, so one equal pair is honest anyway. */
   #leave-dialog .quality-slot {
-    grid-area: 3 / 1 / 7 / 2;
+    grid-area: 3 / 1 / 8 / 2;
     margin-bottom: 0;
   }
   #sound-label {
@@ -1988,17 +2017,30 @@ a:focus-visible {
     min-height: 38px;
     padding: 6px 8px;
   }
+  /* Columns by flow rather than a fixed 1fr 1fr: on the menu screen's face
+     of this panel the step-out button is hidden and Back is the only action,
+     and a two-column template would leave it half a row wide beside a hole. */
   #leave-dialog .dialog-actions {
     grid-area: 6 / 2 / 7 / 3;
-    grid-template-columns: 1fr 1fr;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
     align-content: center;
   }
   #leave-dialog .dialog-actions button {
     min-width: 0;
     padding: 12px 10px;
   }
+  /* The way out of the game, last in the right column under the two
+     actions - the same place it takes in the stacked panel, one row further
+     down. The left column's quality rows span it too, which is what keeps the
+     two columns the same height. */
+  #dialog-quit {
+    grid-area: 7 / 2 / 8 / 3;
+    margin-top: 10px;
+    padding: 9px 14px;
+  }
   #pause-note {
-    grid-area: 7 / 1 / 8 / 3;
+    grid-area: 8 / 1 / 9 / 3;
   }
   /* The rows have the room for their notes here, where the stacked layout
      did not. */

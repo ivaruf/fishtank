@@ -543,9 +543,9 @@ const framed = () => {
   }
 };
 // The words on both of the doors, written once. There are two ways out of this
-// game - the button on the menu screen and #confirm-leave inside the panel -
-// and they are the same door reached from two places, so they must not be able
-// to say different things about where it goes. exit.js's verb() is the only
+// game - #menu-quit on the menu screen and #dialog-quit inside the panel - and
+// they are the same door reached from two places, so they must not be able to
+// say different things about where it goes. exit.js's verb() is the only
 // thing that knows the answer; the fallback is reached only when exit.js is
 // missing outright.
 //
@@ -579,11 +579,35 @@ function quitGame(refused) {
   // exit.js existed at all.
   if (framed()) history.back();
 }
+// Is there somewhere to go back to? Asked once, because neither answer can
+// change under a running page: a frame does not unframe itself and a tab does
+// not install itself.
+//
+// ONLY WHEN THERE IS SOMEWHERE TO GO, which is not the same question as
+// whether quit() could do something: in a plain tab it could - the arcade is a
+// URL and a navigation always works - but somebody who typed this game's own
+// address did not come from the arcade and may never have heard of it. So: a
+// launcher behind us, or an installed window that can genuinely close.
+//
+// ASKED THROUGH framed()/standalone() AND NOT THROUGH exit.js's own offers(),
+// which says exactly this but is newer than both of them. The copy of exit.js
+// that answers may be OLDER than this code - it is fetched from ../../arcade/,
+// and a service worker on this shared origin can hand back a version cached
+// long before offers() was written - and a guard built on the new name fails
+// CLOSED there: the way out silently disappears, inside the arcade, where it
+// is the one control that matters. This cost maxgear a release.
+const exitOffered = (() => {
+  const exit = window.ArcadeExit;
+  return !!exit && (exit.framed() || exit.standalone());
+})();
 let leavePromptOpen = false;
-// The menu plate in the corner, and Escape, open this panel wherever you
-// are: on the menu, in the lobby, mid-round. One button always goes back to what you were
-// doing and the other always takes you one step out, and only their labels
-// change - so the corner means the same thing on all three screens.
+// The menu plate in the corner opens this panel wherever you are: on the
+// menu, in the lobby, mid-round. One button always goes back to what you were
+// doing; mid-session a second takes you one step out of the round or the
+// lobby, and the last one, #dialog-quit, takes you out of the game - so the
+// corner means the same thing on all three screens. Escape opens it too, but
+// only mid-session: on the menu screen Escape is the way out (onEscape,
+// below).
 function openGameMenu() {
   if (leavePromptOpen || portrait.matches) return;
   leavePromptOpen = true;
@@ -601,16 +625,17 @@ function openGameMenu() {
   // went plain: a panel is named for what it is.
   say("pause-tag", inRound && alone ? "pause.paused" : "pause.menu");
   say("continue", inRound ? "resume" : "back");
-  // On the menu there is no tank to leave, so the corner leaves the GAME - and
-  // what that means is exit.js's question, not ours, asked through exitWords()
-  // so this and the menu screen's own button cannot come to disagree. It says
-  // "back to arcade" for a framed game AND for an ordinary tab, because a tab
-  // has nowhere to close to but somewhere to go; only an installed window
-  // closes.
-  say(
-    "confirm-leave",
-    !state ? exitWords : inRound ? "leave.game" : "leave.lobby",
-  );
+  // On the menu screen there is no round or lobby to step out of, so the
+  // panel is Settings with a Back and nothing else. It used to wear the way
+  // out of the GAME here too, which put that door inside a second panel - and
+  // the way out belongs at the top level of a screen, never behind another
+  // layer (hub §2). The menu screen has its own #menu-quit for that.
+  $("confirm-leave").hidden = !state;
+  if (state) say("confirm-leave", inRound ? "leave.game" : "leave.lobby");
+  // Mid-session the way out of the game sits right here, last, rather than
+  // one screen further on behind "Leave game". Not offered on the menu
+  // screen's face of this panel, for the reason above.
+  $("dialog-quit").hidden = !(exitOffered && state);
   $("pause-note").hidden = true;
   $("leave-dialog").showModal();
 }
@@ -629,11 +654,56 @@ $("leave-dialog").addEventListener("cancel", (event) => {
   event.preventDefault();
   continueGame();
 });
-window.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && !event.repeat && !leavePromptOpen) {
-    event.preventDefault();
-    openGameMenu();
+// ESCAPE GOES ONE STEP BACK, and from the menu screen that step is the arcade
+// (hub §2). One handler for the whole game, so the key cannot mean two things
+// at once, in this order:
+//
+//   in a text field          leaves the field and nothing else. The name box
+//                            is on the menu screen, where Escape quits, and a
+//                            player dismissing an autocomplete must not find
+//                            themselves back in the arcade.
+//   the panel is up          closes it: Continue, the run carries on (or
+//                            resumes, where it was ours to pause). Handled here
+//                            rather than left to the dialog's own `cancel`,
+//                            because preventDefault() below is what stops the
+//                            same press reaching anything else - the `cancel`
+//                            listener stays for the close requests that are
+//                            not keys, such as Android's back gesture.
+//   the join panel is up     its Back.
+//   mid-session              opens the panel. Pausing is the host's call and
+//                            openGameMenu() only asks: alone in the water it
+//                            stops, with company it does not and says MENU.
+//   the menu screen          the same press as #menu-quit, and only when that
+//                            button is there to press. Without it there is
+//                            nowhere for Escape to go, so it does nothing.
+//
+// So Escape never throws a round away in one press: from a round it can only
+// ever open the menu, and the menu's own way out is a button.
+function onEscape() {
+  if (leavePromptOpen) {
+    continueGame();
+    return;
   }
+  if (!$("games").hidden) {
+    $("games-back").click();
+    return;
+  }
+  if (state) {
+    openGameMenu();
+    return;
+  }
+  const quit = $("menu-quit");
+  if (!quit.hidden && !quit.disabled) quit.click();
+}
+window.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape" || event.repeat) return;
+  event.preventDefault();
+  const typing = event.target.closest?.("input, textarea, [contenteditable]");
+  if (typing && typing.type !== "range") {
+    typing.blur();
+    return;
+  }
+  onEscape();
 });
 // Browsers consume Escape when releasing pointer lock, so an unlock during a
 // round is how Escape reaches the menu at all.
@@ -1045,12 +1115,32 @@ $("games-back").onclick = () => {
   closePanel();
 };
 $("game-menu").onclick = openGameMenu;
+// One step out of the round or the lobby and back to the menu screen. It is
+// only shown mid-session; the way out of the game is #dialog-quit, below it.
 $("confirm-leave").onclick = () => {
   audio.play("click");
-  // One step out of wherever you are: out of the round or the lobby and back
-  // to the menu, and out of the menu means out of the game.
   if (state) leave();
-  else
+};
+// The two doors out of the game, wired once: #menu-quit on the menu screen and
+// #dialog-quit at the foot of the panel. Labelled by exitWords() through say(),
+// so a language switch rewrites both, and written into their <span>s so the
+// back arrow beside the words survives it. Only when exitOffered (above).
+if (exitOffered) {
+  const menuQuit = $("menu-quit");
+  say("menu-quit-label", exitWords);
+  menuQuit.hidden = false;
+  menuQuit.onclick = () => {
+    audio.play("click");
+    quitGame(() => {
+      // There is no note line on this screen, so the button says it itself
+      // rather than leaving a control that looks like it did nothing.
+      say("menu-quit-label", "exit.yourself");
+      menuQuit.disabled = true;
+    });
+  };
+  say("dialog-quit-label", exitWords);
+  $("dialog-quit").onclick = () => {
+    audio.play("click");
     quitGame(() => {
       // The panel has a line of its own for this, and it is only worth writing
       // if the panel is still up to read it in.
@@ -1058,40 +1148,7 @@ $("confirm-leave").onclick = () => {
       say("pause-note", "exit.refused");
       $("pause-note").hidden = false;
     });
-};
-// The same door, on the screen the player lands on. Every other game in the
-// hub puts the way out there rather than behind the menu plate, and this one
-// had it two taps deep.
-//
-// ONLY WHEN THERE IS SOMEWHERE TO GO, which is not the same question as
-// whether quit() could do something: in a plain tab it could - the arcade is a
-// URL and a navigation always works - but somebody who typed this game's own
-// address did not come from the arcade and may never have heard of it. So: a
-// launcher behind us, or an installed window that can genuinely close.
-//
-// ASKED THROUGH framed()/standalone() AND NOT THROUGH exit.js's own offers(),
-// which says exactly this but is newer than both of them. The copy of exit.js
-// that answers may be OLDER than this code - it is fetched from ../../arcade/,
-// and a service worker on this shared origin can hand back a version cached
-// long before offers() was written - and a guard built on the new name fails
-// CLOSED there: the way out silently disappears, inside the arcade, where it
-// is the one control that matters. This cost maxgear a release.
-{
-  const exit = window.ArcadeExit;
-  if (exit && (exit.framed() || exit.standalone())) {
-    const button = $("menu-quit");
-    say(button, exitWords);
-    button.hidden = false;
-    button.onclick = () => {
-      audio.play("click");
-      quitGame(() => {
-        // There is no note line on this screen, so the button says it itself
-        // rather than leaving a control that looks like it did nothing.
-        say(button, "exit.yourself");
-        button.disabled = true;
-      });
-    };
-  }
+  };
 }
 // A new game means back to the lobby, not straight into another round: the
 // code is on screen there, the match length can change, and anyone watching
