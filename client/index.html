@@ -180,14 +180,14 @@
              every game in the hub, and a child who learns "top right makes it
              bigger" once should not have to learn it again in the next
              cabinet.
-             ON EVERY SCREEN, which is one of the two placements the hub
-             sanctions and the one this game can afford: nothing in this pill
-             belongs to a round, nothing in it is a setting of the game, and
-             nothing here comes and goes - so the corner means the same thing
-             on the menu, in the lobby and mid-round. The other shape gives the
-             corner up to the HUD in play and costs fullscreen once a round has
-             started; the stats sit under the wordmark on the left here, so
-             nothing is competing for this corner.
+             ON EVERY SCREEN, and nothing else up there - the hub's one shape
+             since 2026-10-11, which this game already had: the menu, the
+             lobby, mid-round and the end card all keep these three plates and
+             only these, so fullscreen is reachable mid-round and the corner
+             means the same thing everywhere. The stats sit under the wordmark
+             on the left and the roster bottom right, so nothing competes for
+             this corner, and there is no HUD pause pill or second speaker:
+             the menu plate is pause.
              The three glyphs are the hub's, to the path data, so a player
              crossing from one cabinet to the next is looking at the same
              object rather than a family resemblance. The colour, the plate and
@@ -375,6 +375,69 @@
         ><button id="join" class="secondary">
           <b data-i18n="menu.join">Bli med</b> <span>→</span>
         </button>
+      </div>
+      <!-- LANGUAGE, on the start screen itself and not only behind the three
+           bars (hub §2, 2026-10-11): the player who needs it most is the
+           stranger who cannot read the bokmål the game opened in, and the
+           owner could not find the row in two other cabinets when it lived
+           only in the menu. It sits above the way out, which stays last. The
+           same row as the panel's - js/i18n.js wires any [data-lang] in the
+           page and keeps both copies' aria-pressed in step - but the Union
+           Jack's clipPath ids are page-global, so this copy carries its own,
+           or the second flag would silently clip against the first. -->
+      <div class="menu-lang">
+        <div class="group-label" id="menu-language-label" data-i18n="language">
+          SPRÅK
+        </div>
+        <div
+          class="lang-row"
+          role="group"
+          aria-labelledby="menu-language-label"
+        >
+          <button
+            type="button"
+            class="lang-option"
+            data-lang="nb"
+            aria-pressed="true"
+            lang="nb"
+          >
+            <svg viewBox="0 0 22 16" aria-hidden="true">
+              <rect width="22" height="16" fill="#ba0c2f" />
+              <path d="M6 0h4v16H6zM0 6h22v4H0z" fill="#fff" />
+              <path d="M7 0h2v16H7zM0 7h22v2H0z" fill="#00205b" />
+            </svg>
+            Norsk
+          </button>
+          <button
+            type="button"
+            class="lang-option"
+            data-lang="en"
+            aria-pressed="false"
+            lang="en"
+          >
+            <svg viewBox="0 0 60 30" aria-hidden="true">
+              <clipPath id="fishtank-menu-uk-clip">
+                <path d="M0 0v30h60V0z" />
+              </clipPath>
+              <clipPath id="fishtank-menu-uk-diag">
+                <path d="M30 15h30v15zv15H0zH0V0zV0h30z" />
+              </clipPath>
+              <g clip-path="url(#fishtank-menu-uk-clip)">
+                <path d="M0 0v30h60V0z" fill="#012169" />
+                <path d="M0 0l60 30m0-30L0 30" stroke="#fff" stroke-width="6" />
+                <path
+                  d="M0 0l60 30m0-30L0 30"
+                  clip-path="url(#fishtank-menu-uk-diag)"
+                  stroke="#c8102e"
+                  stroke-width="4"
+                />
+                <path d="M30 0v30M0 15h60" stroke="#fff" stroke-width="10" />
+                <path d="M30 0v30M0 15h60" stroke="#c8102e" stroke-width="6" />
+              </g>
+            </svg>
+            English
+          </button>
+        </div>
       </div>
       <!-- The way out, on the screen the player actually lands on. It is the
            same door as #dialog-quit in the panel behind the three bars -
@@ -649,10 +712,10 @@
           />
         </label>
       </div>
-      <!-- LANGUAGE, in the panel behind the three bars, which is also the one
-           the start screen opens - so a stranger who cannot read the bokmål the
-           game opened in can find English before a round, and switch back
-           mid-round without anything pausing, restarting or closing. Two equal
+      <!-- LANGUAGE, in the panel behind the three bars as well as on the start
+           screen itself - so a stranger who cannot read the bokmål the game
+           opened in can find English before a round, and switch back mid-round
+           without anything pausing, restarting or closing. Two equal
            buttons, Norsk first, each with its flag and its own name written in
            its own language whatever the current one is, with `lang` so a
            screen reader says it right. The flags are the hub's drawing, copied
