@@ -626,16 +626,14 @@ function openGameMenu() {
   say("pause-tag", inRound && alone ? "pause.paused" : "pause.menu");
   say("continue", inRound ? "resume" : "back");
   // On the menu screen there is no round or lobby to step out of, so the
-  // panel is Settings with a Back and nothing else. It used to wear the way
-  // out of the GAME here too, which put that door inside a second panel - and
-  // the way out belongs at the top level of a screen, never behind another
-  // layer (hub §2). The menu screen has its own #menu-quit for that.
+  // panel is Settings with a Back and no "Leave game".
   $("confirm-leave").hidden = !state;
   if (state) say("confirm-leave", inRound ? "leave.game" : "leave.lobby");
-  // Mid-session the way out of the game sits right here, last, rather than
-  // one screen further on behind "Leave game". Not offered on the menu
-  // screen's face of this panel, for the reason above.
-  $("dialog-quit").hidden = !(exitOffered && state);
+  // The way out of the game sits right here, last, on BOTH faces of this
+  // panel. The corner's menu panel is top level wherever it is opened (hub
+  // §2, ratified 2026-10-11), so the Settings face over the menu screen
+  // carries it too, the same as every other cabinet's.
+  $("dialog-quit").hidden = !exitOffered;
   $("pause-note").hidden = true;
   $("leave-dialog").showModal();
 }
