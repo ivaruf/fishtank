@@ -16,7 +16,7 @@ One caveat with serving the repository directly: everything in it is served, `.g
 
 Type a name and pick which of the fourteen fish you want to be; the choice is remembered and the chosen fish swims large beside the menu — drag to turn it, scroll or pinch to look closer. Then **Play** to open a tank of your own, or **Join game** to go into someone else's.
 
-The game speaks bokmål by default and English on request: the **Language** row — on the start screen, above the way back to the arcade, and again in the menu behind the three bars — switches it live, mid-round included, and the choice is the arcade's own `arcade.lang.v1`, shared by every game in the hub. Every word is in `client/js/i18n.js`. Nothing a peer sends is ever a sentence — the host's world sends ids, species and numbers, and each device says them in its own language.
+The game speaks bokmål by default and English on request: the **Language** row in the menu behind the three bars switches it live, mid-round included, and the choice is the arcade's own `arcade.lang.v1`, shared by every game in the hub. Every word is in `client/js/i18n.js`. Nothing a peer sends is ever a sentence — the host's world sends ids, species and numbers, and each device says them in its own language.
 
 **Play** hosts, and hosting is the only way in: it lands you in the lobby with a code of three pictures — 🐟 🦆 🐝 ⛵ 🚗 🍕 🌲 ⭐ 🌙 🔑 🎩 ⚽ — shown with its words underneath and a Copy button. Start with nobody there and it is a solo run; share the code first and it is not. An empty tank _is_ a solo game, so there is no second code path for one, and unlike the local-only solo game this replaced, a friend can still arrive after you have started.
 

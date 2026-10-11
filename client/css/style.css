@@ -1501,31 +1501,11 @@ dialog:not([open]) {
      its cell, so an unplaced one would be dropped into column 1 - on top of
      the title art and the fish - rather than at the foot of the form where it
      belongs. Adding a row to a hand-cut grid means re-cutting it, and the
-     error line below moves down one to make room - which it did again when
-     the language row joined on 2026-10-11. */
-  /* The language row, re-cut in as its own row above the way out: the
-     caption and the two flags take row 4, the way out moves to 5 and the
-     error line to 6. Caption and buttons are both trimmed - the last thirty
-     pixels sideways come from control heights, and 38 is about where a finger
-     stops being comfortable. */
-  .panel .menu-lang {
-    grid-column: 2;
-    grid-row: 4;
-    width: 100%;
-    max-width: 340px;
-    margin-inline: auto;
-  }
-  .panel .menu-lang .group-label {
-    margin: 8px 0 5px;
-  }
-  .panel .menu-lang .lang-option {
-    min-height: 36px;
-    padding: 5px 8px;
-  }
+     error line below moves down one to make room. */
   .panel .menu-tools {
     grid-column: 2;
-    grid-row: 5;
-    margin-top: 10px;
+    grid-row: 4;
+    margin-top: 14px;
   }
   /* Down to the height of the two doors above it: the last thirty pixels on a
      sideways phone are bought back from control heights, and a finger is still
@@ -1537,7 +1517,7 @@ dialog:not([open]) {
   }
   .panel .error {
     grid-column: 2;
-    grid-row: 6;
+    grid-row: 5;
     /* `auto` on the sides, not 0: this row is centred with the rest of the
        form above it. */
     margin: 4px auto 0;
@@ -1896,25 +1876,10 @@ a:focus-visible {
    the bigger choice for being the longer word. The chosen one is lit the way
    a chosen graphics row is: the lime edge and the deeper water, with the
    pressed state carried by aria-pressed and not by colour alone. */
-/* The same row twice: once in the panel and once on the start screen, above
-   the way out (hub §2). One rule draws both; only their spacing differs. */
-.lang-row {
+#leave-dialog .lang-row {
   display: flex;
   gap: 8px;
-}
-#leave-dialog .lang-row {
   margin-bottom: 22px;
-}
-/* On the start screen it takes the form's one measure, like every other row
-   of that column, so its two buttons line up with the two doors above it. */
-.menu-lang {
-  max-width: var(--menu-col);
-}
-.menu-lang .group-label {
-  margin: 18px 0 8px;
-}
-.menu-lang .lang-option {
-  margin: 0;
 }
 .lang-option {
   flex: 1 1 0;
@@ -2119,15 +2084,13 @@ a:focus-visible {
   /* The panel covers the screen here, and the fish preview is underneath it:
      everything but the controls themselves is transparent to the pointer, so a
      drag on the water turns the fish. The name row is one of them - it carries
-     the die now, which is a button and has to be pressable, and so is the
-     language row, or its two flags would be pictures of buttons. */
+     the die now, which is a button and has to be pressable. */
   .panel {
     pointer-events: none;
   }
   .panel .name-row,
   .panel .species-strip,
   .panel .buttons,
-  .panel .menu-lang,
   .panel .menu-tools {
     pointer-events: auto;
   }
