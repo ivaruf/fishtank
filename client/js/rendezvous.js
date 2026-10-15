@@ -3,6 +3,7 @@ import {
   relaySignalling,
   hostOverWebRTC,
   joinOverWebRTC,
+  iceConfig,
 } from "./webrtc.js";
 // How two browsers find each other. The game itself never goes through any of
 // this: once a connection is up, peers talk directly and none of it is
@@ -20,8 +21,9 @@ import {
 //
 // A public broker is a real trade: it is a third party with no promises, it
 // sees room codes and connection metadata (never game data), and it offers no
-// TURN, so a minority of network situations will fail to connect at all.
-// Against that, it needs nothing running and nothing paid for.
+// TURN of its own we rely on — that comes from Cloudflare, with its own trade
+// written down at the top of webrtc.js. Against that, it needs nothing running
+// and nothing paid for.
 const PEERJS = {
   url: "https://cdn.jsdelivr.net/npm/peerjs@1.5.5/dist/peerjs.min.js",
   integrity:
@@ -132,7 +134,12 @@ export async function hostRendezvous(code, onPeer) {
   }
   try {
     const Peer = await loadBroker();
-    const peer = new Peer(brokerId(code));
+    // On this path the PeerJS connection IS the game connection, so it gets
+    // our TURN; left alone, PeerJS falls back on its own public relay. PeerJS
+    // reads this once, so a tank left open past the credentials' hour relays
+    // new guests no longer — direct ones are unaffected, and hosting again
+    // fixes it.
+    const peer = new Peer(brokerId(code), { config: await iceConfig() });
     await new Promise((resolve, reject) => {
       peer.on("open", resolve);
       peer.on("error", (error) =>
@@ -236,7 +243,8 @@ export async function joinRendezvous(code) {
     return { mode: "relay", channel, close: signalling.close };
   }
   const Peer = await loadBroker();
-  const peer = new Peer();
+  // Our TURN for the connection; see hostRendezvous.
+  const peer = new Peer({ config: await iceConfig() });
   await new Promise((resolve, reject) => {
     peer.on("open", resolve);
     peer.on("error", (error) =>

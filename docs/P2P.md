@@ -172,8 +172,8 @@ A public broker is a real trade, and worth stating plainly:
   started; games already connected are unaffected, because it carries no game
   traffic.
 - It sees room codes and connection metadata. It never sees game data.
-- It provides no TURN, so a minority of network situations - roughly the
-  usual tenth - will fail to connect at all, with no fallback.
+- It provides no TURN we rely on. Since 2026-10-15 the roughly one pair in
+  ten that cannot go direct is relayed by Cloudflare instead (below).
 - Its id space is shared with every other PeerJS app, so codes are namespaced
   `fishtank-v1-`, and a taken code is reported rather than silently failing.
   A code is three picture names joined by dashes — `fishtank-v1-boat-fish-star`
@@ -203,9 +203,15 @@ candidates trickling separately.
 The work order is done. Beyond it, the things that are genuinely hard rather than merely
 undone:
 
-- **No TURN.** Some pairs of networks will not connect, and there is no free
-  way around it. A relay costs bandwidth by the gigabyte, which is what this
-  whole exercise was avoiding.
+- **TURN through Cloudflare, and a third party for the pairs that need it.**
+  Credentials come an hour at a time from a small Worker
+  (`gopher-cloud-turn`) that holds the key, so no secret sits in this repo,
+  and they go to the PeerJS connection as well as the relay path's own. The
+  trade: Cloudflare sees the IP addresses of relayed players and how much
+  they send, never game data (it forwards ciphertext). The first 1,000 GB a
+  month are free and a game uses megabytes. If the Worker cannot be reached,
+  `webrtc.js` falls back to STUN alone and those few pairs fail as before.
+  `?relay` in the URL forces the relay, for testing it.
 - **The host must stay on the page.** The worker keeps the simulation running
   in a background tab, but a closed tab or a locked phone still ends the game
   for everyone. Host migration would need a full state handoff and fresh
